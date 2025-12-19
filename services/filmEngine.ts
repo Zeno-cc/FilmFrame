@@ -103,10 +103,15 @@ export const processImage = async (
       const holeCenter = borderSize * 0.5;
 
       // 5. 绘制齿孔 (Draw Holes)
+      // 确定圆角大小：基于用户设置
+      // 方孔: 0.15 (柯达风格，微圆角)
+      // 圆角: 0.50 (富士风格，半圆)
+      const roundingRatio = settings.holeType === 'rounded' ? 0.5 : 0.15;
+
       const drawSingleHole = (x: number, y: number, w: number, h: number) => {
         ctx.save();
         ctx.fillStyle = settings.holeColor;
-        drawRoundedRect(ctx, x, y, w, h, Math.min(w, h) * preset.holeRounding);
+        drawRoundedRect(ctx, x, y, w, h, Math.min(w, h) * roundingRatio);
         ctx.fill();
         
         // 微弱光影

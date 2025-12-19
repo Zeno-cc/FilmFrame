@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { FilmType, FilmSettings, ImageItem, FILM_PRESETS } from './types';
+import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType } from './types';
 import { processImage } from './services/filmEngine';
 
 declare const EXIF: any;
@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: FilmSettings = {
   textColor: '#ffcc00', // Matches Ultramax gold
   borderSize: 12,
   grainIntensity: 15,
+  holeType: 'square' // Default square for Kodak
 };
 
 const App: React.FC = () => {
@@ -47,11 +48,17 @@ const App: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 当品牌改变时，自动同步品牌主色调
+  // 当品牌改变时，自动同步品牌主色调和推荐的齿孔样式
   useEffect(() => {
     const preset = FILM_PRESETS[settings.brandText];
     if (preset) {
-      setSettings(prev => ({ ...prev, textColor: preset.brandColor }));
+      // 如果 preset.holeRounding 大于 0.4 (例如 Fuji 的 0.5), 则自动切换为 Rounded, 否则为 Square
+      const recommendedHoleType: HoleType = preset.holeRounding > 0.4 ? 'rounded' : 'square';
+      setSettings(prev => ({ 
+        ...prev, 
+        textColor: preset.brandColor,
+        holeType: recommendedHoleType
+      }));
     }
   }, [settings.brandText]);
 
@@ -201,6 +208,33 @@ const App: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            {/* 齿孔形状选择 */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-gray-400">齿孔形状</span>
+              <div className="grid grid-cols-2 bg-white/5 p-1 rounded-md border border-white/10">
+                <button
+                  onClick={() => setSettings({...settings, holeType: 'square'})}
+                  className={`text-xs py-1.5 rounded transition-all ${
+                    settings.holeType === 'square' 
+                    ? 'bg-amber-500 text-black font-bold shadow-sm' 
+                    : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  方孔 (Kodak)
+                </button>
+                <button
+                  onClick={() => setSettings({...settings, holeType: 'rounded'})}
+                  className={`text-xs py-1.5 rounded transition-all ${
+                    settings.holeType === 'rounded' 
+                    ? 'bg-amber-500 text-black font-bold shadow-sm' 
+                    : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  圆角 (Fuji)
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-[10px] text-gray-500 text-center">边框色</span>

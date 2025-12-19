@@ -23,6 +23,8 @@ export enum FilmType {
   ILFORD_HP5 = 'ILFORD HP5 PLUS'
 }
 
+export type HoleType = 'square' | 'rounded';
+
 export interface FilmSettings {
   brandText: FilmType;
   frameNumber: number;
@@ -33,6 +35,7 @@ export interface FilmSettings {
   textColor: string;
   borderSize: number;
   grainIntensity: number;
+  holeType: HoleType;
 }
 
 export interface ImageItem {
@@ -57,7 +60,7 @@ export interface FilmPreset {
 const BASE_KODAK: FilmPreset = {
   holeWidthRatio: 0.38,
   holeHeightRatio: 0.042,
-  holeRounding: 0.3,
+  holeRounding: 0.15, // 默认为较方的孔
   spacingRatio: 0.088,
   fontFamily: '"JetBrains Mono", monospace',
   fontWeight: 'bold',
@@ -68,7 +71,7 @@ const BASE_KODAK: FilmPreset = {
 const BASE_FUJI: FilmPreset = {
   holeWidthRatio: 0.36,
   holeHeightRatio: 0.040,
-  holeRounding: 0.45,
+  holeRounding: 0.5, // 默认为全圆角
   spacingRatio: 0.090,
   fontFamily: 'sans-serif',
   fontWeight: 'normal',
@@ -79,7 +82,7 @@ const BASE_FUJI: FilmPreset = {
 const BASE_BW: FilmPreset = {
   holeWidthRatio: 0.38,
   holeHeightRatio: 0.042,
-  holeRounding: 0.25,
+  holeRounding: 0.15,
   spacingRatio: 0.088,
   fontFamily: '"JetBrains Mono", monospace',
   fontWeight: 'bold',
@@ -103,7 +106,7 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
     brandColor: '#ffcc00', 
     fontFamily: 'Arial, "Helvetica Neue", sans-serif',
     fontWeight: '900', // 特粗
-    holeRounding: 0.25 
+    holeRounding: 0.15 
   }, 
   
   [FilmType.KODAK_COLORPLUS_200]: { ...BASE_KODAK, brandColor: '#a855f7' },
@@ -121,7 +124,7 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
   [FilmType.CINESTILL_800T]: { 
     holeWidthRatio: 0.39,
     holeHeightRatio: 0.043,
-    holeRounding: 0.4,
+    holeRounding: 0.2, // CineStill 也是类似 Kodak 的齿孔
     spacingRatio: 0.089,
     fontFamily: '"JetBrains Mono", monospace',
     fontWeight: 'bold',
@@ -131,7 +134,7 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
   [FilmType.ILFORD_HP5]: {
     holeWidthRatio: 0.37,
     holeHeightRatio: 0.041,
-    holeRounding: 0.2,
+    holeRounding: 0.15,
     spacingRatio: 0.087,
     fontFamily: 'sans-serif',
     fontWeight: 'bold',
