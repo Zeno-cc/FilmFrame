@@ -119,7 +119,8 @@ const drawGrain = (ctx: CanvasRenderingContext2D, width: number, height: number,
 
 
 /**
- * 模式 A: 处理单张图片 (保持不变)
+ * 模式 A: 处理单张图片
+ * 更新：强制每侧 8 个齿孔，且齿孔尺寸比例与长条模式一致。
  */
 export const processImage = async (
   imageSource: string,
@@ -163,38 +164,73 @@ export const processImage = async (
   // 颗粒
   drawGrain(ctx, canvas.width, canvas.height, settings.grainIntensity);
 
-  // 计算参数
-  const holeRatio = preset.holeWidthRatio;
-  const marginRatio = (1 - holeRatio) / 2; 
-  const outerCenterRatio = marginRatio / 2;
-  const innerCenterRatio = 1 - (marginRatio / 2);
+  // === 齿孔计算 (优化版: 固定8个，比例统一) ===
+  const TARGET_HOLE_COUNT = 8;
   
-  const holeW = isPortrait ? borderSize * holeRatio : canvas.width * preset.holeHeightRatio;
-  const holeH = isPortrait ? canvas.height * preset.holeHeightRatio : borderSize * holeRatio;
-  const holeCenter = borderSize * 0.5;
+  // 尺寸参考 generateFilmStrip: borderSize * 0.60
+  // holePerp: 垂直于胶片边缘的尺寸 (在边框内的深度)
+  // holePara: 平行于胶片边缘的尺寸 (沿长边的长度)
+  // 比例 0.74 保持“瘦长”的胶片孔风格
+  const holePerp = borderSize * 0.60; 
+  const holePara = holePerp * 0.74;
 
-  // 绘制齿孔
-  const spacingRatio = preset.spacingRatio;
+  let holeW, holeH; // W, H 是 Canvas 坐标系下的宽和高
+  let startPos, step;
+
   if (isPortrait) {
-    const spacing = canvas.height * spacingRatio;
-    const startY = (canvas.height % spacing) / 2 + (spacing - holeH) / 2;
-    for (let y = startY; y < canvas.height - holeH; y += spacing) {
-      drawHole(ctx, settings, holeCenter - holeW / 2, y, holeW, holeH, borderSize);
-      drawHole(ctx, settings, canvas.width - holeCenter - holeW / 2, y, holeW, holeH, borderSize);
+    // 竖图 = 竖向胶片条
+    // 齿孔在左右两侧，沿 Y 轴排列
+    holeW = holePerp; // 宽是深度
+    holeH = holePara; // 高是沿边长度
+    
+    const totalLen = canvas.height;
+    const pitch = totalLen / TARGET_HOLE_COUNT;
+    step = pitch;
+    
+    // 计算居中起始位置
+    const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeH;
+    startPos = (totalLen - totalSpan) / 2;
+
+    for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
+      const y = startPos + i * step;
+      // 左侧齿孔 (居中于左边框)
+      drawHole(ctx, settings, (borderSize - holeW) / 2, y, holeW, holeH, borderSize);
+      // 右侧齿孔 (居中于右边框)
+      drawHole(ctx, settings, canvas.width - (borderSize + holeW) / 2, y, holeW, holeH, borderSize);
     }
   } else {
-    const spacing = canvas.width * spacingRatio;
-    const startX = (canvas.width % spacing) / 2 + (spacing - holeW) / 2;
-    for (let x = startX; x < canvas.width - holeW; x += spacing) {
-      drawHole(ctx, settings, x, holeCenter - holeH / 2, holeW, holeH, borderSize);
-      drawHole(ctx, settings, x, canvas.height - holeCenter - holeH / 2, holeW, holeH, borderSize);
+    // 横图 = 横向胶片条
+    // 齿孔在上下两侧，沿 X 轴排列
+    holeH = holePerp; // 高是深度
+    holeW = holePara; // 宽是沿边长度
+
+    const totalLen = canvas.width;
+    const pitch = totalLen / TARGET_HOLE_COUNT;
+    step = pitch;
+
+    const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeW;
+    startPos = (totalLen - totalSpan) / 2;
+
+    for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
+      const x = startPos + i * step;
+      // 顶部齿孔
+      drawHole(ctx, settings, x, (borderSize - holeH) / 2, holeW, holeH, borderSize);
+      // 底部齿孔
+      drawHole(ctx, settings, x, canvas.height - (borderSize + holeH) / 2, holeW, holeH, borderSize);
     }
   }
 
-  // 文字
+  // === 文字处理 ===
   ctx.fillStyle = settings.textColor;
   const isGC400 = settings.brandText.includes('GC 400');
-  const maxFontSizeRatio = marginRatio * 0.85; 
+  
+  // 文字大小计算需要适配新的齿孔大小 (0.60 borderSize)
+  // 剩余可用空间比以前小了 (以前是 ~0.38 hole)，所以稍微调整文字边距比例
+  const marginRatio = (1 - 0.60) / 2; // 0.2
+  const outerCenterRatio = marginRatio / 2; // 靠近边缘
+  const innerCenterRatio = 1 - (marginRatio / 2); // 靠近图片
+
+  const maxFontSizeRatio = marginRatio * 0.9; 
   let fontSizeRatio = isGC400 ? 0.25 : 0.22;
   if (fontSizeRatio > maxFontSizeRatio) fontSizeRatio = maxFontSizeRatio;
   
@@ -206,6 +242,7 @@ export const processImage = async (
   const brandText = settings.brandText;
 
   if (isPortrait) {
+      // 竖图文字旋转
       ctx.save();
       ctx.translate(borderSize * outerCenterRatio, canvas.height * 0.05);
       ctx.rotate(Math.PI / 2);
@@ -242,6 +279,7 @@ export const processImage = async (
         ctx.restore();
       }
   } else {
+      // 横图文字
       ctx.fillText(brandText, canvas.width * 0.05, borderSize * outerCenterRatio);
       if (isGC400) {
           const frameStr = `${settings.frameNumber}A`;
