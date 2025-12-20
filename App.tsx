@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType } from './types';
-import { processImage } from './services/filmEngine';
+import { processImage, generateFilmStrip } from './services/filmEngine';
 
 declare const EXIF: any;
 
@@ -12,8 +12,10 @@ const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" he
 const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
 const MaximizeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>;
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
+const GridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+const StripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>;
 
-// Brand new Film Logo Icon replacing the generic CameraIcon
+
 const FilmLogoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -29,30 +31,32 @@ const FilmLogoIcon = () => (
 );
 
 const DEFAULT_SETTINGS: FilmSettings = {
-  brandText: FilmType.KODAK_ULTRAMAX_400, // Default to Ultramax (GC 400)
+  brandText: FilmType.KODAK_ULTRAMAX_400,
   frameNumber: 1,
   showDate: true,
   dateStr: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
   borderColor: '#111111',
-  holeColor: '#ffffff', // Default to white holes (imitating light)
-  textColor: '#ffcc00', // Matches Ultramax gold
+  holeColor: '#ffffff',
+  textColor: '#ffcc00',
   borderSize: 12,
   grainIntensity: 15,
-  holeType: 'square' // Default square for Kodak
+  holeType: 'square'
 };
+
+type OutputMode = 'single' | 'strip';
 
 const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [settings, setSettings] = useState<FilmSettings>(DEFAULT_SETTINGS);
   const [processing, setProcessing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [outputMode, setOutputMode] = useState<OutputMode>('single');
+  const [stripResult, setStripResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 当品牌改变时，自动同步品牌主色调和推荐的齿孔样式
   useEffect(() => {
     const preset = FILM_PRESETS[settings.brandText];
     if (preset) {
-      // 如果 preset.holeRounding 大于 0.4 (例如 Fuji 的 0.5), 则自动切换为 Rounded, 否则为 Square
       const recommendedHoleType: HoleType = preset.holeRounding > 0.4 ? 'rounded' : 'square';
       setSettings(prev => ({ 
         ...prev, 
@@ -61,6 +65,11 @@ const App: React.FC = () => {
       }));
     }
   }, [settings.brandText]);
+
+  // 清除 Strip 结果当图片变化时
+  useEffect(() => {
+    setStripResult(null);
+  }, [images]);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -71,14 +80,12 @@ const App: React.FC = () => {
       const file = files[i];
       const previewUrl = URL.createObjectURL(file);
       
-      // 提取 EXIF 日期
       let exifDate = '';
       try {
         await new Promise((resolve) => {
           EXIF.getData(file, function(this: any) {
             const date = EXIF.getTag(this, "DateTimeOriginal");
             if (date) {
-              // 格式通常为 "YYYY:MM:DD HH:MM:SS" -> "YYYY/MM/DD"
               exifDate = date.split(' ')[0].replace(/:/g, '/');
             }
             resolve(null);
@@ -111,44 +118,58 @@ const App: React.FC = () => {
   const processAll = async () => {
     if (images.length === 0) return;
     setProcessing(true);
-    
-    const updatedImages = [...images];
-    for (let i = 0; i < updatedImages.length; i++) {
-      const item = updatedImages[i];
-      try {
-        const resultUrl = await processImage(
-          item.previewUrl, 
-          { ...settings, frameNumber: settings.frameNumber + i },
-          item.exifDate
-        );
-        updatedImages[i] = { ...item, processedUrl: resultUrl };
-      } catch (err) {
-        console.error('Processing failed for image', i, err);
+
+    try {
+      if (outputMode === 'strip') {
+        const url = await generateFilmStrip(images, settings);
+        setStripResult(url);
+      } else {
+        const updatedImages = [...images];
+        for (let i = 0; i < updatedImages.length; i++) {
+          const item = updatedImages[i];
+          try {
+            const resultUrl = await processImage(
+              item.previewUrl, 
+              { ...settings, frameNumber: settings.frameNumber + i },
+              item.exifDate
+            );
+            updatedImages[i] = { ...item, processedUrl: resultUrl };
+          } catch (err) {
+            console.error('Processing failed for image', i, err);
+          }
+        }
+        setImages(updatedImages);
       }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setProcessing(false);
     }
-    setImages(updatedImages);
-    setProcessing(false);
   };
 
   const downloadImage = (url: string, filename: string) => {
     const link = document.createElement('a');
     link.href = url;
-    link.download = `film_${filename}.png`;
+    link.download = filename;
     link.click();
   };
 
   const downloadAll = () => {
-    images.forEach((img, idx) => {
-      if (img.processedUrl) {
-        downloadImage(img.processedUrl, `${idx}_${img.file.name.split('.')[0]}`);
-      }
-    });
+    if (outputMode === 'strip') {
+      if (stripResult) downloadImage(stripResult, `film_strip_${Date.now()}.png`);
+    } else {
+      images.forEach((img, idx) => {
+        if (img.processedUrl) {
+          downloadImage(img.processedUrl, `film_${idx}_${img.file.name.split('.')[0]}.png`);
+        }
+      });
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a] text-gray-200">
       {/* Sidebar Settings */}
-      <aside className="w-full md:w-80 bg-[#121212] border-r border-white/10 p-6 flex flex-col gap-6 overflow-y-auto max-h-screen">
+      <aside className="w-full md:w-80 bg-[#121212] border-r border-white/10 p-6 flex flex-col gap-6 overflow-y-auto max-h-screen z-10">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
             <FilmLogoIcon />
@@ -157,6 +178,22 @@ const App: React.FC = () => {
             <h1 className="text-xl font-bold tracking-tight text-white">FilmFrame</h1>
             <p className="text-xs text-gray-500 uppercase tracking-widest">Master Edition</p>
           </div>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="bg-white/5 p-1 rounded-lg flex border border-white/10">
+          <button 
+            onClick={() => setOutputMode('single')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${outputMode === 'single' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
+          >
+            <GridIcon /> 单张卡片
+          </button>
+          <button 
+            onClick={() => setOutputMode('strip')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${outputMode === 'strip' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
+          >
+            <StripIcon /> 连底长条
+          </button>
         </div>
 
         <section className="space-y-4">
@@ -220,7 +257,7 @@ const App: React.FC = () => {
                     : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  方孔 (Kodak)
+                  方孔
                 </button>
                 <button
                   onClick={() => setSettings({...settings, holeType: 'rounded'})}
@@ -230,7 +267,7 @@ const App: React.FC = () => {
                     : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  圆角 (Fuji)
+                  圆角
                 </button>
               </div>
             </div>
@@ -294,33 +331,37 @@ const App: React.FC = () => {
                 <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
                 生成中...
               </>
-            ) : '应用至全部图片'}
+            ) : (outputMode === 'strip' ? '生成胶片长条' : '处理全部单张')}
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto bg-[#0a0a0a]">
         <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
           <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-white">工作室</h2>
-              <p className="text-sm text-gray-500">上传照片，自动添加复古齿孔边框。支持批量处理。</p>
+              <p className="text-sm text-gray-500">
+                {outputMode === 'strip' 
+                  ? '将多张照片拼接为连续的胶片印样 (Contact Sheet)。' 
+                  : '批量为每张照片添加独立的胶片边框。'}
+              </p>
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
-              {images.length > 0 && (
+              {(images.length > 0 && (outputMode === 'single' ? images.some(i => i.processedUrl) : stripResult)) && (
                 <button 
                   onClick={downloadAll}
                   className="flex-1 sm:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-sm transition-colors flex items-center justify-center gap-2"
                 >
-                  <DownloadIcon /> 打包下载
+                  <DownloadIcon /> {outputMode === 'strip' ? '下载长条大图' : '打包下载'}
                 </button>
               )}
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-md text-sm transition-all flex items-center justify-center gap-2"
               >
-                <PlusIcon /> 上传图片
+                <PlusIcon /> 添加图片
               </button>
             </div>
           </header>
@@ -348,68 +389,79 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {images.map((img, index) => (
-                <div key={img.id} className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all">
-                  <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
-                    <img 
-                      src={img.processedUrl || img.previewUrl} 
-                      alt="Preview" 
-                      className={`w-full h-full object-contain transition-opacity duration-300 ${processing ? 'opacity-40' : 'opacity-100'}`}
-                    />
-                    
-                    {/* Hover Actions */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                      {img.processedUrl && (
-                        <>
-                          <button 
-                            onClick={() => setPreviewImage(img.processedUrl!)}
-                            className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-                            title="全屏预览"
-                          >
-                            <MaximizeIcon />
+            <>
+              {outputMode === 'single' ? (
+                // GRID VIEW
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {images.map((img, index) => (
+                    <div key={img.id} className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all">
+                      <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
+                        <img 
+                          src={img.processedUrl || img.previewUrl} 
+                          alt="Preview" 
+                          className={`w-full h-full object-contain transition-opacity duration-300 ${processing ? 'opacity-40' : 'opacity-100'}`}
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                          {img.processedUrl && (
+                            <>
+                              <button onClick={() => setPreviewImage(img.processedUrl!)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
+                                <MaximizeIcon />
+                              </button>
+                              <button onClick={() => downloadImage(img.processedUrl!, img.file.name)} className="p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
+                                <DownloadIcon />
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => removeImage(img.id)} className="p-3 bg-red-500/20 hover:bg-red-500/40 rounded-full text-red-500 transition-colors">
+                            <TrashIcon />
                           </button>
-                          <button 
-                            onClick={() => downloadImage(img.processedUrl!, img.file.name)}
-                            className="p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors"
-                            title="下载"
-                          >
-                            <DownloadIcon />
-                          </button>
-                        </>
-                      )}
-                      <button 
-                        onClick={() => removeImage(img.id)}
-                        className="p-3 bg-red-500/20 hover:bg-red-500/40 rounded-full text-red-500 transition-colors"
-                        title="删除"
-                      >
-                        <TrashIcon />
-                      </button>
+                        </div>
+                      </div>
+                      <div className="p-3 flex items-center justify-between border-t border-white/5">
+                        <span className="text-xs font-medium text-gray-400 truncate max-w-[120px]">{img.file.name}</span>
+                        <span className="text-[10px] text-gray-600 mono uppercase">{img.exifDate ? img.exifDate : `NO EXIF`}</span>
+                      </div>
                     </div>
-
-                    {processing && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                  ))}
+                </div>
+              ) : (
+                // STRIP VIEW
+                <div className="w-full flex flex-col gap-4">
+                  <div className="w-full bg-[#181818] rounded-xl border border-white/5 p-4 overflow-x-auto min-h-[300px] flex items-center justify-center relative">
+                    {processing ? (
+                       <div className="flex flex-col items-center gap-2">
+                          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs text-gray-500">正在拼合胶片长条...</span>
+                       </div>
+                    ) : stripResult ? (
+                      <div className="relative group">
+                        <img src={stripResult} alt="Film Strip" className="max-h-[600px] shadow-2xl" />
+                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => setPreviewImage(stripResult)} className="p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><MaximizeIcon /></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-500">
+                        <StripIcon />
+                        <p className="mt-2 text-sm">点击左侧“生成胶片长条”按钮开始制作</p>
+                        <p className="text-xs opacity-50 mt-1">将按顺序拼接 {images.length} 张图片</p>
                       </div>
                     )}
                   </div>
                   
-                  <div className="p-3 flex items-center justify-between border-t border-white/5">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium text-gray-400 truncate max-w-[120px]">{img.file.name}</span>
-                      <span className="text-[10px] text-gray-600 mono uppercase">
-                        {img.exifDate ? `EXIF: ${img.exifDate}` : `NO EXIF DATA`}
-                      </span>
-                    </div>
-                    {img.processedUrl ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-500 font-bold uppercase tracking-wider">Processed</span>
-                    ) : (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-gray-500 font-bold uppercase tracking-wider">Pending</span>
-                    )}
+                  {/* Mini List to reorder or delete before strip gen */}
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {images.map((img, idx) => (
+                      <div key={img.id} className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-white/5 border border-white/10 group">
+                        <img src={img.previewUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                        <button onClick={() => removeImage(img.id)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
+                        <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 px-1 rounded text-white">{idx+1}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </main>
