@@ -14,6 +14,7 @@ const MaximizeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" he
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
 const GridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const StripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>;
+const GripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>;
 
 
 const FilmLogoIcon = () => (
@@ -53,6 +54,9 @@ const App: React.FC = () => {
   const [outputMode, setOutputMode] = useState<OutputMode>('single');
   const [stripResult, setStripResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag and drop refs
+  const dragItem = useRef<number | null>(null);
 
   useEffect(() => {
     const preset = FILM_PRESETS[settings.brandText];
@@ -164,6 +168,34 @@ const App: React.FC = () => {
         }
       });
     }
+  };
+
+  // --- Drag and Drop Handlers ---
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    dragItem.current = index;
+    // Set effect
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+     if (dragItem.current === null) return;
+     if (dragItem.current === index) return;
+
+     const newImages = [...images];
+     const draggedImage = newImages[dragItem.current];
+     newImages.splice(dragItem.current, 1);
+     newImages.splice(index, 0, draggedImage);
+     
+     dragItem.current = index;
+     setImages(newImages);
+  };
+
+  const handleDragEnd = () => {
+    dragItem.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necessary for onDrop/onDragEnter to work smoothly
   };
 
   return (
@@ -344,8 +376,8 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold text-white">工作室</h2>
               <p className="text-sm text-gray-500">
                 {outputMode === 'strip' 
-                  ? '将多张照片拼接为连续的胶片印样 (Contact Sheet)。' 
-                  : '批量为每张照片添加独立的胶片边框。'}
+                  ? '将多张照片拼接为连续的胶片印样 (Contact Sheet)。长按拖拽可调整叙事顺序。' 
+                  : '批量为每张照片添加独立的胶片边框。长按拖拽可调整处理顺序。'}
               </p>
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
@@ -394,13 +426,24 @@ const App: React.FC = () => {
                 // GRID VIEW
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {images.map((img, index) => (
-                    <div key={img.id} className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all">
+                    <div 
+                      key={img.id} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnter={(e) => handleDragEnter(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all cursor-move active:cursor-grabbing hover:shadow-xl hover:shadow-black/50"
+                    >
                       <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
                         <img 
                           src={img.processedUrl || img.previewUrl} 
                           alt="Preview" 
-                          className={`w-full h-full object-contain transition-opacity duration-300 ${processing ? 'opacity-40' : 'opacity-100'}`}
+                          className={`w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${processing ? 'opacity-40' : 'opacity-100'}`}
                         />
+                        <div className="absolute top-2 right-2 text-white/50 bg-black/50 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                          <GripIcon />
+                        </div>
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                           {img.processedUrl && (
                             <>
@@ -450,12 +493,23 @@ const App: React.FC = () => {
                   </div>
                   
                   {/* Mini List to reorder or delete before strip gen */}
-                  <div className="flex gap-4 overflow-x-auto pb-2">
+                  <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-1">
                     {images.map((img, idx) => (
-                      <div key={img.id} className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-white/5 border border-white/10 group">
-                        <img src={img.previewUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                      <div 
+                        key={img.id} 
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragEnter={(e) => handleDragEnter(e, idx)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-white/5 border border-white/10 group cursor-move hover:scale-105 transition-transform active:scale-95 shadow-md"
+                      >
+                        <img src={img.previewUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         <button onClick={() => removeImage(img.id)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
                         <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 px-1 rounded text-white">{idx+1}</span>
+                        <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-white drop-shadow-md">
+                           <GripIcon />
+                        </div>
                       </div>
                     ))}
                   </div>
