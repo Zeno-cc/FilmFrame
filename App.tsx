@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType } from './types';
+import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat } from './types';
 import { processImage, generateFilmStrip } from './services/filmEngine';
 
 declare const EXIF: any;
@@ -16,7 +16,7 @@ const GridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height
 const StripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>;
 const GripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>;
 const GithubIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>;
-const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
+const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4 4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
 
 const FilmLogoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -35,15 +35,18 @@ const FilmLogoIcon = () => (
 
 const DEFAULT_SETTINGS: FilmSettings = {
   brandText: FilmType.KODAK_ULTRAMAX_400,
+  customText: '', // Default empty
   frameNumber: 1,
-  showDate: true,
+  showDate: false,
   dateStr: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
   borderColor: '#111111',
   holeColor: '#ffffff',
   textColor: '#ffcc00',
   borderSize: 12,
   grainIntensity: 15,
-  holeType: 'square'
+  holeType: 'square',
+  outputFormat: 'image/jpeg', // Default to JPG for WeChat
+  outputQuality: 0.95
 };
 
 type OutputMode = 'single' | 'strip';
@@ -56,7 +59,6 @@ const App: React.FC = () => {
   const [outputMode, setOutputMode] = useState<OutputMode>('single');
   const [stripResult, setStripResult] = useState<string | null>(null);
   const [showDonate, setShowDonate] = useState(false);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag and drop refs
@@ -73,7 +75,7 @@ const App: React.FC = () => {
       }));
     }
   }, [settings.brandText]);
-  
+
   // 清除 Strip 结果当图片变化时
   useEffect(() => {
     setStripResult(null);
@@ -113,7 +115,7 @@ const App: React.FC = () => {
     setImages(prev => [...prev, ...newImages]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
-  
+
   const removeImage = (id: string) => {
     setImages(prev => {
       const target = prev.find(img => img.id === id);
@@ -158,17 +160,22 @@ const App: React.FC = () => {
   const downloadImage = (url: string, filename: string) => {
     const link = document.createElement('a');
     link.href = url;
-    link.download = filename;
+    // 根据输出格式决定后缀
+    const ext = settings.outputFormat === 'image/jpeg' ? 'jpg' : 'png';
+    // 移除原有后缀，添加新后缀
+    const baseName = filename.replace(/\.[^/.]+$/, "");
+    link.download = `${baseName}.${ext}`;
     link.click();
   };
 
   const downloadAll = () => {
+    const ext = settings.outputFormat === 'image/jpeg' ? 'jpg' : 'png';
     if (outputMode === 'strip') {
-      if (stripResult) downloadImage(stripResult, `film_strip_${Date.now()}.png`);
+      if (stripResult) downloadImage(stripResult, `film_strip_${Date.now()}.${ext}`);
     } else {
       images.forEach((img, idx) => {
         if (img.processedUrl) {
-          downloadImage(img.processedUrl, `film_${idx}_${img.file.name.split('.')[0]}.png`);
+          downloadImage(img.processedUrl, `film_${idx}_${img.file.name}`);
         }
       });
     }
@@ -286,6 +293,18 @@ const App: React.FC = () => {
               </select>
             </label>
 
+            {/* 新增：自定义文字 */}
+            <label className="block">
+              <span className="text-xs text-gray-400 mb-1 block">自定义文字 (可选, 覆盖胶片型号)</span>
+              <input 
+                type="text"
+                placeholder="例如: SHOT BY ZENO"
+                className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
+                value={settings.customText}
+                onChange={(e) => setSettings({...settings, customText: e.target.value})}
+              />
+            </label>
+
             <div className="grid grid-cols-2 gap-3">
               <label>
                 <span className="text-xs text-gray-400 mb-1 block">起始编号</span>
@@ -312,10 +331,45 @@ const App: React.FC = () => {
 
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-            视觉细节
+            视觉与输出
           </div>
 
           <div className="space-y-4">
+             {/* 新增：输出格式控制 */}
+             <div className="space-y-2">
+                <span className="text-xs text-gray-400">输出格式</span>
+                <div className="flex bg-white/5 p-1 rounded-md border border-white/10">
+                   <button
+                     onClick={() => setSettings({...settings, outputFormat: 'image/jpeg'})}
+                     className={`flex-1 text-xs py-1.5 rounded transition-all ${settings.outputFormat === 'image/jpeg' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500'}`}
+                   >
+                     JPG (推荐)
+                   </button>
+                   <button
+                     onClick={() => setSettings({...settings, outputFormat: 'image/png'})}
+                     className={`flex-1 text-xs py-1.5 rounded transition-all ${settings.outputFormat === 'image/png' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500'}`}
+                   >
+                     PNG (无损)
+                   </button>
+                </div>
+             </div>
+             
+             {settings.outputFormat === 'image/jpeg' && (
+                <label className="block">
+                  <div className="flex justify-between text-xs text-gray-400 mb-2">
+                    <span>JPG 质量</span>
+                    <span>{Math.round(settings.outputQuality * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0.5" max="1" step="0.05" 
+                    value={settings.outputQuality} 
+                    onChange={e => setSettings({...settings, outputQuality: parseFloat(e.target.value)})} 
+                    className="w-full accent-amber-500" 
+                  />
+                </label>
+             )}
+
+
             {/* 齿孔形状选择 */}
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-gray-400">齿孔形状</span>
@@ -603,7 +657,7 @@ const App: React.FC = () => {
 
              <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden min-h-[250px]">
                 <img 
-                  src={`/alipay.jpg?v=${Date.now()}`} 
+                  src="/alipay.jpg" 
                   alt="Donation QR Code" 
                   className="w-full h-auto rounded-lg object-contain max-h-[400px]" 
                 />

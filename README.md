@@ -128,14 +128,6 @@ npm run build
 - **Vercel**: 项目根目录包含标准构建脚本，直接导入 Git 仓库即可。
 - **Netlify**: 已包含 `netlify.toml`，处理了 SPA 重定向与构建命令。
 
-## ☕ 打赏 (Sponsor)
-
-如果觉得这个工具对你有帮助，欢迎请作者喝一杯奶茶 🥤
-
-<div align="center">
-  <img src="public/alipay.jpg" width="300" alt="Alipay QR Code">
-</div>
-
 ## 📝 许可证 (License)
 
 MIT License. 欢迎 Fork 和 Star！
@@ -143,4 +135,3 @@ MIT License. 欢迎 Fork 和 Star！
 ---
 
 <p align="center">Made with ❤️ by Photographers, for Photographers.</p>
-

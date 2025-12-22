@@ -24,9 +24,11 @@ export enum FilmType {
 }
 
 export type HoleType = 'square' | 'rounded';
+export type OutputFormat = 'image/png' | 'image/jpeg';
 
 export interface FilmSettings {
   brandText: FilmType;
+  customText: string; // 新增：自定义文字
   frameNumber: number;
   showDate: boolean;
   dateStr: string;
@@ -36,6 +38,8 @@ export interface FilmSettings {
   borderSize: number;
   grainIntensity: number;
   holeType: HoleType;
+  outputFormat: OutputFormat; // 新增：输出格式
+  outputQuality: number;      // 新增：输出质量 (0.1 - 1.0)
 }
 
 export interface ImageItem {

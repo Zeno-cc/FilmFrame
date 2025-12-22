@@ -1,4 +1,3 @@
-
 import { FilmSettings, FILM_PRESETS, ImageItem } from '../types';
 
 /**
@@ -99,28 +98,97 @@ const drawHole = (
   ctx.restore();
 };
 
+// 缓存噪点 Canvas，避免重复创建
+let cachedNoiseCanvas: HTMLCanvasElement | null = null;
+
 /**
- * 内部辅助：绘制颗粒
+ * 创建高斯噪点纹理 (256x256 小图)
+ * 相比于在主画布上逐像素操作，先生成小块纹理再平铺 (Pattern) 性能提升巨大。
+ * 优化：使用 Box-Muller 变换生成真实的高斯分布(正态分布)噪点，而非简单的 Uniform Noise。
  */
-const drawGrain = (ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number) => {
-  if (intensity <= 0) return;
-  ctx.save();
-  const grainCount = Math.floor((width * height * 0.025));
-  const safeGrainCount = Math.min(grainCount, 3000000); 
-  for (let i = 0; i < safeGrainCount; i++) {
-    const x = Math.random() * width;
-    const y = Math.random() * height;
-    const opacity = Math.random() * (intensity / 255);
-    ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-    ctx.fillRect(x, y, 1, 1);
+const getNoisePatternCanvas = (): HTMLCanvasElement => {
+  if (cachedNoiseCanvas) return cachedNoiseCanvas;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  
+  const imageData = ctx.createImageData(size, size);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    // Box-Muller 变换生成正态分布
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    
+    // 标准正态分布 N(0, 1)
+    const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    
+    // 调整到 0-255 范围，中心点为 128 (Overlay 混合模式的中性点)
+    // 30 是标准差，决定了噪点的对比度
+    let val = 128 + z * 30;
+    val = Math.max(0, Math.min(255, val));
+
+    data[i] = val;     // R
+    data[i+1] = val;   // G
+    data[i+2] = val;   // B
+    data[i+3] = 255;   // Alpha
   }
+  
+  ctx.putImageData(imageData, 0, 0);
+  cachedNoiseCanvas = canvas;
+  return canvas;
+};
+
+/**
+ * 内部辅助：绘制颗粒 (性能优化版)
+ * 使用 globalCompositeOperation = 'overlay' 配合 Pattern 填充
+ */
+const drawGrain = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, intensity: number) => {
+  if (intensity <= 0) return;
+  if (width <= 0 || height <= 0) return;
+
+  ctx.save();
+  
+  // 1. 限制绘制区域
+  ctx.beginPath();
+  ctx.rect(x, y, width, height);
+  ctx.clip();
+
+  // 2. 准备噪点纹理
+  const noiseCanvas = getNoisePatternCanvas();
+  const pattern = ctx.createPattern(noiseCanvas, 'repeat');
+
+  if (pattern) {
+    // 3. 设置混合模式
+    // 'overlay' 模式会根据底色叠加噪点，亮部更亮，暗部更暗，非常适合模拟胶片颗粒
+    // 同时也比逐像素计算快得多
+    ctx.globalCompositeOperation = 'overlay';
+    
+    // 4. 通过透明度控制强度
+    // 强度系数映射，让用户感知的 0-60 范围比较线性
+    ctx.globalAlpha = Math.min(1.0, (intensity / 100) * 2.0);
+    
+    ctx.fillStyle = pattern;
+    
+    // 随机偏移纹理原点，避免多张图的噪点模式完全一致
+    const offsetX = Math.random() * 256;
+    const offsetY = Math.random() * 256;
+    ctx.translate(offsetX, offsetY);
+    
+    // 绘制覆盖整个区域的矩形 (反向偏移回来以覆盖左上角)
+    ctx.fillRect(-offsetX, -offsetY, width + offsetX, height + offsetY); 
+  }
+
   ctx.restore();
 };
 
 
 /**
  * 模式 A: 处理单张图片
- * 更新：强制每侧 8 个齿孔，且齿孔尺寸比例与长条模式一致。
  */
 export const processImage = async (
   imageSource: string,
@@ -150,72 +218,62 @@ export const processImage = async (
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // 底色
+  // 1. 底色 (边框)
   ctx.fillStyle = settings.borderColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 图像
+  // 2. 绘制图像
+  let imgX = 0, imgY = 0, imgW = img.width, imgH = img.height;
   if (isPortrait) {
-    ctx.drawImage(img, borderSize, 0, img.width, img.height);
+    imgX = borderSize;
+    imgY = 0;
   } else {
-    ctx.drawImage(img, 0, borderSize, img.width, img.height);
+    imgX = 0;
+    imgY = borderSize;
   }
+  ctx.drawImage(img, imgX, imgY, imgW, imgH);
 
-  // 颗粒
-  drawGrain(ctx, canvas.width, canvas.height, settings.grainIntensity);
+  // 3. 施加颗粒 (使用优化后的叠加算法)
+  drawGrain(ctx, imgX, imgY, imgW, imgH, settings.grainIntensity);
 
-  // === 齿孔计算 (优化版: 固定8个，比例统一) ===
+  // === 齿孔计算 ===
   const TARGET_HOLE_COUNT = 8;
-  
-  // 尺寸参考 generateFilmStrip: borderSize * 0.60
-  // holePerp: 垂直于胶片边缘的尺寸 (在边框内的深度)
-  // holePara: 平行于胶片边缘的尺寸 (沿长边的长度)
-  // 比例 0.74 保持“瘦长”的胶片孔风格
   const holePerp = borderSize * 0.60; 
   const holePara = holePerp * 0.74;
 
-  let holeW, holeH; // W, H 是 Canvas 坐标系下的宽和高
+  let holeW, holeH; 
   let startPos, step;
 
   if (isPortrait) {
-    // 竖图 = 竖向胶片条
-    // 齿孔在左右两侧，沿 Y 轴排列
-    holeW = holePerp; // 宽是深度
-    holeH = holePara; // 高是沿边长度
+    // 竖图
+    holeW = holePerp; 
+    holeH = holePara; 
     
     const totalLen = canvas.height;
     const pitch = totalLen / TARGET_HOLE_COUNT;
     step = pitch;
-    
-    // 计算居中起始位置
     const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeH;
     startPos = (totalLen - totalSpan) / 2;
 
     for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
       const y = startPos + i * step;
-      // 左侧齿孔 (居中于左边框)
       drawHole(ctx, settings, (borderSize - holeW) / 2, y, holeW, holeH, borderSize);
-      // 右侧齿孔 (居中于右边框)
       drawHole(ctx, settings, canvas.width - (borderSize + holeW) / 2, y, holeW, holeH, borderSize);
     }
   } else {
-    // 横图 = 横向胶片条
-    // 齿孔在上下两侧，沿 X 轴排列
-    holeH = holePerp; // 高是深度
-    holeW = holePara; // 宽是沿边长度
+    // 横图
+    holeH = holePerp; 
+    holeW = holePara; 
 
     const totalLen = canvas.width;
     const pitch = totalLen / TARGET_HOLE_COUNT;
     step = pitch;
-
     const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeW;
     startPos = (totalLen - totalSpan) / 2;
 
     for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
       const x = startPos + i * step;
-      // 顶部齿孔
       drawHole(ctx, settings, x, (borderSize - holeH) / 2, holeW, holeH, borderSize);
-      // 底部齿孔
       drawHole(ctx, settings, x, canvas.height - (borderSize + holeH) / 2, holeW, holeH, borderSize);
     }
   }
@@ -224,11 +282,9 @@ export const processImage = async (
   ctx.fillStyle = settings.textColor;
   const isGC400 = settings.brandText.includes('GC 400');
   
-  // 文字大小计算需要适配新的齿孔大小 (0.60 borderSize)
-  // 剩余可用空间比以前小了 (以前是 ~0.38 hole)，所以稍微调整文字边距比例
-  const marginRatio = (1 - 0.60) / 2; // 0.2
-  const outerCenterRatio = marginRatio / 2; // 靠近边缘
-  const innerCenterRatio = 1 - (marginRatio / 2); // 靠近图片
+  const marginRatio = (1 - 0.60) / 2; 
+  const outerCenterRatio = marginRatio / 2; 
+  const innerCenterRatio = 1 - (marginRatio / 2); 
 
   const maxFontSizeRatio = marginRatio * 0.9; 
   let fontSizeRatio = isGC400 ? 0.25 : 0.22;
@@ -239,10 +295,11 @@ export const processImage = async (
   ctx.textBaseline = 'middle';
   
   const finalDateStr = dateOverride || settings.dateStr;
-  const brandText = settings.brandText;
+  
+  const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
 
   if (isPortrait) {
-      // 竖图文字旋转
+      // 竖图文字
       ctx.save();
       ctx.translate(borderSize * outerCenterRatio, canvas.height * 0.05);
       ctx.rotate(Math.PI / 2);
@@ -299,12 +356,16 @@ export const processImage = async (
   }
 
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(URL.createObjectURL(blob!)), 'image/png');
+    canvas.toBlob(
+        (blob) => resolve(URL.createObjectURL(blob!)), 
+        settings.outputFormat, 
+        settings.outputQuality
+    );
   });
 };
 
 /**
- * 模式 B: 生成胶片长条 (Film Strip) - 物理仿真版 + 多行折行支持
+ * 模式 B: 生成胶片长条 (Film Strip)
  */
 export const generateFilmStrip = async (
   images: ImageItem[],
@@ -315,85 +376,87 @@ export const generateFilmStrip = async (
   const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
   
   // === 1. 物理几何常量 ===
-  const MAX_PER_ROW = 6; // 每行最多 6 张
+  const MAX_PER_ROW = 6; 
   const STRIP_HEIGHT_PX = 1600; 
-  const ROW_GAP = 120; // 行与行之间的间距
+  const ROW_GAP = 120; 
   
-  const BORDER_RATIO = 0.16; // 16% 边框 (上下各 256px)
+  const BORDER_RATIO = 0.16;
   const borderSize = Math.floor(STRIP_HEIGHT_PX * BORDER_RATIO); 
   const imageAreaHeight = STRIP_HEIGHT_PX - (borderSize * 2);
 
-  // 底片框 (Frame) 的标准尺寸 3:2
   const FRAME_WIDTH = imageAreaHeight * 1.5; 
   const FRAME_GAP = FRAME_WIDTH * 0.055;
 
   // === 2. 计算画布总尺寸 ===
   const totalImages = images.length;
   const numRows = Math.ceil(totalImages / MAX_PER_ROW);
-  // 计算第一行（也是最宽的一行）有多少张图，以此确定总宽度
   const colsInMaxRow = Math.min(totalImages, MAX_PER_ROW);
   
   const START_GAP = FRAME_WIDTH * 0.2;
   const END_GAP = FRAME_WIDTH * 0.2;
   
-  // 按照最宽行的标准计算 Total Width，这样所有行宽度一致，显得整齐
   const totalWidth = START_GAP + (FRAME_WIDTH * colsInMaxRow) + (FRAME_GAP * (Math.max(0, colsInMaxRow - 1))) + END_GAP;
   const totalHeight = (numRows * STRIP_HEIGHT_PX) + ((numRows - 1) * ROW_GAP);
-
-  const loadedImages = await Promise.all(images.map(item => loadImage(item.previewUrl)));
 
   const canvas = document.createElement('canvas');
   canvas.width = totalWidth;
   canvas.height = totalHeight;
-  const ctx = canvas.getContext('2d', { alpha: true }); // alpha true 允许行间距透明
+  const ctx = canvas.getContext('2d', { alpha: true }); 
   if (!ctx) throw new Error("Canvas init failed");
 
-  // === 3. 逐行绘制 ===
+  // === 3. 逐行绘制 (优化：串行加载图片以节省内存) ===
   for (let row = 0; row < numRows; row++) {
     const rowOffsetY = row * (STRIP_HEIGHT_PX + ROW_GAP);
-    const rowImages = loadedImages.slice(row * MAX_PER_ROW, (row + 1) * MAX_PER_ROW);
-    const rowImageItems = images.slice(row * MAX_PER_ROW, (row + 1) * MAX_PER_ROW);
     const startGlobalIdx = row * MAX_PER_ROW;
-
-    // 3.1 绘制这一行的黑色底片背景 (占满整行宽度，保持整齐)
+    const endGlobalIdx = Math.min(startGlobalIdx + MAX_PER_ROW, totalImages);
+    
+    // 3.1 绘制该行的底色
     ctx.fillStyle = settings.borderColor;
     ctx.fillRect(0, rowOffsetY, totalWidth, STRIP_HEIGHT_PX);
 
-    // 3.2 绘制图像
-    rowImages.forEach((img, idx) => {
-      const frameX = START_GAP + idx * (FRAME_WIDTH + FRAME_GAP);
-      const frameY = rowOffsetY + borderSize; // 加上行的 Y 偏移
-      const isPortrait = img.height > img.width;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(frameX, frameY, FRAME_WIDTH, imageAreaHeight);
-      ctx.clip();
-
-      if (isPortrait) {
-        const centerX = frameX + FRAME_WIDTH / 2;
-        const centerY = frameY + imageAreaHeight / 2;
-        ctx.translate(centerX, centerY);
-        ctx.rotate(-Math.PI / 2);
+    // 3.2 串行处理该行每一张图片
+    for (let i = 0; i < (endGlobalIdx - startGlobalIdx); i++) {
+        const globalIdx = startGlobalIdx + i;
+        const imgItem = images[globalIdx];
         
-        const scale = Math.max(FRAME_WIDTH / img.height, imageAreaHeight / img.width);
-        ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
-      } else {
-        const scale = Math.max(FRAME_WIDTH / img.width, imageAreaHeight / img.height);
-        const drawW = img.width * scale;
-        const drawH = img.height * scale;
-        ctx.drawImage(img, frameX + (FRAME_WIDTH - drawW) / 2, frameY + (imageAreaHeight - drawH) / 2, drawW, drawH);
-      }
-      ctx.restore();
-    });
+        // 关键内存优化：每次只加载一张大图，画完立即释放引用
+        // 之前 Promise.all 会同时将所有大图加载进内存
+        const img = await loadImage(imgItem.previewUrl);
 
-    // 3.3 绘制齿孔
-    // 参数配置 (与之前保持一致：大孔、近距)
+        const frameX = START_GAP + i * (FRAME_WIDTH + FRAME_GAP);
+        const frameY = rowOffsetY + borderSize;
+        const isPortrait = img.height > img.width;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(frameX, frameY, FRAME_WIDTH, imageAreaHeight);
+        ctx.clip();
+
+        if (isPortrait) {
+            const centerX = frameX + FRAME_WIDTH / 2;
+            const centerY = frameY + imageAreaHeight / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(-Math.PI / 2);
+            
+            const scale = Math.max(FRAME_WIDTH / img.height, imageAreaHeight / img.width);
+            ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+            const scale = Math.max(FRAME_WIDTH / img.width, imageAreaHeight / img.height);
+            const drawW = img.width * scale;
+            const drawH = img.height * scale;
+            ctx.drawImage(img, frameX + (FRAME_WIDTH - drawW) / 2, frameY + (imageAreaHeight - drawH) / 2, drawW, drawH);
+        }
+        ctx.restore();
+
+        // 施加颗粒 (使用优化后的算法)
+        drawGrain(ctx, frameX, frameY, FRAME_WIDTH, imageAreaHeight, settings.grainIntensity);
+    }
+
+    // 3.3 绘制齿孔 (与图片加载无关，可以批量绘制)
     const holeH = borderSize * 0.60; 
     const holeW = holeH * 0.74; 
     const holePaddingFromImage = borderSize * 0.04; 
     
-    // 注意：Y 坐标需要加上 rowOffsetY
     const holeYTopLocal = borderSize - holeH - holePaddingFromImage;
     const holeYBottomLocal = (STRIP_HEIGHT_PX - borderSize) + holePaddingFromImage;
     
@@ -405,8 +468,8 @@ export const generateFilmStrip = async (
     const holeStartX = START_GAP - (pitch * 0.5);
     const numHoles = Math.ceil((totalWidth - holeStartX) / pitch) + 1;
 
-    for (let i = 0; i < numHoles; i++) {
-      const x = holeStartX + i * pitch;
+    for (let k = 0; k < numHoles; k++) {
+      const x = holeStartX + k * pitch;
       if (x > -holeW && x < totalWidth) {
         drawHole(ctx, settings, x, holeYTop, holeW, holeH, borderSize);
         drawHole(ctx, settings, x, holeYBottom, holeW, holeH, borderSize);
@@ -414,7 +477,6 @@ export const generateFilmStrip = async (
     }
 
     // 3.4 绘制文字
-    // 文字 Y 坐标也需要加上 rowOffsetY
     const textYTop = rowOffsetY + (holeYTopLocal / 2);
     const textYBottom = rowOffsetY + (holeYBottomLocal + holeH) + (STRIP_HEIGHT_PX - (holeYBottomLocal + holeH)) / 2;
 
@@ -425,12 +487,15 @@ export const generateFilmStrip = async (
     ctx.fillStyle = settings.textColor;
     ctx.textBaseline = 'middle';
 
-    rowImageItems.forEach((item, idx) => {
+    const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
+
+    // 重新遍历该行的数据绘制文字
+    const rowImages = images.slice(startGlobalIdx, endGlobalIdx);
+    rowImages.forEach((item, idx) => {
       const frameX = START_GAP + idx * (FRAME_WIDTH + FRAME_GAP);
       const globalIdx = startGlobalIdx + idx;
       const frameNum = settings.frameNumber + globalIdx;
       const dateStr = item.exifDate || settings.dateStr;
-      const brandText = settings.brandText;
 
       const paddingX = FRAME_WIDTH * 0.02;
 
@@ -463,10 +528,11 @@ export const generateFilmStrip = async (
     });
   }
 
-  // === 4. 全局颗粒 (一次性覆盖全图) ===
-  drawGrain(ctx, totalWidth, totalHeight, settings.grainIntensity);
-
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(URL.createObjectURL(blob!)), 'image/png');
+    canvas.toBlob(
+      (blob) => resolve(URL.createObjectURL(blob!)), 
+      settings.outputFormat, 
+      settings.outputQuality
+    );
   });
 };
