@@ -19,18 +19,34 @@ const GithubIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4 4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
 
 const FilmLogoIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="18" height="18" x="3" y="3" rx="2" />
-    <path d="M7 3v18" />
-    <path d="M3 7.5h4" />
-    <path d="M3 12h4" />
-    <path d="M3 16.5h4" />
-    <path d="M17 3v18" />
-    <path d="M17 7.5h4" />
-    <path d="M17 12h4" />
-    <path d="M17 16.5h4" />
+  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="film-gradient" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#fbbf24" />
+        <stop offset="1" stopColor="#b45309" />
+      </linearGradient>
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+    {/* Outer Frame with Rounded Corners */}
+    <rect x="2" y="2" width="28" height="28" rx="6" fill="url(#film-gradient)" className="drop-shadow-lg" />
+    
+    {/* Inner Cutout (The Frame) */}
+    <rect x="8" y="8" width="16" height="16" rx="1" fill="#121212" />
+    
+    {/* Sprocket Holes Left */}
+    <rect x="4.5" y="10" width="2" height="3" rx="0.5" fill="#121212" />
+    <rect x="4.5" y="19" width="2" height="3" rx="0.5" fill="#121212" />
+    
+    {/* Sprocket Holes Right */}
+    <rect x="25.5" y="10" width="2" height="3" rx="0.5" fill="#121212" />
+    <rect x="25.5" y="19" width="2" height="3" rx="0.5" fill="#121212" />
+    
+    {/* Gloss/Highlight overlay for glass effect */}
+    <path d="M2 8C2 4.68629 4.68629 2 8 2H24C27.3137 2 30 4.68629 30 8V14L2 10V8Z" fill="white" fillOpacity="0.1" />
   </svg>
-  
 );
 
 const DEFAULT_SETTINGS: FilmSettings = {
@@ -214,12 +230,12 @@ const App: React.FC = () => {
       {/* Sidebar Settings */}
       <aside className="w-full md:w-80 bg-[#121212] border-r border-white/10 p-6 flex flex-col gap-6 overflow-y-auto max-h-screen z-10">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
+          <div className="flex-shrink-0 transition-transform hover:scale-105">
             <FilmLogoIcon />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">FilmFrame</h1>
-            <p className="text-xs text-gray-500 uppercase tracking-widest">Master Edition</p>
+            <h1 className="text-xl font-bold tracking-tight text-white leading-none">FilmFrame</h1>
+            <p className="text-[10px] text-amber-500 font-medium tracking-[0.2em] mt-1 uppercase opacity-90">Digital Darkroom</p>
           </div>
         </div>
 
