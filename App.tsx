@@ -2,8 +2,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat } from './types';
 import { processImage, generateFilmStrip } from './services/filmEngine';
-
-declare const EXIF: any;
+// Security Fix: Import EXIF from local dependency instead of external CDN
+import EXIF from 'exif-js';
 
 // --- Icons ---
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
@@ -104,12 +104,24 @@ const App: React.FC = () => {
     const newImages: ImageItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+
+      // Security Fix 2: Validate file type and size to prevent DoS or malicious content
+      // Limit size to 50MB
+      if (file.size > 50 * 1024 * 1024) {
+        alert(`文件 "${file.name}" 过大 (超过 50MB)，已跳过。`);
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert(`文件 "${file.name}" 格式不支持，请上传图片文件。`);
+        continue;
+      }
+
       const previewUrl = URL.createObjectURL(file);
       
       let exifDate = '';
       try {
         await new Promise((resolve) => {
-          EXIF.getData(file, function(this: any) {
+          EXIF.getData(file as any, function(this: any) {
             const date = EXIF.getTag(this, "DateTimeOriginal");
             if (date) {
               exifDate = date.split(' ')[0].replace(/:/g, '/');
@@ -168,6 +180,7 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
+      alert('处理过程中发生错误，可能是图片文件损坏或内存不足。');
     } finally {
       setProcessing(false);
     }
@@ -178,9 +191,12 @@ const App: React.FC = () => {
     link.href = url;
     // 根据输出格式决定后缀
     const ext = settings.outputFormat === 'image/jpeg' ? 'jpg' : 'png';
-    // 移除原有后缀，添加新后缀
+    // Security Fix 4: Sanitize filename to prevent path traversal or confusing names
+    // Only allow alphanumeric characters, underscores, hyphens, and Chinese characters
     const baseName = filename.replace(/\.[^/.]+$/, "");
-    link.download = `${baseName}.${ext}`;
+    const safeBaseName = baseName.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_');
+    
+    link.download = `${safeBaseName}.${ext}`;
     link.click();
   };
 

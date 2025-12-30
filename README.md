@@ -1,137 +1,117 @@
 
 <div align="center">
   <br />
-  <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <rect width="18" height="18" x="3" y="3" rx="2" />
-    <path d="M7 3v18" />
-    <path d="M3 7.5h4" />
-    <path d="M3 12h4" />
-    <path d="M3 16.5h4" />
-    <path d="M17 3v18" />
-    <path d="M17 7.5h4" />
-    <path d="M17 12h4" />
-    <path d="M17 16.5h4" />
+  <!-- 使用应用中的胶片 Logo 概念 -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 32 32">
+    <defs>
+      <linearGradient id="g" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#b45309"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#g)" d="M6 2C3.79 2 2 3.79 2 6v20c0 2.21 1.79 4 4 4h20c2.21 0 4-1.79 4-4V6c0-2.21-1.79-4-4-4H6zm0 4h20c.55 0 1 .45 1 1v18c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1zm3 3v14h14V9H9zm-4 2v2h2v-2H5zm22 0v2h2v-2h-2zm-22 8v2h2v-2H5zm22 0v2h2v-2h-2z"/>
   </svg>
   
-  <h1 align="center">Film Frame Maker</h1>
-  <p align="center"><strong>胶片齿孔生成器 (Master Edition)</strong></p>
+  <h1 align="center">FilmFrame</h1>
+  <p align="center"><strong>胶片齿孔生成器 (Digital Darkroom)</strong></p>
   
   <p align="center">
-    为你的数码照片自动添加复古胶片边框、齿孔与 EXIF 时间戳。<br />
-    支持<strong>连底长条印样 (Contact Sheet)</strong>、<strong>拖拽排序</strong>与<strong>批量处理</strong>。
+    一个优雅的浏览器端工具，为您的照片添加复古胶片边框、真实齿孔与 EXIF 时间戳。<br />
+    支持<strong>连底长条印样 (Contact Sheet)</strong>、<strong>自定义文字</strong>与<strong>批量无损处理</strong>。
   </p>
 
   <p align="center">
-    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-blue?logo=react" alt="React"></a>
+    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-blue?logo=react" alt="React"></a>
     <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript" alt="TypeScript"></a>
     <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-Fast-646CFF?logo=vite" alt="Vite"></a>
     <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?logo=tailwindcss" alt="Tailwind"></a>
+    <img src="https://img.shields.io/badge/Privacy-Local_Only-green" alt="Privacy">
   </p>
   <br />
 </div>
 
 ---
 
-## ✨ 项目简介 (Introduction)
+## ✨ 核心特性 (Features)
 
-**Film Frame Maker** 是一个运行在浏览器端的“数字暗房”工具。它不仅仅是简单地给图片加一个黑框，而是通过 Canvas 像素级绘制，真实模拟了柯达 (Kodak)、富士 (Fuji)、伊尔福 (Ilford) 等经典胶卷的物理特征。
+**FilmFrame** 不仅仅是简单的加框工具，它是基于 Canvas 像素级绘制的胶片模拟器，能够还原柯达 (Kodak)、富士 (Fuji) 等经典胶卷的物理质感。
 
-无论你是想要制作单张胶片风格的照片，还是生成一张讲述故事的**连底长条 (Film Strip)**，这里都能满足。
+### 1. 🎞️ 双模式工作室
+- **单张精修 (Single Frame)**：为每张照片生成独立的胶片卡片，支持全屏预览和单独下载。
+- **连底长条 (Film Strip)**：将多张照片拼接成复古的“印样”长条。
+  - **叙事编排**：通过**长按拖拽**调整图片顺序，讲述您的摄影故事。
+  - **智能拼接**：自动处理不同比例的图片，支持自动折行（每行 6 张）。
 
-### 🔥 核心特性
+### 2. 🎨 高度客制化
+- **胶片模拟**：内置 10+ 种主流胶卷预设（Portra, Gold, Ultramax, CineStill, Ilford 等）。
+- **自定义文字**：支持修改边框上的品牌标识（如 "SHOT BY ME"），彰显个性。
+- **物理细节**：
+  - **齿孔形状**：可选方孔 (Square) 或圆角孔 (Rounded)。
+  - **颗粒感**：可调节的胶片颗粒强度 (Grain Intensity)。
+  - **日期戳**：一键读取 EXIF 拍摄时间 (`DateTimeOriginal`) 并打印。
 
-#### 1. 双模式输出
-- **🖼️ 单张卡片模式 (Single Frame)**：批量为每张照片生成独立的胶片边框，适合发朋友圈或 Instagram。
-- **🎞️ 连底长条模式 (Film Strip)**：将多张照片拼接成连续的胶片印样 (Contact Sheet)。
-  - **智能折行**：支持大量图片拼接，每行最多 6 张，自动折行并添加剪切间距。
-  - **物理仿真**：模拟真实的底片间隔和齿孔连续性。
+### 3. 🛡️ 安全与隐私优先
+- **纯前端运行**：所有图片处理均在浏览器本地完成，**绝不上传**到服务器。
+- **防崩溃设计**：内置大图检测与内存保护，防止超大分辨率图片导致浏览器卡死。
+- **安全文件名**：自动清洗下载文件名，防止特殊字符导致的文件系统问题。
+- **供应链安全**：移除外部 CDN 依赖，所有核心库本地化打包。
 
-#### 2. 交互式叙事
-- **✋ 拖拽排序 (Drag & Drop)**：在生成长条前，你可以随意拖拽图片调整顺序。
-- **📖 故事线构建**：按时间、色调或情节重新组织照片，让长条图更具叙事感。
-
-#### 3. 经典胶卷模拟
-- **预设丰富**：内置 10+ 种主流胶卷预设（Kodak Portra/Gold/Ultramax, Fuji Superia, CineStill 800T 等）。
-- **细节还原**：
-  - **字体还原**：Portra 的等宽字体 vs Ultramax 的粗体。
-  - **齿孔形状**：支持切换方孔 (Square) 或圆角孔 (Rounded)。
-  - **物理质感**：内置胶片颗粒 (Grain) 和齿孔的 3D 阴影/高光效果。
-
-#### 4. 自动化与隐私
-- **📅 EXIF 智能识别**：自动读取照片拍摄日期 (`DateTimeOriginal`) 并打印在边框上。
-- **🔒 纯前端处理**：利用浏览器 Canvas 性能秒级渲染，图片**不上传**服务器，完全保护隐私。
+### 4. 💾 专业输出
+- **格式选择**：支持 **JPG** (体积小，适合社交媒体) 和 **PNG** (无损，适合存档)。
+- **质量控制**：可调节 JPG 压缩质量。
 
 ## 📸 支持的胶片型号 (Film Stocks)
 
-我们仔细研究了不同品牌胶卷的齿孔间距和字体风格，目前支持以下型号：
+我们针对每种胶卷的齿孔间距、字体风格和品牌色进行了还原：
 
-| 品牌 (Brand) | 型号 (Model) | 特点 |
+| 系列 | 型号 | 风格特点 |
 | :--- | :--- | :--- |
-| **Kodak Pro** | Portra 160 / 400 / 800 | 专业人像，暖色调，JetBrains Mono 等宽字体 |
-| **Kodak Pro** | Ektar 100 | 极其细腻，高饱和度 |
-| **Kodak Consumer** | Gold 200 / ColorPlus 200 | 经典的日常记录风格 |
-| **Kodak Consumer** | Ultramax 400 (GC 400) | 明亮的金黄色字体，Helvetica 粗体设计 |
-| **Kodak Reversal** | Ektachrome E100 | 正片（反转片），白色边框风格 |
-| **Kodak B&W** | Tri-X 400 / T-Max | 经典的黑白负片风格 |
-| **Fujifilm** | Superia 400 | 独特的绿色调字体，全圆角齿孔 |
-| **Cinema** | CineStill 800T | 电影胶片改制，独特的红色光晕风格 |
-| **Ilford** | HP5 Plus | 英国经典的黑白胶卷 |
+| **Kodak Portra** | 160 / 400 / 800 | 暖色调，经典的 JetBrains Mono 等宽字体 |
+| **Kodak Consumer** | Gold 200 / ColorPlus | 金黄色复古感 |
+| **Kodak Consumer** | Ultramax 400 | **加粗**无衬线字体，高对比度风格 |
+| **Kodak Ektar** | Ektar 100 | 鲜艳的红色品牌标识 |
+| **Reversal (正片)** | Ektachrome E100 | 白色边框，独特的反转片质感 |
+| **Fujifilm** | Superia 400 | 标志性的绿色字体，**全圆角**齿孔 |
+| **Cinema** | CineStill 800T | 电影卷风格，红色高光 |
+| **B&W (黑白)** | Tri-X / T-Max / Ilford | 纯粹的黑白灰度，锐利的字体 |
 
-## 🚀 快速开始 (Getting Started)
+## 🚀 开发指南 (Development)
 
-本项目使用 `Vite` 构建。
+本项目使用 `Vite` + `React` + `TypeScript` 构建。
 
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/your-username/film-frame-maker.git
-cd film-frame-maker
-```
-
-### 2. 安装依赖
+### 1. 环境准备
 
 ```bash
+git clone https://github.com/your-username/FilmFrame.git
+cd FilmFrame
 npm install
-# 或者
-yarn install
-# 或者
-pnpm install
 ```
 
-### 3. 启动开发服务器
+### 2. 启动开发
 
 ```bash
 npm run dev
 ```
 
-打开浏览器访问 `http://localhost:5173` 即可看到效果。
-
-### 4. 构建生产版本
+### 3. 构建部署
 
 ```bash
 npm run build
 ```
 
+构建产物位于 `dist` 目录，可直接部署至 Vercel, Netlify 或任何静态服务器。
+
 ## 🛠️ 技术栈 (Tech Stack)
 
-- **前端框架**: [React 18](https://react.dev/) (Hooks, Functional Components)
-- **开发工具**: [Vite](https://vitejs.dev/) (极速 HMR)
-- **语言**: [TypeScript](https://www.typescriptlang.org/) (强类型安全)
-- **样式**: [Tailwind CSS](https://tailwindcss.com/) (原子化 CSS)
-- **核心逻辑**: HTML5 Canvas API (用于图像合成与绘制)
-- **工具库**: `exif-js` (提取照片元数据)
+- **UI 框架**: React 19
+- **构建工具**: Vite 5
+- **样式引擎**: Tailwind CSS
+- **图像核心**: HTML5 Canvas API (Offscreen processing optimized)
+- **元数据**: `exif-js` (Local dependency)
 
-## 📦 部署 (Deployment)
+## 📄 许可证 (License)
 
-本项目已配置好主流平台的部署文件，开箱即用。
-
-- **Vercel**: 项目根目录包含标准构建脚本，直接导入 Git 仓库即可。
-- **Netlify**: 已包含 `netlify.toml`，处理了 SPA 重定向与构建命令。
-
-## 📝 许可证 (License)
-
-MIT License. 欢迎 Fork 和 Star！
+MIT License. 
 
 ---
 
-<p align="center">Made with ❤️ by Photographers, for Photographers.</p>
+<p align="center">Made with ❤️ for Photographers.</p>

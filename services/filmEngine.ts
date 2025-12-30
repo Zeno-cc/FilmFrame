@@ -1,3 +1,4 @@
+
 import { FilmSettings, FILM_PRESETS, ImageItem } from '../types';
 
 /**
@@ -28,7 +29,15 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
+    img.onload = () => {
+        // Security Fix: Check image dimensions to prevent denial of service via massive images
+        // Limit to 15000px (approx 225 megapixels), which is generous for photography but prevents zip-bomb style attacks
+        if (img.width > 15000 || img.height > 15000) {
+            reject(new Error("Image dimensions too large (max 15000px)"));
+            return;
+        }
+        resolve(img);
+    };
     img.onerror = () => reject(new Error(`Failed to load image`));
     img.src = src;
   });
