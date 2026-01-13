@@ -17,6 +17,7 @@ const StripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heigh
 const GripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>;
 const GithubIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>;
 const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4 4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
+const AlertCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
 
 const FilmLogoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -75,6 +76,7 @@ const App: React.FC = () => {
   const [outputMode, setOutputMode] = useState<OutputMode>('single');
   const [stripResult, setStripResult] = useState<string | null>(null);
   const [showDonate, setShowDonate] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag and drop refs
@@ -102,12 +104,14 @@ const App: React.FC = () => {
     if (!files) return;
 
     const newImages: ImageItem[] = [];
+    const uploadErrors: string[] = [];
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Removed Security Fix 2: Validation for file size deleted per user request
+      // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert(`文件 "${file.name}" 格式不支持，请上传图片文件。`);
+        uploadErrors.push(`"${file.name}" 不是有效的图片文件`);
         continue;
       }
 
@@ -115,17 +119,22 @@ const App: React.FC = () => {
       
       let exifDate = '';
       try {
-        await new Promise((resolve) => {
-          EXIF.getData(file as any, function(this: any) {
-            const date = EXIF.getTag(this, "DateTimeOriginal");
-            if (date) {
-              exifDate = date.split(' ')[0].replace(/:/g, '/');
-            }
-            resolve(null);
-          });
-        });
+        // 使用 Promise.race 防止 EXIF 读取卡死
+        await Promise.race([
+          new Promise((resolve) => {
+            EXIF.getData(file as any, function(this: any) {
+              const date = EXIF.getTag(this, "DateTimeOriginal");
+              if (date) {
+                exifDate = date.split(' ')[0].replace(/:/g, '/');
+              }
+              resolve(null);
+            });
+          }),
+          new Promise((resolve) => setTimeout(resolve, 1000)) // 1秒超时，防止读取大文件元数据卡死
+        ]);
       } catch (e) {
-        console.warn("EXIF extraction failed", e);
+        console.warn("EXIF extraction failed or timed out", e);
+        // 不报错，只是没有日期
       }
 
       newImages.push({
@@ -135,6 +144,11 @@ const App: React.FC = () => {
         exifDate
       });
     }
+
+    if (uploadErrors.length > 0) {
+      setErrorMsg(`无法添加以下文件：\n${uploadErrors.join('\n')}`);
+    }
+
     setImages(prev => [...prev, ...newImages]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
@@ -175,7 +189,7 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      alert('处理过程中发生错误，可能是图片文件损坏或内存不足。');
+      setErrorMsg('处理过程中发生错误，可能是图片文件损坏或内存不足。');
     } finally {
       setProcessing(false);
     }
@@ -654,6 +668,37 @@ const App: React.FC = () => {
             className="max-w-full max-h-full object-contain shadow-2xl" 
             alt="Fullscreen preview" 
           />
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {errorMsg && (
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#181818] border border-red-500/20 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button 
+                onClick={() => setErrorMsg(null)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+            >
+                <CloseIcon />
+            </button>
+            <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                    <AlertCircleIcon />
+                </div>
+                <div>
+                    <h3 className="text-lg font-bold text-white mb-2">出错了</h3>
+                    <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
+                        {errorMsg}
+                    </p>
+                </div>
+                <button 
+                    onClick={() => setErrorMsg(null)}
+                    className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors"
+                >
+                    我知道了
+                </button>
+            </div>
+          </div>
         </div>
       )}
 
