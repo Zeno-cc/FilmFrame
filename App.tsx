@@ -105,12 +105,7 @@ const App: React.FC = () => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Security Fix 2: Validate file type and size to prevent DoS or malicious content
-      // Limit size to 50MB
-      if (file.size > 50 * 1024 * 1024) {
-        alert(`文件 "${file.name}" 过大 (超过 50MB)，已跳过。`);
-        continue;
-      }
+      // Removed Security Fix 2: Validation for file size deleted per user request
       if (!file.type.startsWith('image/')) {
         alert(`文件 "${file.name}" 格式不支持，请上传图片文件。`);
         continue;

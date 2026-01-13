@@ -9,7 +9,10 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='gold' x1='2' y1='2' x2='30' y2='30' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%23b45309'/%3E%3C/linearGradient%3E%3Cfilter id='glow'%3E%3CfeGaussianBlur stdDeviation='1.5' result='coloredBlur'/%3E%3CfeMerge%3E%3CfeMergeNode in='coloredBlur'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3C/defs%3E%3Cpath fill='url(%23gold)' d='M6 2C3.79 2 2 3.79 2 6v20c0 2.21 1.79 4 4 4h20c2.21 0 4-1.79 4-4V6c0-2.21-1.79-4-4-4H6zm0 4h20c.55 0 1 .45 1 1v18c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1zm3 3v14h14V9H9zm-4 2v2h2v-2H5zm22 0v2h2v-2h-2zm-22 8v2h2v-2H5zm22 0v2h2v-2h-2z'/%3E%3C/svg%3E" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
-    <!-- 安全修复：移除外部 EXIF 脚本，改为在 App.tsx 中 import 本地依赖 -->
+    <script>
+      // Polyfill process for libraries that expect it (like React 19 from esm.sh)
+      window.process = { env: { NODE_ENV: 'production' } };
+    </script>
     <style>
       body {
         font-family: 'Noto Sans SC', sans-serif;
@@ -33,22 +36,24 @@
         background: #444;
       }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+    "exif-js": "https://esm.sh/exif-js@2.3.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "exif-js": "https://esm.sh/exif-js@^2.3.0"
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
-    <!-- 关键修复：引入 React 入口文件 -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
