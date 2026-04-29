@@ -1,0 +1,5 @@
+{
+  "name": "胶片齿孔生成器 (Film Frame Maker)",
+  "description": "一个优雅的工具，为您的照片自动添加复古胶片边框、齿孔、感光度标识和时间戳，支持批量处理。",
+  "requestFramePermissions": []
+}

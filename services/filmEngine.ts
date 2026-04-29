@@ -1,0 +1,1242 @@
+
+import { FilmSettings, FILM_PRESETS, FilmType, ImageItem } from '../types';
+import { applyGold200Look } from './filmColor';
+import { drawKodakGoldFrameNumbers } from './filmFrameNumber';
+import {
+  create135LandscapeLayout,
+  create135SidePerforationLayout,
+  drawImageCover,
+  drawImageCoverAutoRotate,
+  Film135Layout,
+  Film135SideLayout,
+  PHYS_135,
+} from './filmGeometry';
+import { draw135Markings, draw135SideMarkings } from './filmMarkings';
+import {
+  KODAK_GOLD_APERTURE_MASK_URL,
+  KODAK_GOLD_APERTURE_SHADOW_URL,
+  KODAK_GOLD_BASE_URL,
+  createKodakGoldStripLayout,
+  createKodakGoldOverlayLayout,
+  drawKodakGoldOverlayLayer,
+  getKodakGoldStripSegment,
+  KodakGoldOverlayLayout,
+  KODAK_GOLD_OVERLAY_URL,
+} from './filmOverlay';
+import {
+  drawDust,
+  drawFilmBaseTexture,
+  drawGrain as drawRealGrain,
+  drawRealFilmStockTexture,
+} from './filmTexture';
+import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from './filmResolution';
+
+/**
+ * 绘制圆角矩形 polyfill
+ */
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+  }
+  ctx.closePath();
+}
+
+/**
+ * 内部辅助：加载图片对象
+ */
+const loadImage = (src: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+        // Removed Security Fix: Image dimension limits deleted per user request
+        resolve(img);
+    };
+    img.onerror = () => reject(new Error(`Failed to load image`));
+    img.src = src;
+  });
+};
+
+type KodakGoldLayeredAssets = {
+  base: HTMLImageElement;
+  apertureMask: HTMLImageElement;
+  apertureShadow: HTMLImageElement;
+};
+
+let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
+
+const loadKodakGoldLayeredAssets = (): Promise<KodakGoldLayeredAssets> => {
+  if (!kodakGoldLayeredAssetsPromise) {
+    kodakGoldLayeredAssetsPromise = Promise.all([
+      loadImage(KODAK_GOLD_BASE_URL),
+      loadImage(KODAK_GOLD_APERTURE_MASK_URL),
+      loadImage(KODAK_GOLD_APERTURE_SHADOW_URL),
+    ])
+      .then(([base, apertureMask, apertureShadow]) => ({ base, apertureMask, apertureShadow }))
+      .catch((error) => {
+        kodakGoldLayeredAssetsPromise = null;
+        throw error;
+      });
+  }
+
+  return kodakGoldLayeredAssetsPromise;
+};
+
+const exportCanvasToObjectUrl = (
+  canvas: HTMLCanvasElement,
+  outputFormat: string,
+  outputQuality: number,
+  errorMessage = 'Failed to export canvas blob'
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error(errorMessage));
+          return;
+        }
+        resolve(URL.createObjectURL(blob));
+      },
+      outputFormat,
+      outputQuality
+    );
+  });
+};
+
+function createLuminanceAlphaMask(
+  mask: HTMLImageElement,
+  width: number,
+  height: number
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context not found');
+
+  ctx.drawImage(mask, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = Math.round(data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722);
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
+    data[i + 3] = alpha;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+/**
+ * 内部辅助：绘制单个齿孔（带3D效果）
+ */
+const drawHole = (
+  ctx: CanvasRenderingContext2D, 
+  settings: FilmSettings, 
+  x: number, 
+  y: number, 
+  w: number, 
+  h: number, 
+  borderSize: number
+) => {
+  const roundingRatio = settings.holeType === 'rounded' ? 0.35 : 0.12;
+  const radius = Math.min(w, h) * roundingRatio;
+
+  // A. 基础孔填充
+  ctx.save();
+  drawRoundedRect(ctx, x, y, w, h, radius);
+  ctx.fillStyle = settings.holeColor;
+  ctx.fill();
+
+  // B. 3D 深度感 (Inner Shadow + Highlight)
+  ctx.clip();
+
+  const strokeWidth = Math.max(2, borderSize * 0.15); 
+  const pathOffset = strokeWidth / 2;
+  const blurSize = Math.max(2, borderSize * 0.05);
+  const shadowDist = Math.max(1, borderSize * 0.02);
+
+  const traceOuterShape = () => {
+    ctx.beginPath();
+    drawRoundedRect(
+      ctx,
+      x - pathOffset,
+      y - pathOffset,
+      w + pathOffset * 2,
+      h + pathOffset * 2,
+      radius + pathOffset
+    );
+  };
+
+  // 1. 内阴影 (Top-Left)
+  traceOuterShape();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = strokeWidth;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  ctx.shadowBlur = blurSize;
+  ctx.shadowOffsetX = shadowDist;
+  ctx.shadowOffsetY = shadowDist;
+  ctx.stroke();
+
+  // 2. 内高光 (Bottom-Right)
+  traceOuterShape();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = strokeWidth;
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
+  ctx.shadowBlur = blurSize;
+  ctx.shadowOffsetX = -shadowDist;
+  ctx.shadowOffsetY = -shadowDist;
+  ctx.stroke();
+
+  ctx.restore();
+};
+
+// 缓存噪点 Canvas，避免重复创建
+let cachedNoiseCanvas: HTMLCanvasElement | null = null;
+
+/**
+ * 创建高斯噪点纹理 (256x256 小图)
+ * 相比于在主画布上逐像素操作，先生成小块纹理再平铺 (Pattern) 性能提升巨大。
+ * 优化：使用 Box-Muller 变换生成真实的高斯分布(正态分布)噪点，而非简单的 Uniform Noise。
+ */
+const getNoisePatternCanvas = (): HTMLCanvasElement => {
+  if (cachedNoiseCanvas) return cachedNoiseCanvas;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  
+  const imageData = ctx.createImageData(size, size);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    // Box-Muller 变换生成正态分布
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    
+    // 标准正态分布 N(0, 1)
+    const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    
+    // 调整到 0-255 范围，中心点为 128 (Overlay 混合模式的中性点)
+    // 30 是标准差，决定了噪点的对比度
+    let val = 128 + z * 30;
+    val = Math.max(0, Math.min(255, val));
+
+    data[i] = val;     // R
+    data[i+1] = val;   // G
+    data[i+2] = val;   // B
+    data[i+3] = 255;   // Alpha
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  cachedNoiseCanvas = canvas;
+  return canvas;
+};
+
+/**
+ * 内部辅助：绘制颗粒 (性能优化版)
+ * 使用 globalCompositeOperation = 'overlay' 配合 Pattern 填充
+ */
+const drawGrain = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, intensity: number) => {
+  if (intensity <= 0) return;
+  if (width <= 0 || height <= 0) return;
+
+  ctx.save();
+  
+  // 1. 限制绘制区域
+  ctx.beginPath();
+  ctx.rect(x, y, width, height);
+  ctx.clip();
+
+  // 2. 准备噪点纹理
+  const noiseCanvas = getNoisePatternCanvas();
+  const pattern = ctx.createPattern(noiseCanvas, 'repeat');
+
+  if (pattern) {
+    // 3. 设置混合模式
+    // 'overlay' 模式会根据底色叠加噪点，亮部更亮，暗部更暗，非常适合模拟胶片颗粒
+    // 同时也比逐像素计算快得多
+    ctx.globalCompositeOperation = 'overlay';
+    
+    // 4. 通过透明度控制强度
+    // 强度系数映射，让用户感知的 0-60 范围比较线性
+    ctx.globalAlpha = Math.min(1.0, (intensity / 100) * 2.0);
+    
+    ctx.fillStyle = pattern;
+    
+    // 随机偏移纹理原点，避免多张图的噪点模式完全一致
+    const offsetX = Math.random() * 256;
+    const offsetY = Math.random() * 256;
+    ctx.translate(offsetX, offsetY);
+    
+    // 绘制覆盖整个区域的矩形 (反向偏移回来以覆盖左上角)
+    ctx.fillRect(-offsetX, -offsetY, width + offsetX, height + offsetY); 
+  }
+
+  ctx.restore();
+};
+
+function drawFilmBase(
+  ctx: CanvasRenderingContext2D,
+  layout: Film135Layout,
+  settings: FilmSettings
+) {
+  const base = settings.enableRealisticRebate === false ? settings.borderColor : '#090807';
+
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+  if (settings.enableRealisticRebate === false) return;
+
+  const gradient = ctx.createRadialGradient(
+    layout.filmW / 2,
+    layout.filmH / 2,
+    layout.filmH * 0.2,
+    layout.filmW / 2,
+    layout.filmH / 2,
+    layout.filmW * 0.75
+  );
+
+  gradient.addColorStop(0, 'rgba(255,255,255,0.035)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.18)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+}
+
+function drawReal135FilmBase(
+  ctx: CanvasRenderingContext2D,
+  layout: Film135SideLayout,
+  settings: FilmSettings
+) {
+  const radius = Math.round(layout.sideRailW * 0.6);
+
+  ctx.save();
+  drawRoundedRect(ctx, 0, 0, layout.filmW, layout.filmH, radius);
+  ctx.clip();
+
+  const base = settings.enableRealisticRebate === false ? settings.borderColor : '#060504';
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+  if (settings.enableRealisticRebate !== false) {
+    const gradient = ctx.createLinearGradient(0, 0, layout.filmW, 0);
+    gradient.addColorStop(0, 'rgba(255, 190, 72, 0.12)');
+    gradient.addColorStop(0.14, 'rgba(255, 190, 72, 0.035)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.015)');
+    gradient.addColorStop(0.86, 'rgba(255, 190, 72, 0.04)');
+    gradient.addColorStop(1, 'rgba(255, 190, 72, 0.14)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(layout.sideRailW, 0, Math.max(1, layout.pxPerMm * 0.12), layout.filmH);
+    ctx.fillRect(layout.imageX + layout.imageW, 0, Math.max(1, layout.pxPerMm * 0.12), layout.filmH);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+function drawImageGateShadow(ctx: CanvasRenderingContext2D, layout: Film135SideLayout) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,0.72)';
+  ctx.lineWidth = Math.max(3, Math.round(layout.pxPerMm * 0.08));
+  ctx.strokeRect(layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(layout.imageX - Math.round(layout.pxPerMm * 0.12), layout.imageY, Math.round(layout.pxPerMm * 0.12), layout.imageH);
+  ctx.fillRect(layout.imageX + layout.imageW, layout.imageY, Math.round(layout.pxPerMm * 0.12), layout.imageH);
+  ctx.restore();
+}
+
+function draw135Perforations(
+  ctx: CanvasRenderingContext2D,
+  layout: Film135Layout,
+  settings: FilmSettings
+) {
+  const holeColor = settings.holeColor || '#f2efe6';
+
+  for (let i = 0; i < PHYS_135.perforationsPerFrame; i++) {
+    const x = Math.round(layout.perfStartX + i * layout.perfPitch);
+
+    drawHole(ctx, { ...settings, holeColor }, x, layout.perfTopY, layout.perfW, layout.perfH, layout.topRebateH);
+    drawHole(ctx, { ...settings, holeColor }, x, layout.perfBottomY, layout.perfW, layout.perfH, layout.bottomRebateH);
+  }
+}
+
+function drawReal135SidePerforations(
+  ctx: CanvasRenderingContext2D,
+  layout: Film135SideLayout
+) {
+  for (let i = 0; i < layout.perfCount; i++) {
+    const y = Math.round(layout.perfStartY + i * layout.perfPitch);
+    drawReal135Hole(ctx, layout.perfLeftX, y, layout.perfW, layout.perfH);
+    drawReal135Hole(ctx, layout.perfRightX, y, layout.perfW, layout.perfH);
+  }
+}
+
+function drawReal135Hole(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  const radius = Math.round(Math.min(w, h) * 0.22);
+
+  ctx.save();
+  drawRoundedRect(ctx, x, y, w, h, radius);
+  ctx.fillStyle = '#020100';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = Math.max(4, Math.round(h * 0.12));
+  ctx.fill();
+
+  ctx.clip();
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = 'rgba(230, 165, 45, 0.28)';
+  ctx.lineWidth = Math.max(2, Math.round(h * 0.08));
+  drawRoundedRect(ctx, x + 1, y + 1, w - 2, h - 2, radius);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function composeOnScannerCanvas(filmCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  const paddingRatio = 0.055;
+  const outputW = filmCanvas.width;
+  const outputH = Math.round((outputW * 3) / 4);
+
+  let canvasW = outputW;
+  let canvasH = outputH;
+
+  if (filmCanvas.height > canvasH * (1 - paddingRatio * 2)) {
+    canvasH = Math.round(filmCanvas.height / (1 - paddingRatio * 2));
+    canvasW = Math.round((canvasH * 4) / 3);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  ctx.fillStyle = '#e8e3d8';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  const gradient = ctx.createRadialGradient(
+    canvasW / 2,
+    canvasH / 2,
+    canvasH * 0.1,
+    canvasW / 2,
+    canvasH / 2,
+    canvasW * 0.75
+  );
+  gradient.addColorStop(0, 'rgba(255,255,255,0.16)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.08)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  const x = Math.round((canvasW - filmCanvas.width) / 2);
+  const y = Math.round((canvasH - filmCanvas.height) / 2);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = Math.round(canvasW * 0.012);
+  ctx.shadowOffsetY = Math.round(canvasW * 0.004);
+  ctx.drawImage(filmCanvas, x, y);
+  ctx.restore();
+
+  return canvas;
+}
+
+export const processImageReal135 = async (
+  imageSource: string,
+  settings: FilmSettings,
+  dateOverride?: string
+): Promise<string> => {
+  const img = await loadImage(imageSource);
+  const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
+  const layout = create135SidePerforationLayout(targetImageWidthPx);
+
+  const filmCanvas = document.createElement('canvas');
+  filmCanvas.width = layout.filmW;
+  filmCanvas.height = layout.filmH;
+
+  const ctx = filmCanvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context not found');
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  drawReal135FilmBase(ctx, layout, settings);
+  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  drawImageGateShadow(ctx, layout);
+
+  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+    applyGold200Look(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  }
+
+  drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
+  drawReal135SidePerforations(ctx, layout);
+  draw135SideMarkings(ctx, layout, settings);
+  drawRealFilmStockTexture(ctx, layout, settings);
+  drawDust(ctx, layout.filmW, layout.filmH, 30);
+
+  const finalCanvas =
+    (settings.scanOutputAspect ?? '4:3') === '4:3'
+      ? composeOnScannerCanvas(filmCanvas)
+      : filmCanvas;
+
+  return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+};
+
+const processImageWithTemplateOverlay = async (
+  imageSource: string,
+  settings: FilmSettings
+): Promise<string | null> => {
+  if (settings.useFilmOverlayTemplate === false) return null;
+
+  let layeredAssets: KodakGoldLayeredAssets;
+  try {
+    layeredAssets = await loadKodakGoldLayeredAssets();
+  } catch (error) {
+    console.warn('Layered film assets not available, falling back to legacy template.', error);
+    try {
+      const overlay = await loadImage(settings.filmOverlayUrl || KODAK_GOLD_OVERLAY_URL);
+      const img = await loadImage(imageSource);
+      const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
+      const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx);
+
+      const finalCanvas =
+        (settings.scanOutputAspect ?? 'native') === '4:3'
+          ? composeOnScannerCanvas(canvas)
+          : canvas;
+
+      return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+    } catch (legacyError) {
+      console.warn('Film overlay template not available, falling back to programmatic renderer.', legacyError);
+      return null;
+    }
+  }
+
+  const img = await loadImage(imageSource);
+  const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
+  const canvas = renderKodakGoldLayeredFrameCanvas(
+    img,
+    layeredAssets.base,
+    layeredAssets.apertureMask,
+    layeredAssets.apertureShadow,
+    settings,
+    targetImageWidthPx
+  );
+
+  const finalCanvas =
+    (settings.scanOutputAspect ?? 'native') === '4:3'
+      ? composeOnScannerCanvas(canvas)
+      : canvas;
+
+  return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+};
+
+function renderKodakGoldTemplateFrameCanvas(
+  img: HTMLImageElement,
+  overlay: HTMLImageElement,
+  settings: FilmSettings,
+  targetImageWidthPx: number
+): HTMLCanvasElement {
+  const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.filmW;
+  canvas.height = layout.filmH;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings);
+  return canvas;
+}
+
+function renderKodakGoldLayeredFrameCanvas(
+  img: HTMLImageElement,
+  base: HTMLImageElement,
+  apertureMask: HTMLImageElement,
+  apertureShadow: HTMLImageElement,
+  settings: FilmSettings,
+  targetImageWidthPx: number
+): HTMLCanvasElement {
+  const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.filmW;
+  canvas.height = layout.filmH;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  drawKodakGoldLayeredFrame(ctx, img, base, apertureMask, apertureShadow, layout, settings);
+  return canvas;
+}
+
+function drawKodakGoldLayeredFrame(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  base: HTMLImageElement,
+  apertureMask: HTMLImageElement,
+  apertureShadow: HTMLImageElement,
+  layout: KodakGoldOverlayLayout,
+  settings: FilmSettings
+) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#050403';
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+  const emulsion = document.createElement('canvas');
+  emulsion.width = layout.filmW;
+  emulsion.height = layout.filmH;
+
+  const emulsionCtx = emulsion.getContext('2d', { alpha: true });
+  if (!emulsionCtx) throw new Error('Canvas context not found');
+
+  emulsionCtx.imageSmoothingEnabled = true;
+  emulsionCtx.imageSmoothingQuality = 'high';
+  drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+
+  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+    applyGold200Look(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  }
+
+  drawRealGrain(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
+
+  emulsionCtx.save();
+  emulsionCtx.globalCompositeOperation = 'destination-in';
+  emulsionCtx.drawImage(createLuminanceAlphaMask(apertureMask, layout.filmW, layout.filmH), 0, 0);
+  emulsionCtx.restore();
+
+  ctx.drawImage(emulsion, 0, 0);
+  ctx.drawImage(base, 0, 0, layout.filmW, layout.filmH);
+  ctx.drawImage(apertureShadow, 0, 0, layout.filmW, layout.filmH);
+  drawKodakGoldFrameNumbers(ctx, layout, settings);
+}
+
+function drawKodakGoldTemplateFrame(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  overlay: HTMLImageElement,
+  layout: KodakGoldOverlayLayout,
+  settings: FilmSettings
+) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#050403';
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+  ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
+  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+
+  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+    applyGold200Look(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  }
+
+  drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
+  drawKodakGoldOverlayLayer(ctx, overlay, layout);
+  drawKodakGoldFrameNumbers(ctx, layout, settings);
+}
+
+function drawKodakGoldTemplateFrameSegment(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  overlay: HTMLImageElement,
+  layout: KodakGoldOverlayLayout,
+  settings: FilmSettings,
+  clipX: number,
+  clipW: number
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(clipX, 0, clipW, layout.filmH);
+  ctx.clip();
+  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings);
+  ctx.restore();
+}
+
+function drawContinuousFilmRowBase(
+  ctx: CanvasRenderingContext2D,
+  layout: ReturnType<typeof createKodakGoldStripLayout>,
+  rowY: number,
+  rowCount: number
+) {
+  const frame = layout.frame;
+  const rowW = frame.imageX + rowCount * frame.imageW + Math.max(0, rowCount - 1) * layout.frameGap + (frame.filmW - frame.imageX - frame.imageW);
+  const radius = Math.max(10, Math.round(frame.filmH * 0.018));
+
+  ctx.save();
+  ctx.translate(layout.padding, rowY);
+
+  ctx.fillStyle = '#050403';
+  drawRoundedRect(ctx, 0, 0, rowW, frame.filmH, radius);
+  ctx.fill();
+
+  const glow = ctx.createLinearGradient(0, 0, 0, frame.filmH);
+  glow.addColorStop(0, 'rgba(255,255,255,0.055)');
+  glow.addColorStop(0.42, 'rgba(255,255,255,0.012)');
+  glow.addColorStop(0.58, 'rgba(0,0,0,0.1)');
+  glow.addColorStop(1, 'rgba(0,0,0,0.34)');
+  ctx.fillStyle = glow;
+  drawRoundedRect(ctx, 0, 0, rowW, frame.filmH, radius);
+  ctx.fill();
+
+  // Continuous base texture: the strip should read as one physical film stock, not repeated single-frame PNGs.
+  for (let i = 0; i < Math.round(rowW * frame.filmH / 1050); i++) {
+    const x = Math.random() * rowW;
+    const y = Math.random() * frame.filmH;
+    ctx.globalAlpha = 0.012 + Math.random() * 0.045;
+    ctx.fillStyle = Math.random() > 0.5 ? '#3a2b19' : '#000000';
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  ctx.globalAlpha = 1;
+  for (let col = 0; col < rowCount; col++) {
+    const apertureX = frame.imageX + col * layout.frameStride;
+    ctx.fillStyle = '#020100';
+    ctx.fillRect(apertureX - 5, frame.imageY - 5, frame.imageW + 10, frame.imageH + 10);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.11)';
+    ctx.lineWidth = Math.max(1, Math.round(frame.filmH * 0.002));
+    ctx.strokeRect(apertureX - 4, frame.imageY - 4, frame.imageW + 8, frame.imageH + 8);
+
+    if (col < rowCount - 1) {
+      const gapX = apertureX + frame.imageW;
+      ctx.fillStyle = 'rgba(0,0,0,0.42)';
+      ctx.fillRect(gapX, frame.imageY - 8, layout.frameGap, frame.imageH + 16);
+    }
+  }
+
+  drawContinuousSprocketHoles(ctx, frame, rowW, layout.frameStride);
+  ctx.restore();
+}
+
+function drawContinuousSprocketHoles(
+  ctx: CanvasRenderingContext2D,
+  frame: KodakGoldOverlayLayout,
+  rowW: number,
+  frameStride: number
+) {
+  const holeW = Math.round(frame.imageW * 0.055);
+  const holeH = Math.round(frame.topRebateH * 0.42);
+  const pitch = frameStride / 8;
+  const topY = Math.round(frame.topRebateH * 0.42);
+  const bottomY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.18);
+
+  for (let x = frame.imageX * 0.42; x < rowW - holeW; x += pitch) {
+    drawReal135Hole(ctx, Math.round(x), topY, holeW, holeH);
+    drawReal135Hole(ctx, Math.round(x), bottomY, holeW, holeH);
+  }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = Math.max(1, Math.round(frame.filmH * 0.002));
+  ctx.strokeRect(2, 2, rowW - 4, frame.filmH - 4);
+  ctx.restore();
+}
+
+function drawContinuousStripMarkings(
+  ctx: CanvasRenderingContext2D,
+  layout: ReturnType<typeof createKodakGoldStripLayout>,
+  rowY: number,
+  index: number,
+  frameNumber: number
+) {
+  const frame = layout.frame;
+  const col = index % layout.maxPerRow;
+  const slotX = layout.padding + col * layout.frameStride;
+  const imageX = slotX + frame.imageX;
+  const textColor = '#d99a16';
+
+  ctx.save();
+  ctx.translate(0, rowY);
+  ctx.beginPath();
+  ctx.rect(slotX, 0, layout.frameStride, frame.filmH);
+  ctx.clip();
+  ctx.fillStyle = textColor;
+  ctx.globalAlpha = 0.9;
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 2;
+
+  const brandFont = Math.max(12, Math.round(frame.topRebateH * 0.118));
+  const numberFont = Math.max(12, Math.round(frame.topRebateH * 0.11));
+  const smallFont = Math.max(10, Math.round(frame.bottomRebateH * 0.09));
+  const topLabelY = Math.round(frame.topRebateH * 0.16);
+  const topNumberY = Math.round(frame.topRebateH * 0.29);
+  const bottomBarcodeY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.64);
+  const bottomTextY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.82);
+  const bottomNumberY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.92);
+
+  ctx.font = `900 ${brandFont}px Arial, Helvetica, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('KODAK  GOLD 200', slotX + frame.imageX * 0.18, topLabelY);
+
+  ctx.textAlign = 'center';
+  ctx.font = `800 ${Math.round(brandFont * 0.86)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText('GB 36', imageX + frame.imageW * 0.53, topLabelY);
+
+  ctx.textAlign = 'right';
+  ctx.font = `900 ${brandFont}px Arial, Helvetica, sans-serif`;
+  ctx.fillText('KODAK', imageX + frame.imageW * 0.91, topLabelY);
+
+  ctx.textAlign = 'center';
+  ctx.font = `900 ${numberFont}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, topNumberY);
+  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, bottomNumberY);
+
+  ctx.textAlign = 'left';
+  ctx.font = `800 ${smallFont}px Arial, Helvetica, sans-serif`;
+  ctx.fillText('DX', slotX + frame.imageX * 0.18, bottomTextY);
+  ctx.fillText('SAFETY FILM', imageX + frame.imageW * 0.43, bottomTextY);
+  drawContinuousDxBlocks(ctx, imageX + frame.imageW * 0.1, bottomBarcodeY, frame.imageW * 0.22, smallFont);
+  drawContinuousDxBlocks(ctx, imageX + frame.imageW * 0.72, bottomBarcodeY, frame.imageW * 0.18, smallFont);
+
+  ctx.restore();
+}
+
+function drawContinuousDxBlocks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const pattern = [1, 0.35, 0.8, 0.45, 1, 0.3, 0.65, 0.9, 0.5, 1, 0.4, 0.8];
+  const gap = Math.max(2, Math.round(width * 0.018));
+  const blockW = Math.max(3, Math.round((width - gap * pattern.length) / pattern.length));
+  let cursor = x;
+
+  for (const p of pattern) {
+    ctx.fillRect(cursor, y + height * (1 - p), blockW, height * p);
+    cursor += blockW + gap;
+  }
+}
+
+const generateReal135FilmStrip = async (
+  images: ImageItem[],
+  settings: FilmSettings
+): Promise<string | null> => {
+  if (settings.useFilmOverlayTemplate === false) return null;
+
+  const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
+  const layout = createKodakGoldStripLayout(targetImageWidthPx, images.length, 4);
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.totalW;
+  canvas.height = layout.totalH;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  ctx.fillStyle = '#161514';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let row = 0; row < layout.rows; row++) {
+    const rowCount = Math.min(layout.maxPerRow, images.length - row * layout.maxPerRow);
+    const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+    drawContinuousFilmRowBase(ctx, layout, y, rowCount);
+  }
+
+  for (let index = 0; index < images.length; index++) {
+    const row = Math.floor(index / layout.maxPerRow);
+    const col = index % layout.maxPerRow;
+    const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+    const img = await loadImage(images[index].previewUrl);
+    const frameSettings = {
+      ...settings,
+      frameNumber: ((settings.frameNumber + index - 1) % (settings.maxRollFrames ?? 36)) + 1,
+    };
+
+    const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
+
+    ctx.save();
+    drawImageCoverAutoRotate(ctx, img, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+    if (settings.brandText === FilmType.KODAK_GOLD_200) {
+      applyGold200Look(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+    }
+    drawRealGrain(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
+    ctx.strokeStyle = 'rgba(0,0,0,0.72)';
+    ctx.lineWidth = Math.max(2, Math.round(layout.frame.filmH * 0.003));
+    ctx.strokeRect(imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+    ctx.restore();
+
+    drawContinuousStripMarkings(ctx, layout, y, index, frameSettings.frameNumber);
+  }
+
+  return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality, 'Failed to export film strip blob');
+};
+
+/**
+ * 模式 A: 处理单张图片
+ */
+export const processImage = async (
+  imageSource: string,
+  settings: FilmSettings,
+  dateOverride?: string
+): Promise<string> => {
+  if ((settings.frameRenderMode ?? 'real135') === 'real135') {
+    const templatedResult = await processImageWithTemplateOverlay(imageSource, settings);
+    if (templatedResult) return templatedResult;
+
+    return processImageReal135(imageSource, settings, dateOverride);
+  }
+
+  const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
+  if (!preset) throw new Error("Invalid Preset");
+
+  const img = await loadImage(imageSource);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  const isPortrait = img.height > img.width;
+  const baseDim = isPortrait ? img.height : img.width;
+  const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
+  
+  if (isPortrait) {
+    canvas.width = img.width + borderSize * 2;
+    canvas.height = img.height;
+  } else {
+    canvas.width = img.width;
+    canvas.height = img.height + borderSize * 2;
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // 1. 底色 (边框)
+  ctx.fillStyle = settings.borderColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. 绘制图像
+  let imgX = 0, imgY = 0, imgW = img.width, imgH = img.height;
+  if (isPortrait) {
+    imgX = borderSize;
+    imgY = 0;
+  } else {
+    imgX = 0;
+    imgY = borderSize;
+  }
+  ctx.drawImage(img, imgX, imgY, imgW, imgH);
+
+  // 3. 施加颗粒 (使用优化后的叠加算法)
+  drawGrain(ctx, imgX, imgY, imgW, imgH, settings.grainIntensity);
+
+  // === 齿孔计算 ===
+  const TARGET_HOLE_COUNT = 8;
+  const holePerp = borderSize * 0.60; 
+  const holePara = holePerp * 0.74;
+
+  let holeW, holeH; 
+  let startPos, step;
+
+  if (isPortrait) {
+    // 竖图
+    holeW = holePerp; 
+    holeH = holePara; 
+    
+    const totalLen = canvas.height;
+    const pitch = totalLen / TARGET_HOLE_COUNT;
+    step = pitch;
+    const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeH;
+    startPos = (totalLen - totalSpan) / 2;
+
+    for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
+      const y = startPos + i * step;
+      drawHole(ctx, settings, (borderSize - holeW) / 2, y, holeW, holeH, borderSize);
+      drawHole(ctx, settings, canvas.width - (borderSize + holeW) / 2, y, holeW, holeH, borderSize);
+    }
+  } else {
+    // 横图
+    holeH = holePerp; 
+    holeW = holePara; 
+
+    const totalLen = canvas.width;
+    const pitch = totalLen / TARGET_HOLE_COUNT;
+    step = pitch;
+    const totalSpan = (TARGET_HOLE_COUNT - 1) * pitch + holeW;
+    startPos = (totalLen - totalSpan) / 2;
+
+    for (let i = 0; i < TARGET_HOLE_COUNT; i++) {
+      const x = startPos + i * step;
+      drawHole(ctx, settings, x, (borderSize - holeH) / 2, holeW, holeH, borderSize);
+      drawHole(ctx, settings, x, canvas.height - (borderSize + holeH) / 2, holeW, holeH, borderSize);
+    }
+  }
+
+  // === 文字处理 ===
+  ctx.fillStyle = settings.textColor;
+  const isGC400 = settings.brandText.includes('GC 400');
+  
+  const marginRatio = (1 - 0.60) / 2; 
+  const outerCenterRatio = marginRatio / 2; 
+  const innerCenterRatio = 1 - (marginRatio / 2); 
+
+  const maxFontSizeRatio = marginRatio * 0.9; 
+  let fontSizeRatio = isGC400 ? 0.25 : 0.22;
+  if (fontSizeRatio > maxFontSizeRatio) fontSizeRatio = maxFontSizeRatio;
+  
+  const fontSize = borderSize * fontSizeRatio;
+  ctx.font = `${preset.fontWeight} ${Math.floor(fontSize)}px ${preset.fontFamily}`;
+  ctx.textBaseline = 'middle';
+  
+  const finalDateStr = dateOverride || settings.dateStr;
+  
+  const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
+
+  if (isPortrait) {
+      // 竖图文字
+      ctx.save();
+      ctx.translate(borderSize * outerCenterRatio, canvas.height * 0.05);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(brandText, 0, 0);
+      ctx.restore();
+      
+      if (!isGC400) {
+          ctx.save();
+          ctx.font = `normal ${Math.floor(fontSize * 0.55)}px ${preset.fontFamily}`;
+          ctx.translate(borderSize * innerCenterRatio, canvas.height * 0.95);
+          ctx.rotate(Math.PI / 2);
+          ctx.fillText('SAFETY FILM', -ctx.measureText('SAFETY FILM').width, 0);
+          ctx.restore();
+      }
+      
+      ctx.save();
+      ctx.translate(canvas.width - borderSize * outerCenterRatio, canvas.height * 0.05);
+      ctx.rotate(Math.PI / 2);
+      if (isGC400) {
+           ctx.fillText(`${settings.frameNumber}A`, 0, 0);
+      } else {
+           ctx.fillText(`${settings.frameNumber}`, 0, 0);
+           ctx.font = `normal ${Math.floor(fontSize * 0.8)}px ${preset.fontFamily}`;
+           ctx.fillText(`${settings.frameNumber}A`, fontSize * 2.5, 0);
+      }
+      ctx.restore();
+      
+      if (settings.showDate) {
+        ctx.save();
+        ctx.font = `normal ${Math.floor(fontSize * 0.75)}px ${preset.fontFamily}`;
+        ctx.translate(canvas.width - borderSize * innerCenterRatio, canvas.height * 0.95);
+        ctx.rotate(Math.PI / 2);
+        ctx.fillText(finalDateStr, -ctx.measureText(finalDateStr).width, 0);
+        ctx.restore();
+      }
+  } else {
+      // 横图文字
+      ctx.fillText(brandText, canvas.width * 0.05, borderSize * outerCenterRatio);
+      if (isGC400) {
+          const frameStr = `${settings.frameNumber}A`;
+          ctx.fillText(frameStr, canvas.width - ctx.measureText(frameStr).width - canvas.width * 0.05, borderSize * outerCenterRatio);
+      } else {
+          const frameStr = `${settings.frameNumber}`;
+          ctx.fillText(frameStr, canvas.width - ctx.measureText(frameStr).width - canvas.width * 0.05, borderSize * outerCenterRatio);
+      }
+      if (!isGC400) {
+           ctx.font = `normal ${Math.floor(fontSize * 0.7)}px ${preset.fontFamily}`;
+           ctx.fillText('SAFETY FILM', canvas.width * 0.05, (canvas.height - borderSize) + borderSize * outerCenterRatio);
+      }
+      if (settings.showDate) {
+        ctx.font = `normal ${Math.floor(fontSize * 0.75)}px ${preset.fontFamily}`;
+        ctx.fillText(finalDateStr, canvas.width - ctx.measureText(finalDateStr).width - canvas.width * 0.05, (canvas.height - borderSize) + borderSize * innerCenterRatio);
+      }
+  }
+
+  return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality);
+};
+
+/**
+ * 模式 B: 生成胶片长条 (Film Strip)
+ */
+export const generateFilmStrip = async (
+  images: ImageItem[],
+  settings: FilmSettings
+): Promise<string> => {
+  if (images.length === 0) return '';
+
+  if ((settings.frameRenderMode ?? 'real135') === 'real135') {
+    const realStrip = await generateReal135FilmStrip(images, settings);
+    if (realStrip) return realStrip;
+  }
+  
+  const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
+  
+  // === 1. 物理几何常量 ===
+  const MAX_PER_ROW = 6; 
+  const STRIP_HEIGHT_PX = 1600; 
+  const ROW_GAP = 120; 
+  
+  const BORDER_RATIO = 0.16;
+  const borderSize = Math.floor(STRIP_HEIGHT_PX * BORDER_RATIO); 
+  const imageAreaHeight = STRIP_HEIGHT_PX - (borderSize * 2);
+
+  const FRAME_WIDTH = imageAreaHeight * 1.5; 
+  const FRAME_GAP = FRAME_WIDTH * 0.055;
+
+  // === 2. 计算画布总尺寸 ===
+  const totalImages = images.length;
+  const numRows = Math.ceil(totalImages / MAX_PER_ROW);
+  const colsInMaxRow = Math.min(totalImages, MAX_PER_ROW);
+  
+  const START_GAP = FRAME_WIDTH * 0.2;
+  const END_GAP = FRAME_WIDTH * 0.2;
+  
+  const totalWidth = START_GAP + (FRAME_WIDTH * colsInMaxRow) + (FRAME_GAP * (Math.max(0, colsInMaxRow - 1))) + END_GAP;
+  const totalHeight = (numRows * STRIP_HEIGHT_PX) + ((numRows - 1) * ROW_GAP);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = totalWidth;
+  canvas.height = totalHeight;
+  const ctx = canvas.getContext('2d', { alpha: true }); 
+  if (!ctx) throw new Error("Canvas init failed");
+
+  // === 3. 逐行绘制 (优化：串行加载图片以节省内存) ===
+  for (let row = 0; row < numRows; row++) {
+    const rowOffsetY = row * (STRIP_HEIGHT_PX + ROW_GAP);
+    const startGlobalIdx = row * MAX_PER_ROW;
+    const endGlobalIdx = Math.min(startGlobalIdx + MAX_PER_ROW, totalImages);
+    
+    // 3.1 绘制该行的底色
+    ctx.fillStyle = settings.borderColor;
+    ctx.fillRect(0, rowOffsetY, totalWidth, STRIP_HEIGHT_PX);
+
+    // 3.2 串行处理该行每一张图片
+    for (let i = 0; i < (endGlobalIdx - startGlobalIdx); i++) {
+        const globalIdx = startGlobalIdx + i;
+        const imgItem = images[globalIdx];
+        
+        // 关键内存优化：每次只加载一张大图，画完立即释放引用
+        // 之前 Promise.all 会同时将所有大图加载进内存
+        const img = await loadImage(imgItem.previewUrl);
+
+        const frameX = START_GAP + i * (FRAME_WIDTH + FRAME_GAP);
+        const frameY = rowOffsetY + borderSize;
+        const isPortrait = img.height > img.width;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(frameX, frameY, FRAME_WIDTH, imageAreaHeight);
+        ctx.clip();
+
+        if (isPortrait) {
+            const centerX = frameX + FRAME_WIDTH / 2;
+            const centerY = frameY + imageAreaHeight / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(-Math.PI / 2);
+            
+            const scale = Math.max(FRAME_WIDTH / img.height, imageAreaHeight / img.width);
+            ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+            const scale = Math.max(FRAME_WIDTH / img.width, imageAreaHeight / img.height);
+            const drawW = img.width * scale;
+            const drawH = img.height * scale;
+            ctx.drawImage(img, frameX + (FRAME_WIDTH - drawW) / 2, frameY + (imageAreaHeight - drawH) / 2, drawW, drawH);
+        }
+        ctx.restore();
+
+        // 施加颗粒 (使用优化后的算法)
+        drawGrain(ctx, frameX, frameY, FRAME_WIDTH, imageAreaHeight, settings.grainIntensity);
+    }
+
+    // 3.3 绘制齿孔 (与图片加载无关，可以批量绘制)
+    const holeH = borderSize * 0.60; 
+    const holeW = holeH * 0.74; 
+    const holePaddingFromImage = borderSize * 0.04; 
+    
+    const holeYTopLocal = borderSize - holeH - holePaddingFromImage;
+    const holeYBottomLocal = (STRIP_HEIGHT_PX - borderSize) + holePaddingFromImage;
+    
+    const holeYTop = rowOffsetY + holeYTopLocal;
+    const holeYBottom = rowOffsetY + holeYBottomLocal;
+
+    const HOLES_PER_FRAME = 6;
+    const pitch = (FRAME_WIDTH + FRAME_GAP) / HOLES_PER_FRAME; 
+    const holeStartX = START_GAP - (pitch * 0.5);
+    const numHoles = Math.ceil((totalWidth - holeStartX) / pitch) + 1;
+
+    for (let k = 0; k < numHoles; k++) {
+      const x = holeStartX + k * pitch;
+      if (x > -holeW && x < totalWidth) {
+        drawHole(ctx, settings, x, holeYTop, holeW, holeH, borderSize);
+        drawHole(ctx, settings, x, holeYBottom, holeW, holeH, borderSize);
+      }
+    }
+
+    // 3.4 绘制文字
+    const textYTop = rowOffsetY + (holeYTopLocal / 2);
+    const textYBottom = rowOffsetY + (holeYBottomLocal + holeH) + (STRIP_HEIGHT_PX - (holeYBottomLocal + holeH)) / 2;
+
+    const isGC400 = settings.brandText.includes('GC 400');
+    const baseFontSize = borderSize * 0.22; 
+    
+    ctx.font = `${preset.fontWeight} ${Math.floor(baseFontSize)}px ${preset.fontFamily}`;
+    ctx.fillStyle = settings.textColor;
+    ctx.textBaseline = 'middle';
+
+    const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
+
+    // 重新遍历该行的数据绘制文字
+    const rowImages = images.slice(startGlobalIdx, endGlobalIdx);
+    rowImages.forEach((item, idx) => {
+      const frameX = START_GAP + idx * (FRAME_WIDTH + FRAME_GAP);
+      const globalIdx = startGlobalIdx + idx;
+      const frameNum = settings.frameNumber + globalIdx;
+      const dateStr = item.exifDate || settings.dateStr;
+
+      const paddingX = FRAME_WIDTH * 0.02;
+
+      // 1. 品牌名
+      ctx.textAlign = 'left';
+      ctx.fillText(brandText, frameX + paddingX, textYTop);
+
+      // 2. 帧编号
+      ctx.textAlign = 'right';
+      const frameLabel = isGC400 ? `${frameNum}A` : `${frameNum}A`;
+      ctx.fillText(frameLabel, frameX + FRAME_WIDTH - paddingX, textYTop);
+
+      // 3. 日期
+      if (settings.showDate) {
+        ctx.save();
+        ctx.font = `normal ${Math.floor(baseFontSize * 0.8)}px ${preset.fontFamily}`;
+        ctx.textAlign = 'right';
+        ctx.fillText(dateStr, frameX + FRAME_WIDTH - paddingX, textYBottom);
+        ctx.restore();
+      }
+
+      // 4. Safety Film
+      if (!isGC400) {
+        ctx.save();
+        ctx.font = `normal ${Math.floor(baseFontSize * 0.8)}px ${preset.fontFamily}`;
+        ctx.textAlign = 'left';
+        ctx.fillText("SAFETY FILM", frameX + paddingX, textYBottom);
+        ctx.restore();
+      }
+    });
+  }
+
+  return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality);
+};
