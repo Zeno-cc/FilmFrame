@@ -88,7 +88,9 @@ Worker 若缺资产或任一步报错，不在 Worker 内执行 legacy 模板 fa
 
 ## 照片 cover 与旋转
 
-普通 cover：比较源宽高比和目标宽高比，裁掉多余宽或高，居中绘制。
+普通 cover 由共享 `RenderTransform` 控制。每张图片默认 `{focusX:0.5, focusY:0.5, zoom:1, quarterTurns:0}`，因此与旧居中 cover 等价。`focusX/focusY` 是 `[0,1]` 连续位置，`zoom` 是 `[1,3]` 的 cover 基准倍率，旋转只接受四分之一圈；旧 transform 缺少 zoom 时自动补 1。
+
+`createCoverPlacement()` 先应用用户旋转，再依据旋转后尺寸判断是否需要真实 135 自动旋入；随后把连续位置映射到自动旋入后的坐标，计算 `minimum cover scale * zoom`、overflow 和有界偏移。主线程与 Worker 使用同一 placement，拖动和缩放不会暴露空白。
 
 竖图进入横向片窗的条件：
 
@@ -100,9 +102,11 @@ sourceHeight > sourceWidth && frameWidth > frameHeight
 
 - 片窗内顺时针 `Math.PI / 2`；
 - 旋转后以源高作为逻辑宽、源宽作为逻辑高做 cover；
-- 单张输出最后逆时针 `-Math.PI / 2` 恢复产品方向。
+- 单张输出最后只恢复自动旋入的角度，不撤销用户旋转。
 
-这意味着照片一定可能发生中心裁切，当前没有裁切位置或缩放 UI。EXIF orientation 是否已被 `Image` / `createImageBitmap` 统一处理依赖浏览器，需要目标浏览器实测。
+用户通过 `CropEditor` 在本地草稿中拖动照片、连续缩放、旋转或重置。点击完成后才把一次 normalized transform 写回 `ImageItem` 并触发即时胶片预览，pointermove 不运行昂贵 renderer。EXIF orientation 是否已被 `Image` / `createImageBitmap` 统一处理依赖浏览器，需要目标浏览器实测。
+
+裁切片窗不能直接使用原图比例。Gold 真实模板使用实际 `1123/800` aperture；竖向用户视图取其倒数。classic 的片窗跟随用户旋转后的原图比例。`getVisibleFrameAspect()` 统一这条 UI 几何契约，避免 4:3、16:9 原图在编辑器与成片之间发生隐形二次裁切。
 
 ## 分辨率策略
 

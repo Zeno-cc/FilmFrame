@@ -1,9 +1,10 @@
 # FilmFrame 项目交接入口
 
-> 最后核验：2026-07-11
+> 最后核验：2026-07-12
 >
-> 稳定化前基线：`main` / `a036da628e1538573769fc27950c1fee6b33aff6`
-> 重要：本文描述的是包含本交接文档的稳定化提交；分支、远端和工作区状态必须以当前 `git status` 为准。
+> 当前开发基线：`main` / `e5c5a84` 加 P0/P1 体验升级工作区
+>
+> 重要：分支、远端和工作区状态必须以当前 `git status` 为准。
 
 ## 0. 新会话先读这里
 
@@ -37,10 +38,10 @@ FilmFrame 是一个纯浏览器端的单页图片处理应用。用户把本地�
 | 输出 | JPEG/PNG 单张、连续胶片长条、Store 模式 ZIP32 |
 | 渲染模式 | `classic`；`real135` 仅在 Kodak Gold 200 下通过 UI 开放 |
 | 加速 | Gold 200 真实 135 在能力满足时走 Worker；classic 暂固定主线程 |
-| 状态 | React 内存状态；偏好写入 `localStorage`，图片和结果不持久化 |
+| 状态 | React 内存状态；偏好和本地配方写入 `localStorage`，图片和结果不持久化 |
 | 部署 | `dist/` 静态站；没有已落盘的有效平台配置 |
-| 测试现状 | Vitest；11 个测试文件、66 项断言；`npm run check` 聚合验证 |
-| 提交边界 | 本轮稳定化基于 `a036da628e15`，代码、测试和交接文档作为同一批次收束 |
+| 测试现状 | Vitest；16 个测试文件、117 项断言；`npm run check` 聚合验证 |
+| 当前开发 | P0 主流程/移动端与 P1 自由裁切创作闭环已实现，尚未提交 |
 
 ## 2. 快速开始
 
@@ -86,6 +87,11 @@ index.html
             -> filmEngine.ts         主线程 Canvas 与完整 fallback
        -> previewNavigation.ts       预览循环导航
        -> previewDownload.ts         下载源和文件名
+       -> previewRenderController.ts 即时预览 debounce/generation
+       -> renderTransform.ts         每图连续位置、缩放与旋转契约
+       -> workflowState.ts           任务状态、排序和主操作
+       -> recipeStorage.ts           本地设置配方
+       -> shareArtifact.ts           Web Share 文件分享
        -> zip.ts                     ZIP32 打包
        -> settingsStorage.ts         localStorage 偏好
 ```
@@ -115,12 +121,12 @@ index.html
 
 ## 5. 不可误判的技术事实
 
-- `App.tsx` 是 1100 多行单体根组件，承担 UI、状态和工作流编排。没有组件目录、路由或状态库。
+- `App.tsx` 是 1800 多行单体根组件，承担 UI、状态和工作流编排。没有组件目录、路由或状态库，下一轮应按已稳定契约拆分。
 - `filmEngine.ts` 和 `filmWorker.ts` 维护两套渲染实现，已经存在行为差异。涉及尺寸、旋转、纹理、长条、标记或导出时必须检查两边。
 - Worker client 懒创建；能力条件为 `Worker`、`OffscreenCanvas`、`convertToBlob`、`createImageBitmap` 全部存在，构造失败安全回退。
 - Worker 请求有 120 秒超时、`messageerror`、dispose 和卸载终止；晚到响应不会创建无主 Object URL。
 - 所有照片和成片由 `File`、Blob、Object URL 留在浏览器内存。偏好之外没有持久化。
-- 真实 135 会把竖图顺时针旋入横向 3:2 片窗，center-cover 裁切，再把最终单张成片逆时针旋回竖向。长条保持横向片窗排版。
+- 每张图可记录连续 focus、1-3x zoom 和四分之一旋转；`CropEditor` 只在完成时提交本地草稿。共享 RenderTransform 先应用用户旋转，再判断真实 135 自动旋入。单张只恢复自动旋入，不撤销用户旋转。
 - 视觉颗粒、灰尘、划痕和部分 DX 标记使用 `Math.random()`，同一输入不会得到逐像素确定的输出。
 - ZIP 是项目自研的 Store 模式 ZIP32，不压缩、无 ZIP64，单文件和总档案受约 4 GiB 边界约束。
 - 所有新画布受 32767 边长和 6400 万像素预算保护；ZIP 输入另限制为 256 MiB。
@@ -145,9 +151,9 @@ index.html
 ## 7. 当前最高优先级风险
 
 1. Worker 与主线程仍有重复渲染实现；classic 已固定主线程止血，但长期仍需共享渲染契约。
-2. 上传阶段对解码失败仍然容错接受，且只按 `image/*` MIME 判断；生成阶段虽有画布预算，但还缺总源像素预算。
+2. 上传已严格限制 JPEG/PNG/WebP 并拒绝解码失败；仍缺批次总源像素预算和 HEIC 等格式的明确转码策略。
 3. ZIP 有 256 MiB 输入预算并改为顺序读取，但仍是内存内 Store ZIP，不适合超大档案。
-4. 移动端排序、hover 操作和首屏布局不友好；模态和图标操作存在明显可访问性缺口。
+4. transform 已有共享几何与 payload 测试，但尚无真实 Canvas/OffscreenCanvas 像素基准矩阵。
 5. 生产发布会复制 `public/` 全部内容，包括 `.DS_Store`、素材说明和多个可能仅为中间产物的 PNG。
 6. `public/alipay.jpg` 仍损坏，需所有者提供正确原图。
 7. 开发工具链审计仍有 1 high、2 moderate、1 low；生产依赖审计为 0，升级需单独验证。

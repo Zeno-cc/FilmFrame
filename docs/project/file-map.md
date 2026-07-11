@@ -1,6 +1,6 @@
 # 文件与模块地图
 
-> 最后核验：2026-07-11。排除 `.git/`、`node_modules/`、`dist/` 和被忽略的手工浏览器产物。
+> 最后核验：2026-07-12。排除 `.git/`、`node_modules/`、`dist/` 和被忽略的手工浏览器产物。
 
 ## 根目录
 
@@ -23,12 +23,18 @@
 | `.gitignore` | 忽略依赖、dist、日志、Playwright、DS_Store | `public/.DS_Store` 仍会被构建复制 |
 | `handoff.md` | 项目接手入口 | 发布前更新快照 |
 
+## `components/`
+
+| 文件 | 职责 | 维护注意 |
+| --- | --- | --- |
+| `CropEditor.tsx` | 自由裁切本地草稿、直接拖动、缩放、旋转、复位与提交 | 只在完成时提交；预览几何必须继续复用 renderTransform 语义 |
+
 ## `services/`
 
 | 文件 | 公开入口 | 职责 |
 | --- | --- | --- |
 | `filmWorkerClient.ts` | `processImage`, `generateFilmStrip` | Worker 能力/策略判断、请求 Map、失败回退 |
-| `filmWorker.ts` | Worker `self.onmessage` | OffscreenCanvas 两模式两输出的渲染；当前未跟踪 |
+| `filmWorker.ts` | Worker `self.onmessage` | OffscreenCanvas 两模式两输出的渲染 |
 | `filmEngine.ts` | `processImage`, `processImageReal135`, `generateFilmStrip` | 主线程完整渲染、模板 fallback、经典模式 |
 | `filmGeometry.ts` | layout、cover、rotate helpers | 135 物理几何和图像装框 |
 | `filmOverlay.ts` | Gold URL/layout/segment/draw helpers | 模板 aperture 与连续长条布局 |
@@ -38,13 +44,18 @@
 | `filmMarkings.ts` | 135 marking helpers | 程序化文字和 DX-like 标记 |
 | `filmFrameNumber.ts` | normalize/positions/draw | 帧号循环和模板动态编号 |
 | `settingsStorage.ts` | normalize/merge/load/save | `filmFrame.preferences.v1` |
-| `uploadFiles.ts` | `prepareUploadedImages` | MIME、尺寸、大图警告、EXIF 编排；当前未跟踪 |
+| `uploadFiles.ts` | `prepareUploadedImages` | MIME allowlist、尺寸解码、大图警告、EXIF 编排 |
 | `previewNavigation.ts` | index/next/source | 纯函数预览导航 |
-| `previewDownload.ts` | source/name/build | 预览下载；当前未跟踪 |
+| `previewDownload.ts` | source/name/build | 预览下载 |
 | `zip.ts` | `createZipBlob` | 自研 Store ZIP32、CRC32 |
 | `renderResult.ts` | settings key、artifact、MIME 命名 | current/stale 结果身份 |
 | `imageBatch.ts` | 按 ID 合并、generation gate | 防旧批次覆盖最新列表 |
 | `renderBudget.ts` | canvas/strip budget | 分配大画布前拒绝超限 |
+| `renderTransform.ts` | normalize/key/cover placement | 连续位置、1-3x 缩放、用户旋转与自动旋入契约 |
+| `workflowState.ts` | status/select/move/primary action | UI 工作流纯函数 |
+| `previewRenderController.ts` | debounce/generation/revoke | 即时预览生命周期 |
+| `recipeStorage.ts` | load/save/delete | `filmFrame.recipes.v1` 本地配方 |
+| `shareArtifact.ts` | capability/share result | Web Share 文件边界 |
 
 依赖方向原则：UI 可以依赖 service；通用纯 service 不应反向依赖 `App`。渲染 helper 依赖 `types.ts`，但不应依赖 React。
 
@@ -55,7 +66,7 @@
 | `filmGeometry.test.ts` | 135 尺寸、帧号、旋转、模板/长条布局、分辨率 | Vitest 真实执行通过 |
 | `previewNavigation.test.ts` | 循环导航、源选择 | 真实执行通过 |
 | `settingsStorage.test.ts` | 白名单、钳制、存取 | 真实执行通过 |
-| `uploadFiles.test.ts` | MIME、大图、EXIF、容错 | 未跟踪；真实执行通过 |
+| `uploadFiles.test.ts` | MIME、大图、EXIF、解码失败回收 | Vitest 真实执行通过 |
 | `previewDownload.test.ts` | artifact 下载与未处理原图禁用 | Vitest 真实执行通过 |
 | `renderResult.test.ts` | MIME、settings key、stale、顺序 | Vitest 真实执行通过 |
 | `imageBatch.test.ts` | 删除晚到、新增/排序保留、generation | Vitest 真实执行通过 |
@@ -63,7 +74,7 @@
 | `renderBudget.test.ts` | 画布边长/面积和长条边界 | Vitest 真实执行通过 |
 | `zip.test.ts` | ZIP 签名和输入内存预算 | Vitest 真实执行通过 |
 
-测试由 Vitest 执行，当前 11 个文件、66 项断言。仍没有 coverage 和自动浏览器 spec。
+测试由 Vitest 执行，当前 16 个文件、117 项断言。新增 transform、workflow、preview controller、recipe 和 share 覆盖；仍没有 coverage 和自动浏览器 spec。
 
 ## `public/`
 

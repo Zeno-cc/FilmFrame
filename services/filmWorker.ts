@@ -1,4 +1,4 @@
-import { FilmSettings, FILM_PRESETS, FilmType, ImageItem } from '../types';
+import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
 import { drawKodakGoldFrameNumbers, getFrameNumberForIndex } from './filmFrameNumber';
 import {
@@ -8,7 +8,8 @@ import {
   KODAK_GOLD_APERTURE_SHADOW_URL,
   KODAK_GOLD_BASE_URL,
 } from './filmOverlay';
-import { getOutputRestoreRotationRadiansForFilmFrame, shouldAutoRotateForFilmFrame } from './filmGeometry';
+import { drawImageCoverAutoRotate, drawImageCoverWithTransform } from './filmGeometry';
+import { getAutoQuarterTurns, getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
 import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from './filmResolution';
 import { drawGrain } from './filmTexture';
 import { validateCanvasBudget } from './renderBudget';
@@ -19,6 +20,7 @@ type ProcessRequest = {
   file: File;
   settings: FilmSettings;
   dateOverride?: string;
+  transform?: RenderTransform;
 };
 
 type StripRequest = {
@@ -133,63 +135,6 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   return kodakGoldLayeredAssetsPromise;
 }
 
-function drawImageCover(
-  ctx: WorkerContext,
-  img: WorkerImage,
-  dx: number,
-  dy: number,
-  dw: number,
-  dh: number
-) {
-  const srcRatio = img.width / img.height;
-  const dstRatio = dw / dh;
-
-  let sx = 0;
-  let sy = 0;
-  let sw = img.width;
-  let sh = img.height;
-
-  if (srcRatio > dstRatio) {
-    sw = img.height * dstRatio;
-    sx = (img.width - sw) / 2;
-  } else {
-    sh = img.width / dstRatio;
-    sy = (img.height - sh) / 2;
-  }
-
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-}
-
-function drawImageCoverAutoRotate(
-  ctx: WorkerContext,
-  img: WorkerImage,
-  dx: number,
-  dy: number,
-  dw: number,
-  dh: number
-) {
-  if (!shouldAutoRotateForFilmFrame(img.width, img.height, dw, dh)) {
-    drawImageCover(ctx, img, dx, dy, dw, dh);
-    return;
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(dx, dy, dw, dh);
-  ctx.clip();
-  ctx.translate(dx + dw / 2, dy + dh / 2);
-  ctx.rotate(Math.PI / 2);
-
-  const rotatedW = img.height;
-  const rotatedH = img.width;
-  const scale = Math.max(dw / rotatedW, dh / rotatedH);
-  const drawW = img.width * scale;
-  const drawH = img.height * scale;
-
-  ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-  ctx.restore();
-}
-
 function createLuminanceAlphaMask(mask: WorkerImage, width: number, height: number): WorkerCanvas {
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d');
@@ -275,11 +220,20 @@ function restoreOutputOrientationForSource(
   canvas: WorkerCanvas,
   img: WorkerImage,
   frameWidth: number,
-  frameHeight: number
+  frameHeight: number,
+  transform?: RenderTransform,
 ) {
+  const normalized = normalizeRenderTransform(transform);
+  const autoQuarterTurns = getAutoQuarterTurns(
+    img.width,
+    img.height,
+    frameWidth,
+    frameHeight,
+    normalized.quarterTurns,
+  );
   return rotateCanvas(
     canvas,
-    getOutputRestoreRotationRadiansForFilmFrame(img.width, img.height, frameWidth, frameHeight)
+    -autoQuarterTurns * Math.PI / 2,
   );
 }
 
@@ -290,17 +244,18 @@ async function canvasToBlob(canvas: OffscreenCanvas, settings: FilmSettings) {
   });
 }
 
-async function renderClassicFrame(file: File, settings: FilmSettings, dateOverride?: string): Promise<Blob> {
+async function renderClassicFrame(file: File, settings: FilmSettings, dateOverride?: string, transform?: RenderTransform): Promise<Blob> {
   const img = await createImageBitmap(file);
   try {
     const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
     if (!preset) throw new Error('Invalid preset');
 
-    const isPortrait = img.height > img.width;
-    const baseDim = isPortrait ? img.height : img.width;
+    const rotated = getRotatedDimensions(img.width, img.height, normalizeRenderTransform(transform).quarterTurns);
+    const isPortrait = rotated.height > rotated.width;
+    const baseDim = isPortrait ? rotated.height : rotated.width;
     const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
-    const canvasWidth = isPortrait ? img.width + borderSize * 2 : img.width;
-    const canvasHeight = isPortrait ? img.height : img.height + borderSize * 2;
+    const canvasWidth = isPortrait ? rotated.width + borderSize * 2 : rotated.width;
+    const canvasHeight = isPortrait ? rotated.height : rotated.height + borderSize * 2;
     assertCanvasBudget(canvasWidth, canvasHeight);
     const canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -313,8 +268,8 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
 
     const imgX = isPortrait ? borderSize : 0;
     const imgY = isPortrait ? 0 : borderSize;
-    ctx.drawImage(img, imgX, imgY, img.width, img.height);
-    drawGrain(ctx, imgX, imgY, img.width, img.height, settings.grainIntensity);
+    drawImageCoverWithTransform(ctx, img, imgX, imgY, rotated.width, rotated.height, transform);
+    drawGrain(ctx, imgX, imgY, rotated.width, rotated.height, settings.grainIntensity);
 
     const holePerp = borderSize * 0.6;
     const holePara = holePerp * 0.74;
@@ -371,9 +326,9 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
   }
 }
 
-async function renderReal135Frame(file: File, settings: FilmSettings): Promise<Blob> {
+async function renderReal135Frame(file: File, settings: FilmSettings, transform?: RenderTransform): Promise<Blob> {
   if (settings.brandText !== FilmType.KODAK_GOLD_200 || settings.useFilmOverlayTemplate === false) {
-    return renderClassicFrame(file, { ...settings, frameRenderMode: 'classic' });
+    return renderClassicFrame(file, { ...settings, frameRenderMode: 'classic' }, undefined, transform);
   }
 
   const assets = await loadKodakGoldLayeredAssets();
@@ -397,7 +352,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings): Promise<B
 
     emulsionCtx.imageSmoothingEnabled = true;
     emulsionCtx.imageSmoothingQuality = 'high';
-    drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+    drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
     applyGold200Look(emulsionCtx as unknown as CanvasRenderingContext2D, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
     drawGrain(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
 
@@ -420,7 +375,8 @@ async function renderReal135Frame(file: File, settings: FilmSettings): Promise<B
       finalCanvas,
       img,
       targetImageWidthPx,
-      Math.round(targetImageWidthPx * 2 / 3)
+      Math.round(targetImageWidthPx * 2 / 3),
+      transform,
     );
 
     return canvasToBlob(outputCanvas, settings);
@@ -457,10 +413,15 @@ async function renderClassicStrip(images: ImageItem[], settings: FilmSettings): 
       const col = index % maxPerRow;
       const frameX = frameWidth * 0.2 + col * (frameWidth + gap);
       const frameY = row * (frameHeight + 100) + borderSize;
-      const scale = Math.max(frameWidth / img.width, imageHeight / img.height);
-      const drawW = img.width * scale;
-      const drawH = img.height * scale;
-      ctx.drawImage(img, frameX + (frameWidth - drawW) / 2, frameY + (imageHeight - drawH) / 2, drawW, drawH);
+      drawImageCoverAutoRotate(
+        ctx,
+        img,
+        frameX,
+        frameY,
+        frameWidth,
+        imageHeight,
+        images[index].transform,
+      );
       drawGrain(ctx, frameX, frameY, frameWidth, imageHeight, settings.grainIntensity);
     } finally {
       img.close();
@@ -632,7 +593,7 @@ async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): 
       const imageY = y + layout.frame.imageY;
 
       ctx.save();
-      drawImageCoverAutoRotate(ctx, img, imageX, imageY, layout.frame.imageW, layout.frame.imageH);
+      drawImageCoverAutoRotate(ctx, img, imageX, imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
       applyGold200Look(ctx as unknown as CanvasRenderingContext2D, imageX, imageY, layout.frame.imageW, layout.frame.imageH);
       drawGrain(ctx, imageX, imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
       ctx.strokeStyle = 'rgba(0,0,0,0.72)';
@@ -660,8 +621,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     const blob =
       request.type === 'processImage'
         ? (request.settings.frameRenderMode ?? 'real135') === 'real135'
-          ? await renderReal135Frame(request.file, request.settings)
-          : await renderClassicFrame(request.file, request.settings, request.dateOverride)
+          ? await renderReal135Frame(request.file, request.settings, request.transform)
+          : await renderClassicFrame(request.file, request.settings, request.dateOverride, request.transform)
         : (request.settings.frameRenderMode ?? 'real135') === 'real135'
           ? await renderReal135Strip(request.images, request.settings)
           : await renderClassicStrip(request.images, request.settings);

@@ -36,7 +36,7 @@ npm run build
 npm run check
 ```
 
-`npm run check` 依次执行真实测试、类型检查和构建。本轮实测 11 个测试文件、66 项断言全部通过。覆盖几何、旋转、帧号、结果身份、批次合并、下载、上传、设置、Worker 生命周期、共享颗粒实现、画布预算和 ZIP 预算。
+`npm run check` 依次执行真实测试、类型检查和构建。2026-07-12 实测 16 个测试文件、117 项断言全部通过。新增覆盖连续 transform/zoom 几何、真实片窗比例、非中心缩放稳定性、结果 key、Worker payload、工作流状态与 task ownership、严格上传、即时预览 generation、配方和 Web Share。
 
 旧 geometry 失败来自只被测试引用的 `getKodakGoldStripSegment()`；连续片基生产实现已不使用该 helper。本轮删除死 helper、死绘制函数和对应失真断言，其余几何断言保留。
 
@@ -127,7 +127,7 @@ npm run build
 
 - clone URL 从 `your-username` 改为真实仓库；
 - `npm install` 改为可复现的 `npm ci`；
-- 说明真实 Worker 是当前未提交开发态，提交后再作为稳定能力；
+- 说明 Worker、transform 与体验升级的当前提交边界；
 - 修正素材 fallback 顺序；
 - 不要说只复制单个 overlay，Vite 复制整个 public；
 - 补 `LICENSE` 后再明确 MIT；

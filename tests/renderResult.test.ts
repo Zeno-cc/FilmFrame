@@ -85,4 +85,30 @@ describe('render result identity', () => {
     expect(createImageRenderKey(settings, '2026/07/11'))
       .not.toBe(createImageRenderKey(settings, '2026/07/12'));
   });
+
+  it('changes only the transformed image key', () => {
+    const centered = { focusX: 0.5, focusY: 0.5, zoom: 1, quarterTurns: 0 } as const;
+    const left = { ...centered, focusX: 0 } as const;
+    const zoomed = { ...centered, zoom: 1.5 } as const;
+
+    expect(createImageRenderKey(settings, undefined, centered))
+      .not.toBe(createImageRenderKey(settings, undefined, left));
+    expect(createImageRenderKey(settings, undefined, centered))
+      .toBe(createImageRenderKey(settings, undefined, centered));
+    expect(createImageRenderKey(settings, undefined, centered))
+      .not.toBe(createImageRenderKey(settings, undefined, zoomed));
+  });
+
+  it('changes a strip key when any ordered image transform changes', () => {
+    const centered = { focusX: 0.5, focusY: 0.5, zoom: 1, quarterTurns: 0 } as const;
+    const rotated = { ...centered, zoom: 1.25, quarterTurns: 1 } as const;
+
+    expect(createOrderedStripKey(settings, [
+      { id: 'a', transform: centered },
+      { id: 'b', transform: centered },
+    ])).not.toBe(createOrderedStripKey(settings, [
+      { id: 'a', transform: centered },
+      { id: 'b', transform: rotated },
+    ]));
+  });
 });

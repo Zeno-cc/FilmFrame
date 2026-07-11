@@ -1,4 +1,5 @@
-import type { FilmSettings, OutputFormat } from '../types';
+import type { FilmSettings, OutputFormat, RenderTransform } from '../types';
+import { createRenderTransformKey } from './renderTransform';
 
 export interface RenderArtifact {
   url: string;
@@ -33,21 +34,25 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
 
 export function createOrderedStripKey(
   settings: FilmSettings,
-  orderedImageIds: readonly string[]
+  orderedImages: readonly (string | { id: string; transform?: RenderTransform })[]
 ): string {
   return JSON.stringify([
     createRenderSettingsKey(settings),
-    orderedImageIds,
+    orderedImages.map(image => typeof image === 'string'
+      ? [image, createRenderTransformKey()]
+      : [image.id, createRenderTransformKey(image.transform)]),
   ]);
 }
 
 export function createImageRenderKey(
   settings: FilmSettings,
   dateOverride?: string,
+  transform?: RenderTransform,
 ): string {
   return JSON.stringify([
     createRenderSettingsKey(settings),
     dateOverride ?? '',
+    createRenderTransformKey(transform),
   ]);
 }
 

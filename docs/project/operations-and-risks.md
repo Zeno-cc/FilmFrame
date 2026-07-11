@@ -1,21 +1,19 @@
 # 风险、排障与后续计划
 
-> 最后核验：2026-07-11。优先级是建议，不代表已获批准的开发计划。
+> 最后核验：2026-07-12。优先级是建议，不代表已获批准的开发计划。
 
 ## 已完成的 P0 稳定化
 
-- Vitest 已接管真实测试，`npm run check` 聚合 66 项断言、类型检查和构建。
+- Vitest 已接管真实测试，`npm run check` 聚合 117 项断言、类型检查和构建。
 - 单图和长条结果记录 MIME 与设置/顺序签名；stale 结果不再显示或下载。
 - 批次按图片 ID 合并，删除晚到结果会 revoke，不再整体覆盖最新数组。
 - Worker client 已有懒创建、构造失败回退、120 秒超时、`messageerror`、dispose 和晚到保护。
 - classic 暂固定主线程，避免已知双实现差异影响用户。
 - 画布和 ZIP 在分配/读取前执行统一容量预算。
 
-### 保护当前未提交工作
+### 当前 P0/P1 工作区
 
-影响：Worker、上传、下载与旋转修复尚未提交，任何 reset/覆盖都可能丢失工作。
-
-建议：每次接手先 `git status` 和 `git diff`；不要把远端 main 当当前实现。
+`e5c5a84` 之后的主流程、移动端、RenderTransform、即时预览、配方和分享升级尚未提交。每次接手必须先运行 `git status` 并阅读本轮两组计划文档。
 
 ## P1：渲染与资源可靠性
 
@@ -49,11 +47,9 @@ Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路�
 
 ## P1：产品正确性
 
-### 输入契约过宽
+### 输入契约
 
-`image/*` 允许文案之外的 SVG/GIF/HEIC；尺寸读取失败仍加入。
-
-建议：明确支持矩阵；用实际 decode 结果决定是否接受；对动画、SVG 和 HEIC 给出明确策略。
+当前只接受 JPEG/PNG/WebP 并要求尺寸解码成功。后续若支持 HEIC/动画格式，必须新增显式转码或首帧策略，不能扩大 MIME allowlist 后交给渲染阶段失败。
 
 ### 起始编号当前会话可为负数
 
@@ -64,9 +60,8 @@ Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路�
 ## P2：可维护性与体验
 
 - 拆分 `App.tsx` 的 settings/sidebar、workspace、preview dialogs 和 workflow hooks，但避免引入重型状态框架。
-- 移动端把上传入口前置；避免整屏 sidebar 和嵌套滚动。
-- 为排序提供触屏和键盘按钮；hover 操作增加常驻/焦点状态。
-- 模态增加 dialog 语义、焦点管理和 Escape。
+- 把 2026-07-12 的手工移动验收落为自动浏览器 spec。
+- 增加真实 Canvas/OffscreenCanvas 的 transform 构图基准矩阵。
 - 删除死配置或真正实现 `autoCropToFilmRatio`。
 - 决定是否加载 JetBrains Mono，或从预设说明移除。
 - 增加 LICENSE、CI、CHANGELOG、发布和 ADR 流程。

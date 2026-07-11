@@ -1,17 +1,17 @@
 
-import { FilmSettings, FILM_PRESETS, FilmType, ImageItem } from '../types';
+import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
 import { drawKodakGoldFrameNumbers, getFrameNumberForIndex } from './filmFrameNumber';
 import {
   create135LandscapeLayout,
   create135SidePerforationLayout,
-  drawImageCover,
   drawImageCoverAutoRotate,
+  drawImageCoverWithTransform,
   Film135Layout,
   Film135SideLayout,
-  getOutputRestoreRotationRadiansForFilmFrame,
   PHYS_135,
 } from './filmGeometry';
+import { getAutoQuarterTurns, getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
 import { draw135Markings, draw135SideMarkings } from './filmMarkings';
 import {
   KODAK_GOLD_APERTURE_MASK_URL,
@@ -145,11 +145,20 @@ function restoreOutputOrientationForSource(
   canvas: HTMLCanvasElement,
   img: HTMLImageElement,
   frameWidth: number,
-  frameHeight: number
+  frameHeight: number,
+  transform?: RenderTransform,
 ): HTMLCanvasElement {
+  const normalized = normalizeRenderTransform(transform);
+  const autoQuarterTurns = getAutoQuarterTurns(
+    img.width,
+    img.height,
+    frameWidth,
+    frameHeight,
+    normalized.quarterTurns,
+  );
   return rotateCanvas(
     canvas,
-    getOutputRestoreRotationRadiansForFilmFrame(img.width, img.height, frameWidth, frameHeight)
+    -autoQuarterTurns * Math.PI / 2,
   );
 }
 
@@ -507,7 +516,8 @@ function composeOnScannerCanvas(filmCanvas: HTMLCanvasElement): HTMLCanvasElemen
 export const processImageReal135 = async (
   imageSource: string,
   settings: FilmSettings,
-  dateOverride?: string
+  dateOverride?: string,
+  transform?: RenderTransform,
 ): Promise<string> => {
   const img = await loadImage(imageSource);
   const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
@@ -524,7 +534,7 @@ export const processImageReal135 = async (
   ctx.imageSmoothingQuality = 'high';
 
   drawReal135FilmBase(ctx, layout, settings);
-  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
   drawImageGateShadow(ctx, layout);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
@@ -542,13 +552,14 @@ export const processImageReal135 = async (
       ? composeOnScannerCanvas(filmCanvas)
       : filmCanvas;
 
-  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, layout.imageW, layout.imageH);
+  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, layout.imageW, layout.imageH, transform);
   return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
 };
 
 const processImageWithTemplateOverlay = async (
   imageSource: string,
-  settings: FilmSettings
+  settings: FilmSettings,
+  transform?: RenderTransform,
 ): Promise<string | null> => {
   if (settings.useFilmOverlayTemplate === false) return null;
 
@@ -561,14 +572,14 @@ const processImageWithTemplateOverlay = async (
       const overlay = await loadImage(settings.filmOverlayUrl || KODAK_GOLD_OVERLAY_URL);
       const img = await loadImage(imageSource);
       const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-      const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx);
+      const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx, transform);
 
       const finalCanvas =
         (settings.scanOutputAspect ?? 'native') === '4:3'
           ? composeOnScannerCanvas(canvas)
           : canvas;
 
-      const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3));
+      const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3), transform);
       return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
     } catch (legacyError) {
       console.warn('Film overlay template not available, falling back to programmatic renderer.', legacyError);
@@ -584,7 +595,8 @@ const processImageWithTemplateOverlay = async (
     layeredAssets.apertureMask,
     layeredAssets.apertureShadow,
     settings,
-    targetImageWidthPx
+    targetImageWidthPx,
+    transform,
   );
 
   const finalCanvas =
@@ -592,7 +604,7 @@ const processImageWithTemplateOverlay = async (
       ? composeOnScannerCanvas(canvas)
       : canvas;
 
-  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3));
+  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3), transform);
   return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
 };
 
@@ -600,7 +612,8 @@ function renderKodakGoldTemplateFrameCanvas(
   img: HTMLImageElement,
   overlay: HTMLImageElement,
   settings: FilmSettings,
-  targetImageWidthPx: number
+  targetImageWidthPx: number,
+  transform?: RenderTransform,
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   const canvas = document.createElement('canvas');
@@ -610,7 +623,7 @@ function renderKodakGoldTemplateFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings);
+  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings, transform);
   return canvas;
 }
 
@@ -620,7 +633,8 @@ function renderKodakGoldLayeredFrameCanvas(
   apertureMask: HTMLImageElement,
   apertureShadow: HTMLImageElement,
   settings: FilmSettings,
-  targetImageWidthPx: number
+  targetImageWidthPx: number,
+  transform?: RenderTransform,
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   const canvas = document.createElement('canvas');
@@ -630,7 +644,7 @@ function renderKodakGoldLayeredFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldLayeredFrame(ctx, img, base, apertureMask, apertureShadow, layout, settings);
+  drawKodakGoldLayeredFrame(ctx, img, base, apertureMask, apertureShadow, layout, settings, transform);
   return canvas;
 }
 
@@ -641,7 +655,8 @@ function drawKodakGoldLayeredFrame(
   apertureMask: HTMLImageElement,
   apertureShadow: HTMLImageElement,
   layout: KodakGoldOverlayLayout,
-  settings: FilmSettings
+  settings: FilmSettings,
+  transform?: RenderTransform,
 ) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -657,7 +672,7 @@ function drawKodakGoldLayeredFrame(
 
   emulsionCtx.imageSmoothingEnabled = true;
   emulsionCtx.imageSmoothingQuality = 'high';
-  drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     applyGold200Look(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
@@ -682,7 +697,8 @@ function drawKodakGoldTemplateFrame(
   img: HTMLImageElement,
   overlay: HTMLImageElement,
   layout: KodakGoldOverlayLayout,
-  settings: FilmSettings
+  settings: FilmSettings,
+  transform?: RenderTransform,
 ) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -690,7 +706,7 @@ function drawKodakGoldTemplateFrame(
   ctx.fillRect(0, 0, layout.filmW, layout.filmH);
 
   ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
-  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     applyGold200Look(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
@@ -901,7 +917,7 @@ const generateReal135FilmStrip = async (
     const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
 
     ctx.save();
-    drawImageCoverAutoRotate(ctx, img, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+    drawImageCoverAutoRotate(ctx, img, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
     if (settings.brandText === FilmType.KODAK_GOLD_200) {
       applyGold200Look(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
     }
@@ -923,24 +939,26 @@ const generateReal135FilmStrip = async (
 export const processImage = async (
   imageSource: string,
   settings: FilmSettings,
-  dateOverride?: string
+  dateOverride?: string,
+  transform?: RenderTransform,
 ): Promise<string> => {
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
-    const templatedResult = await processImageWithTemplateOverlay(imageSource, settings);
+    const templatedResult = await processImageWithTemplateOverlay(imageSource, settings, transform);
     if (templatedResult) return templatedResult;
 
-    return processImageReal135(imageSource, settings, dateOverride);
+    return processImageReal135(imageSource, settings, dateOverride, transform);
   }
 
   const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
   if (!preset) throw new Error("Invalid Preset");
 
   const img = await loadImage(imageSource);
-  const isPortrait = img.height > img.width;
-  const baseDim = isPortrait ? img.height : img.width;
+  const rotated = getRotatedDimensions(img.width, img.height, normalizeRenderTransform(transform).quarterTurns);
+  const isPortrait = rotated.height > rotated.width;
+  const baseDim = isPortrait ? rotated.height : rotated.width;
   const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
-  const canvasWidth = isPortrait ? img.width + borderSize * 2 : img.width;
-  const canvasHeight = isPortrait ? img.height : img.height + borderSize * 2;
+  const canvasWidth = isPortrait ? rotated.width + borderSize * 2 : rotated.width;
+  const canvasHeight = isPortrait ? rotated.height : rotated.height + borderSize * 2;
   assertCanvasBudget(canvasWidth, canvasHeight);
 
   const canvas = document.createElement('canvas');
@@ -957,7 +975,7 @@ export const processImage = async (
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 2. 绘制图像
-  let imgX = 0, imgY = 0, imgW = img.width, imgH = img.height;
+  let imgX = 0, imgY = 0, imgW = rotated.width, imgH = rotated.height;
   if (isPortrait) {
     imgX = borderSize;
     imgY = 0;
@@ -965,7 +983,7 @@ export const processImage = async (
     imgX = 0;
     imgY = borderSize;
   }
-  ctx.drawImage(img, imgX, imgY, imgW, imgH);
+  drawImageCoverWithTransform(ctx, img, imgX, imgY, imgW, imgH, transform);
 
   // 3. 施加颗粒 (使用优化后的叠加算法)
   drawGrain(ctx, imgX, imgY, imgW, imgH, settings.grainIntensity);
@@ -1159,28 +1177,15 @@ export const generateFilmStrip = async (
 
         const frameX = START_GAP + i * (FRAME_WIDTH + FRAME_GAP);
         const frameY = rowOffsetY + borderSize;
-        const isPortrait = img.height > img.width;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(frameX, frameY, FRAME_WIDTH, imageAreaHeight);
-        ctx.clip();
-
-        if (isPortrait) {
-            const centerX = frameX + FRAME_WIDTH / 2;
-            const centerY = frameY + imageAreaHeight / 2;
-            ctx.translate(centerX, centerY);
-            ctx.rotate(Math.PI / 2);
-            
-            const scale = Math.max(FRAME_WIDTH / img.height, imageAreaHeight / img.width);
-            ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
-        } else {
-            const scale = Math.max(FRAME_WIDTH / img.width, imageAreaHeight / img.height);
-            const drawW = img.width * scale;
-            const drawH = img.height * scale;
-            ctx.drawImage(img, frameX + (FRAME_WIDTH - drawW) / 2, frameY + (imageAreaHeight - drawH) / 2, drawW, drawH);
-        }
-        ctx.restore();
+        drawImageCoverAutoRotate(
+          ctx,
+          img,
+          frameX,
+          frameY,
+          FRAME_WIDTH,
+          imageAreaHeight,
+          imgItem.transform,
+        );
 
         // 施加颗粒 (使用优化后的算法)
         drawGrain(ctx, frameX, frameY, FRAME_WIDTH, imageAreaHeight, settings.grainIntensity);

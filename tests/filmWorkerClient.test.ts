@@ -142,6 +142,27 @@ describe('createWorkerRenderer', () => {
     await expect(pending).rejects.toThrow('could not be deserialized');
     expect(worker.terminated).toBe(true);
   });
+
+  it('preserves transform in single and strip worker payloads', () => {
+    const { renderer, worker } = createHarness();
+    const transform = { focusX: 0.237, focusY: 0.816, zoom: 1.75, quarterTurns: 3 } as const;
+    const single = renderer.processImage({} as File, settings, undefined, transform);
+    const strip = renderer.generateFilmStrip([{
+      id: 'one',
+      file: {} as File,
+      previewUrl: 'blob:one',
+      transform,
+    }], settings);
+
+    expect(worker.messages[0]).toMatchObject({ type: 'processImage', transform });
+    expect(worker.messages[1]).toMatchObject({
+      type: 'generateFilmStrip',
+      images: [{ id: 'one', transform }],
+    });
+    renderer.dispose();
+    void single.catch(() => undefined);
+    void strip.catch(() => undefined);
+  });
 });
 
 describe('worker routing policy', () => {

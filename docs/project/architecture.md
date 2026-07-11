@@ -1,6 +1,6 @@
 # 系统架构与数据流
 
-> 最后核验：2026-07-11。本文描述当前工作区，不只描述 `HEAD`。
+> 最后核验：2026-07-12。本文描述 `e5c5a84` 加当前 P0/P1 工作区。
 
 ## 总体结构
 
@@ -61,11 +61,11 @@ Browser main thread
 
 ### `ImageItem`
 
-`ImageItem` 是页面会话内图片的所有权单元：原始 `File`、原始预览 URL、可选处理结果 URL、EXIF 日期和处理错误。数组顺序本身承载业务顺序。
+`ImageItem` 是页面会话内图片的所有权单元：原始 `File`、原始预览 URL、可选处理结果 URL、EXIF 日期、处理错误和可选 `RenderTransform`。transform 包含连续 `focusX/focusY`、`1-3x zoom` 与 `0/90/180/270` 用户旋转；数组顺序本身承载业务顺序。裁切编辑期间的 draft 只存在于 `CropEditor`，完成后才写回 ImageItem。
 
 ### React 状态
 
-`App` 管理：`images`、`settings`、`processing`、`preview`、`outputMode`、`stripResult`、三个覆盖层/错误相关状态和上传拖入状态。
+`App` 管理：图片/设置/输出、处理与导出状态、active/queued ID、即时预览、notice/error、移动设置展开、配方和覆盖层。`workflowState.ts` 负责可见状态推导，避免 JSX 直接用 URL 猜测状态。
 
 `imagesRef`、`settingsRef`、`stripResultRef` 用于读取最新状态和卸载清理。处理任务保存 immutable 输入快照，但每个结果通过 ID 合并到 `imagesRef.current`；generation 和设置签名决定结果是否可接受或只作为 stale 历史结果保留。
 
@@ -75,7 +75,7 @@ Browser main thread
 FileList / DataTransfer.files
   -> addFiles
   -> prepareUploadedImages
-       MIME prefix check
+       JPEG/PNG/WebP allowlist
        URL.createObjectURL
        Image decode for dimensions
        size warning
@@ -84,7 +84,7 @@ FileList / DataTransfer.files
   -> React render
 ```
 
-处理是逐文件串行。对无效 MIME 不创建 URL。对已创建 URL 后的尺寸/EXIF 失败不回收也不拒绝，因为图片仍进入列表供后续渲染尝试。
+处理是逐文件串行。无效 MIME 不创建 URL；尺寸解码失败会拒绝文件并回收 preview URL；EXIF 失败不阻止已成功解码的图片加入。大图只产生非阻塞 warning。
 
 ## 渲染门面与 Worker 协议
 
@@ -136,7 +136,7 @@ idle
   -> processing=false
 ```
 
-结果携带 MIME 与 settings key。当前设置或帧号/顺序不匹配时，旧结果不会作为 current 显示和下载；新批次替换时回收旧 URL。
+结果携带 MIME 与 settings key。单图 key 还包含 EXIF override 和 transform；长条 key 包含设置、有序图片 ID 和逐图 transform。当前签名不匹配时，旧结果显示为“待更新”且不可下载；新批次替换时回收旧 URL。
 
 ## Object URL 所有权
 
@@ -147,12 +147,13 @@ idle
 | `stripResult.url` | Worker client / main engine | 图片数组变化、签名拒绝、替换结果、App 卸载 |
 | ZIP 临时 URL | `downloadBlob` | 下载触发 1 秒后 |
 | file-to-main-thread 临时 URL | `withImageSourceUrl` | `finally`，仅无 fallback URL 时 |
+| 即时编辑预览 URL | `previewRenderController` | 新预览替换、generation 拒绝、关闭编辑器 |
 
 潜在泄漏：App 卸载后仍完成的异步请求可能创建新的 URL；没有 abort 或 mounted guard 捕获它。
 
 ## 偏好存储
 
-唯一 key 为 `filmFrame.preferences.v1`。读写均包在 `try/catch`，不可用、配额、隐私模式和 JSON 损坏时静默回退。
+设置偏好 key 为 `filmFrame.preferences.v1`，本地配方 key 为 `filmFrame.recipes.v1`。两者读写均包在 `try/catch`；配方最多 12 条，只保存白名单设置，不保存图片、Blob、URL 或 transform。
 
 存储前执行白名单归一化：
 

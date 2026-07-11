@@ -29,6 +29,15 @@ export type FrameRenderMode = 'classic' | 'real135';
 export type ScanOutputAspect = 'native' | '4:3';
 export type ProcessingMode = 'preview' | 'high';
 export type OutputMode = 'single' | 'strip';
+export type FocusAnchor = number;
+export type QuarterTurn = 0 | 1 | 2 | 3;
+
+export interface RenderTransform {
+  focusX: FocusAnchor;
+  focusY: FocusAnchor;
+  zoom?: number;
+  quarterTurns: QuarterTurn;
+}
 
 export interface FilmSettings {
   brandText: FilmType;
@@ -63,6 +72,7 @@ export interface ImageItem {
   processedSettingsKey?: string;
   exifDate?: string;
   processingError?: string;
+  transform?: RenderTransform;
 }
 
 export interface FilmPreset {

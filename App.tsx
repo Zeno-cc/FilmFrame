@@ -3,10 +3,18 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
 import { disposeFilmWorkerClient, processImage, generateFilmStrip } from './services/filmWorkerClient';
 import { createZipBlob } from './services/zip';
-import { loadPreferences, savePreferences } from './services/settingsStorage';
+import { loadPreferences, mergeSettings, savePreferences } from './services/settingsStorage';
 import { buildPreviewDownload } from './services/previewDownload';
 import { prepareUploadedImages } from './services/uploadFiles';
 import { acceptImageRenderResult } from './services/imageBatch';
+import {
+  deriveImageWorkflowStatus,
+  getPrimaryAction,
+  isImageTaskContextCurrent,
+  isImageRemovalAllowed,
+  moveItem,
+  type ImageWorkflowStatus,
+} from './services/workflowState';
 import {
   createArtifactFilename,
   createImageRenderKey,
@@ -18,6 +26,12 @@ import {
   getPreviewImageIndex,
   PreviewDirection,
 } from './services/previewNavigation';
+import { DEFAULT_RENDER_TRANSFORM, normalizeRenderTransform } from './services/renderTransform';
+import { deleteRecipe, loadRecipes, saveRecipe } from './services/recipeStorage';
+import { shareArtifact } from './services/shareArtifact';
+import { createPreviewRenderController } from './services/previewRenderController';
+import { KODAK_GOLD_APERTURE_ASPECT } from './services/filmOverlay';
+import CropEditor from './components/CropEditor';
 // Security Fix: Import EXIF from local dependency instead of external CDN
 import EXIF from 'exif-js';
 
@@ -37,6 +51,11 @@ const GithubIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4 4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
 const AlertCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
 const RetryIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 8h5V3"/></svg>;
+const ArrowUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
+const ArrowDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+const RotateIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>;
+const ShareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51 8.59 10.49"/></svg>;
+const CropIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>;
 
 const FilmLogoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -97,6 +116,17 @@ type PreviewState =
   | { type: 'single'; imageId: string }
   | { type: 'strip' };
 
+type Notice = {
+  tone: 'info' | 'warning' | 'success';
+  message: string;
+};
+
+type PreviewRenderRequest = {
+  item: ImageItem;
+  index: number;
+  settings: FilmSettings;
+};
+
 function revokeObjectUrl(url?: string | null) {
   if (url?.startsWith('blob:')) {
     URL.revokeObjectURL(url);
@@ -128,7 +158,7 @@ function getCurrentImageArtifact(
   }
 
   const imageSettings = settingsForImage(settings, index);
-  const settingsKey = createImageRenderKey(imageSettings, item.exifDate);
+  const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform);
   if (item.processedMime !== settings.outputFormat || item.processedSettingsKey !== settingsKey) {
     return null;
   }
@@ -138,6 +168,23 @@ function getCurrentImageArtifact(
     mime: item.processedMime,
     settingsKey: item.processedSettingsKey,
   };
+}
+
+function statusBadgeClass(status: ImageWorkflowStatus): string {
+  switch (status.kind) {
+    case 'complete':
+      return 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200';
+    case 'processing':
+      return 'border-amber-400/30 bg-amber-400/10 text-amber-100';
+    case 'queued':
+      return 'border-sky-400/25 bg-sky-400/10 text-sky-200';
+    case 'failed':
+      return 'border-red-400/30 bg-red-400/10 text-red-200';
+    case 'stale':
+      return 'border-orange-400/25 bg-orange-400/10 text-orange-200';
+    default:
+      return 'border-white/10 bg-black/45 text-gray-300';
+  }
 }
 
 function readImageSize(src: string): Promise<{ width: number; height: number }> {
@@ -154,19 +201,39 @@ const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [settings, setSettings] = useState<FilmSettings>(() => initialPreferences.settings);
   const [processing, setProcessing] = useState(false);
+  const [activeBatchMode, setActiveBatchMode] = useState<OutputMode | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>(() => initialPreferences.outputMode);
   const [stripResult, setStripResult] = useState<RenderArtifact | null>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
+  const [queuedImageIds, setQueuedImageIds] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recipes, setRecipes] = useState(() => loadRecipes());
+  const [recipeName, setRecipeName] = useState('');
+  const [selectedRecipeId, setSelectedRecipeId] = useState('');
+  const [previewSourceMode, setPreviewSourceMode] = useState<'before' | 'after'>('after');
+  const [editorPreviewUrl, setEditorPreviewUrl] = useState<string | null>(null);
+  const [previewRendering, setPreviewRendering] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const settingsPanelRef = useRef<HTMLElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const imagesRef = useRef<ImageItem[]>([]);
   const settingsRef = useRef<FilmSettings>(settings);
   const stripResultRef = useRef<RenderArtifact | null>(null);
   const renderGenerationRef = useRef(0);
   const mountedRef = useRef(true);
+  const dialogCloseRef = useRef<HTMLButtonElement>(null);
+  const dialogRootRef = useRef<HTMLDivElement>(null);
+  const cropTriggerRef = useRef<HTMLButtonElement>(null);
+  const isCroppingRef = useRef(false);
   const supportsReal135Template = settings.brandText === FilmType.KODAK_GOLD_200;
   const isReal135Mode = supportsReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
 
@@ -212,6 +279,16 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const closeCropEditor = useCallback(() => {
+    isCroppingRef.current = false;
+    setIsCropping(false);
+    window.requestAnimationFrame(() => cropTriggerRef.current?.focus({ preventScroll: true }));
+  }, []);
+
+  useEffect(() => {
+    isCroppingRef.current = isCropping;
+  }, [isCropping]);
+
   useEffect(() => {
     if (!preview) return;
 
@@ -234,12 +311,8 @@ const App: React.FC = () => {
     if (!preview) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setPreview(null);
-        return;
-      }
-
       if (preview.type !== 'single') return;
+      if (isCropping) return;
 
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
@@ -252,7 +325,43 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigatePreview, preview]);
+  }, [isCropping, navigatePreview, preview]);
+
+  const activeDialog = errorMsg ? 'error' : showDonate ? 'donate' : preview ? 'preview' : null;
+  useEffect(() => {
+    if (!activeDialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => dialogCloseRef.current?.focus());
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (activeDialog === 'error') setErrorMsg(null);
+        else if (activeDialog === 'donate') setShowDonate(false);
+        else if (isCroppingRef.current) closeCropEditor();
+        else setPreview(null);
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRootRef.current) return;
+      const focusable = Array.from(
+        dialogRootRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      ).filter(element => element.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('keydown', handleDialogKeyDown);
+      previousFocus?.focus();
+    };
+  }, [activeDialog, closeCropEditor]);
 
   useEffect(() => {
     const preset = FILM_PRESETS[settings.brandText];
@@ -297,15 +406,18 @@ const App: React.FC = () => {
     const { images: newImages, errors: uploadErrors, warnings: uploadWarnings } = await prepareUploadedImages(files, {
       createId: () => Math.random().toString(36).substr(2, 9),
       createObjectUrl: file => URL.createObjectURL(file),
+      revokeObjectUrl,
       readImageSize,
       readExifDate,
     });
 
-    if (uploadErrors.length > 0 || uploadWarnings.length > 0) {
-      const messages = [];
-      if (uploadErrors.length > 0) messages.push(`无法添加以下文件：\n${uploadErrors.join('\n')}`);
-      if (uploadWarnings.length > 0) messages.push(`大图提示：\n${uploadWarnings.join('\n')}`);
-      setErrorMsg(messages.join('\n\n'));
+    if (uploadErrors.length > 0) {
+      setErrorMsg(`无法添加以下文件：\n${uploadErrors.join('\n')}`);
+    }
+    if (uploadWarnings.length > 0) {
+      setNotice({ tone: 'warning', message: `大图提示：${uploadWarnings.join('；')}` });
+    } else if (newImages.length > 0) {
+      setNotice({ tone: 'success', message: `已添加 ${newImages.length} 张照片，照片仅在本机处理。` });
     }
 
     setImages(prev => {
@@ -323,6 +435,7 @@ const App: React.FC = () => {
   }, [addFiles]);
 
   const removeImage = (id: string) => {
+    if (!isImageRemovalAllowed(processing, outputMode, exporting)) return;
     const currentImages = imagesRef.current;
     const targetIndex = currentImages.findIndex(img => img.id === id);
     const target = targetIndex >= 0 ? currentImages[targetIndex] : undefined;
@@ -339,27 +452,46 @@ const App: React.FC = () => {
     }
   };
 
-  const processAll = async () => {
-    if (processing) return;
+  const processAll = async (force = false) => {
+    if (processing || exporting) return;
 
-    const batchImages = [...imagesRef.current];
+    const sourceImages = [...imagesRef.current];
     const batchSettings = settings;
     const batchMode = outputMode;
-    if (batchImages.length === 0) return;
+    if (sourceImages.length === 0) return;
+
+    const batchEntries = sourceImages
+      .map((item, index) => ({ item, index }))
+      .filter(({ item, index }) => {
+        if (batchMode === 'strip' || force) return true;
+        const imageSettings = settingsForImage(batchSettings, index);
+        return deriveImageWorkflowStatus(item, {
+          expectedMime: batchSettings.outputFormat,
+          expectedSettingsKey: createImageRenderKey(imageSettings, item.exifDate, item.transform),
+        }).kind !== 'complete';
+      });
+    const batchImages = batchEntries.map(entry => entry.item);
+    if (batchImages.length === 0) {
+      setNotice({ tone: 'info', message: '当前成片均为最新，无需重新冲洗。' });
+      return;
+    }
 
     const generation = ++renderGenerationRef.current;
     setProcessing(true);
+    setActiveBatchMode(batchMode);
     setErrorMsg(null);
+    setNotice(null);
+    setQueuedImageIds(batchMode === 'single' ? batchImages.map(item => item.id) : []);
     setProcessingMessage(batchMode === 'strip' ? '正在拼合胶片长条...' : `正在处理 1/${batchImages.length}`);
 
     try {
       if (batchMode === 'strip') {
-        const settingsKey = createOrderedStripKey(batchSettings, batchImages.map(item => item.id));
+        const settingsKey = createOrderedStripKey(batchSettings, batchImages);
         setProcessingMessage(`正在拼合 ${batchImages.length} 张照片...`);
         const url = await generateFilmStrip(batchImages, batchSettings);
         const currentKey = createOrderedStripKey(
           settingsRef.current,
-          imagesRef.current.map(item => item.id),
+          imagesRef.current,
         );
 
         if (!mountedRef.current || generation !== renderGenerationRef.current || currentKey !== settingsKey) {
@@ -379,18 +511,38 @@ const App: React.FC = () => {
         });
       } else {
         const failedFiles: string[] = [];
-        for (let i = 0; i < batchImages.length; i++) {
-          const item = batchImages[i];
-          const imageSettings = settingsForImage(batchSettings, i);
-          const settingsKey = createImageRenderKey(imageSettings, item.exifDate);
+        let completedCount = 0;
+        for (let i = 0; i < batchEntries.length; i++) {
+          if (generation !== renderGenerationRef.current) break;
+          const { item, index } = batchEntries[i];
+          if (!imagesRef.current.some(current => current.id === item.id)) continue;
+          const imageSettings = settingsForImage(batchSettings, index);
+          const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform);
+          setActiveImageId(item.id);
+          setQueuedImageIds(batchEntries.slice(i + 1).map(entry => entry.item.id));
           setProcessingMessage(`正在处理 ${i + 1}/${batchImages.length}`);
           try {
             const resultUrl = await processImage(
               item.file,
               imageSettings,
               item.exifDate,
-              item.previewUrl
+              item.previewUrl,
+              item.transform,
             );
+
+            const currentIndex = imagesRef.current.findIndex(current => current.id === item.id);
+            const currentItem = imagesRef.current[currentIndex];
+            const currentSettingsKey = currentItem && currentIndex >= 0
+              ? createImageRenderKey(
+                  settingsForImage(settingsRef.current, currentIndex),
+                  currentItem.exifDate,
+                  currentItem.transform,
+                )
+              : null;
+            if (currentSettingsKey !== settingsKey) {
+              revokeObjectUrl(resultUrl);
+              continue;
+            }
 
             const merged = acceptImageRenderResult(
               imagesRef.current,
@@ -412,7 +564,18 @@ const App: React.FC = () => {
             imagesRef.current = merged.items;
             setImages(merged.items);
             revokeObjectUrl(merged.replacedUrl);
+            completedCount += 1;
           } catch (err) {
+            const taskStillCurrent = isImageTaskContextCurrent({
+              mounted: mountedRef.current,
+              resultGeneration: generation,
+              currentGeneration: renderGenerationRef.current,
+              itemExists: imagesRef.current.some(current => current.id === item.id),
+            });
+            if (!taskStillCurrent) {
+              if (!mountedRef.current || generation !== renderGenerationRef.current) break;
+              continue;
+            }
             console.error('Processing failed for image', i, err);
             failedFiles.push(item.file.name);
             if (generation === renderGenerationRef.current) {
@@ -426,23 +589,46 @@ const App: React.FC = () => {
             }
           }
         }
-        if (failedFiles.length > 0) {
-          setErrorMsg(`以下文件处理失败，其他图片已保留处理结果：\n${failedFiles.map(name => `"${name}"`).join('\n')}`);
+        if (mountedRef.current && generation === renderGenerationRef.current) {
+          if (failedFiles.length > 0) {
+            setErrorMsg(`以下文件处理失败，其他图片已保留处理结果：\n${failedFiles.map(name => `"${name}"`).join('\n')}`);
+          }
+          setNotice({
+            tone: failedFiles.length > 0 ? 'warning' : 'success',
+            message: failedFiles.length > 0
+              ? `这一卷已完成 ${completedCount} 张，${failedFiles.length} 张需要处理。`
+              : `这一卷冲洗完成，共 ${completedCount} 张成片。`,
+          });
         }
       }
     } catch (e) {
+      if (!mountedRef.current || generation !== renderGenerationRef.current) return;
       console.error(e);
       setErrorMsg('处理过程中发生错误，可能是图片文件损坏或内存不足。');
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
         setProcessing(false);
+        setActiveBatchMode(null);
         setProcessingMessage('');
+        setActiveImageId(null);
+        setQueuedImageIds([]);
       }
     }
   };
 
+  const stopProcessing = () => {
+    if (!processing) return;
+    renderGenerationRef.current += 1;
+    setProcessing(false);
+    setActiveBatchMode(null);
+    setProcessingMessage('');
+    setActiveImageId(null);
+    setQueuedImageIds([]);
+    setNotice({ tone: 'info', message: '已停止后续冲洗，已完成的成片仍会保留。' });
+  };
+
   const retryImage = async (id: string) => {
-    if (processing) return;
+    if (processing || exporting) return;
 
     const currentImages = imagesRef.current;
     const index = currentImages.findIndex(img => img.id === id);
@@ -451,10 +637,12 @@ const App: React.FC = () => {
 
     const generation = ++renderGenerationRef.current;
     const retrySettings = settingsForImage(settings, index);
-    const settingsKey = createImageRenderKey(retrySettings, item.exifDate);
+    const settingsKey = createImageRenderKey(retrySettings, item.exifDate, item.transform);
 
     setProcessing(true);
+    setActiveBatchMode('single');
     setErrorMsg(null);
+    setActiveImageId(id);
     setProcessingMessage(`正在重试 ${item.file.name}`);
     setImages(prev => {
       const nextImages = prev.map(img =>
@@ -469,8 +657,23 @@ const App: React.FC = () => {
         item.file,
         retrySettings,
         item.exifDate,
-        item.previewUrl
+        item.previewUrl,
+        item.transform,
       );
+
+      const currentIndex = imagesRef.current.findIndex(current => current.id === id);
+      const currentItem = imagesRef.current[currentIndex];
+      const currentSettingsKey = currentItem && currentIndex >= 0
+        ? createImageRenderKey(
+            settingsForImage(settingsRef.current, currentIndex),
+            currentItem.exifDate,
+            currentItem.transform,
+          )
+        : null;
+      if (currentSettingsKey !== settingsKey) {
+        revokeObjectUrl(resultUrl);
+        return;
+      }
 
       const merged = acceptImageRenderResult(
         imagesRef.current,
@@ -493,6 +696,12 @@ const App: React.FC = () => {
       setImages(merged.items);
       revokeObjectUrl(merged.replacedUrl);
     } catch (err) {
+      if (!isImageTaskContextCurrent({
+        mounted: mountedRef.current,
+        resultGeneration: generation,
+        currentGeneration: renderGenerationRef.current,
+        itemExists: imagesRef.current.some(current => current.id === id),
+      })) return;
       console.error('Retry failed for image', id, err);
       setImages(prev => {
         const nextImages = prev.map(img =>
@@ -505,7 +714,9 @@ const App: React.FC = () => {
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
         setProcessing(false);
+        setActiveBatchMode(null);
         setProcessingMessage('');
+        setActiveImageId(null);
       }
     }
   };
@@ -527,8 +738,9 @@ const App: React.FC = () => {
   };
 
   const downloadAll = async () => {
+    if (exporting || processing) return;
     if (outputMode === 'strip') {
-      const currentKey = createOrderedStripKey(settings, images.map(item => item.id));
+      const currentKey = createOrderedStripKey(settings, images);
       if (stripResult?.settingsKey === currentKey && stripResult.mime === settings.outputFormat) {
         downloadImage(stripResult, `film_strip_${Date.now()}`);
       }
@@ -543,8 +755,11 @@ const App: React.FC = () => {
       }
 
       try {
+        setExporting(true);
+        setExportMessage(`正在打包 0/${processedImages.length}`);
         const zipFiles = [];
         for (let idx = 0; idx < processedImages.length; idx++) {
+          setExportMessage(`正在打包 ${idx + 1}/${processedImages.length}`);
           const { img, artifact } = processedImages[idx];
           const response = await fetch(artifact.url);
           if (!response.ok) throw new Error(`Failed to read generated image ${idx + 1}`);
@@ -560,18 +775,100 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Failed to create ZIP archive', error);
         setErrorMsg('打包下载失败，请重新处理图片后再试。');
+      } finally {
+        setExporting(false);
+        setExportMessage('');
       }
     }
   };
 
+  const moveImage = (id: string, direction: 'up' | 'down') => {
+    if (exporting) return;
+    const nextImages = moveItem(imagesRef.current, id, direction);
+    if (nextImages === imagesRef.current) return;
+    imagesRef.current = [...nextImages];
+    setImages([...nextImages]);
+  };
+
+  const updateImageTransform = (id: string, patch: Partial<NonNullable<ImageItem['transform']>>) => {
+    const nextImages = imagesRef.current.map(item =>
+      item.id === id
+        ? { ...item, transform: normalizeRenderTransform({ ...normalizeRenderTransform(item.transform), ...patch }) }
+        : item
+    );
+    imagesRef.current = nextImages;
+    setImages(nextImages);
+  };
+
+  const toggleMobileSettings = (trigger: HTMLButtonElement) => {
+    settingsTriggerRef.current = trigger;
+    setSettingsOpen(open => {
+      const next = !open;
+      if (next) {
+        window.requestAnimationFrame(() => {
+          settingsPanelRef.current?.scrollIntoView({ block: 'start' });
+          settingsPanelRef.current?.focus({ preventScroll: true });
+        });
+      } else {
+        window.requestAnimationFrame(() => settingsTriggerRef.current?.focus());
+      }
+      return next;
+    });
+  };
+
+  const saveCurrentRecipe = () => {
+    const next = saveRecipe(recipeName, settings);
+    setRecipes(next);
+    if (recipeName.trim()) {
+      setNotice({ tone: 'success', message: `配方“${recipeName.trim().slice(0, 40)}”已保存在本机。` });
+      setRecipeName('');
+    }
+  };
+
+  const applyRecipe = (recipeId: string) => {
+    const recipe = recipes.find(item => item.id === recipeId);
+    if (!recipe) return;
+    setSelectedRecipeId(recipeId);
+    setSettings(current => mergeSettings(current, recipe.settings));
+    setNotice({ tone: 'info', message: `已应用配方“${recipe.name}”，现有成片需要重新冲洗。` });
+  };
+
+  const removeRecipe = (recipeId: string) => {
+    setRecipes(deleteRecipe(recipeId));
+    if (selectedRecipeId === recipeId) setSelectedRecipeId('');
+  };
+
+  const shareCurrentPreview = async () => {
+    if (!previewImageItem || !previewImageArtifact) return;
+    try {
+      const response = await fetch(previewImageArtifact.url);
+      if (!response.ok) throw new Error('Unable to read generated image');
+      const blob = await response.blob();
+      const file = new File(
+        [blob],
+        createArtifactFilename(previewImageItem.file.name, previewImageArtifact.mime),
+        { type: previewImageArtifact.mime },
+      );
+      const result = await shareArtifact(file, {
+        title: 'FilmFrame 成片',
+        text: '由 FilmFrame 在本机冲洗完成',
+      });
+      if (result.status === 'shared') setNotice({ tone: 'success', message: '成片已交给系统分享。' });
+      else if (result.status === 'unsupported') setNotice({ tone: 'info', message: '当前浏览器不支持文件分享，请使用下载。' });
+      else if (result.status === 'failed') setNotice({ tone: 'warning', message: '分享失败，成片仍可下载。' });
+    } catch {
+      setNotice({ tone: 'warning', message: '分享失败，成片仍可下载。' });
+    }
+  };
+
   // --- Drag and Drop Handlers ---
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+  const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
     dragItem.current = index;
     // Set effect
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+  const handleDragEnter = (e: React.DragEvent<HTMLElement>, index: number) => {
      if (dragItem.current === null) return;
      if (dragItem.current === index) return;
 
@@ -589,7 +886,7 @@ const App: React.FC = () => {
     dragItem.current = null;
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault(); // Necessary for onDrop/onDragEnter to work smoothly
   };
 
@@ -628,12 +925,29 @@ const App: React.FC = () => {
       return artifact ? [[img.id, artifact] as const] : [];
     }),
   );
-  const currentStripKey = createOrderedStripKey(settings, images.map(item => item.id));
+  const currentStripKey = createOrderedStripKey(settings, images);
   const currentStripResult =
     stripResult?.settingsKey === currentStripKey && stripResult.mime === settings.outputFormat
       ? stripResult
       : null;
   const processedCount = currentImageArtifacts.size;
+  const imageWorkflowStatuses = new Map(
+    images.map((img, index) => {
+      const imageSettings = settingsForImage(settings, index);
+      return [
+        img.id,
+        deriveImageWorkflowStatus(img, {
+          expectedMime: settings.outputFormat,
+          expectedSettingsKey: createImageRenderKey(imageSettings, img.exifDate, img.transform),
+          activeImageId,
+          queuedImageIds,
+        }),
+      ] as const;
+    }),
+  );
+  const pendingCount = [...imageWorkflowStatuses.values()]
+    .filter(status => status.kind === 'unprocessed' || status.kind === 'stale' || status.kind === 'failed')
+    .length;
   const hasAnyResult = outputMode === 'single' ? processedCount > 0 : Boolean(currentStripResult);
   const previewImageIndex =
     preview?.type === 'single' ? getPreviewImageIndex(images, preview.imageId) : -1;
@@ -661,23 +975,106 @@ const App: React.FC = () => {
         currentStripResult,
       )
     : null;
+  const previewTransform = normalizeRenderTransform(previewImageItem?.transform ?? DEFAULT_RENDER_TRANSFORM);
+  useEffect(() => {
+    setPreviewSourceMode('after');
+    setIsCropping(false);
+  }, [preview?.type, previewImageItem?.id]);
+  useEffect(() => {
+    setEditorPreviewUrl(null);
+    if (preview?.type !== 'single' || !previewImageItem || previewImageIndex < 0) {
+      setPreviewRendering(false);
+      return;
+    }
+
+    setPreviewRendering(true);
+    const controller = createPreviewRenderController<PreviewRenderRequest>({
+      render: request => processImage(
+        request.item.file,
+        { ...settingsForImage(request.settings, request.index), processingMode: 'preview' },
+        request.item.exifDate,
+        request.item.previewUrl,
+        request.item.transform,
+      ),
+      onResult: url => {
+        setEditorPreviewUrl(url);
+        setPreviewRendering(false);
+      },
+      onError: () => {
+        setPreviewRendering(false);
+        setNotice({ tone: 'warning', message: '即时预览生成失败，原图和已有成片仍然可用。' });
+      },
+      revokeObjectURL: revokeObjectUrl,
+    });
+    controller.schedule({ item: previewImageItem, index: previewImageIndex, settings });
+    return () => {
+      controller.dispose();
+      setEditorPreviewUrl(null);
+    };
+  }, [preview?.type, previewImageItem, previewImageIndex, settings]);
+
+  const effectivePreviewSource =
+    preview?.type === 'single' && previewImageItem
+      ? previewSourceMode === 'before'
+        ? previewImageItem.previewUrl
+        : editorPreviewUrl ?? previewImageArtifact?.url ?? previewImageItem.previewUrl
+      : previewImageSource;
   const processButtonLabel =
     images.length === 0
       ? '先添加图片'
       : outputMode === 'strip'
         ? (currentStripResult ? '重新生成胶片长条' : '生成胶片长条')
-        : processedCount > 0
-          ? `重新处理全部单张 (${images.length})`
-          : `处理全部单张 (${images.length})`;
+        : pendingCount > 0
+          ? `冲洗待更新照片 (${pendingCount})`
+          : '全部成片均为最新';
   const downloadButtonLabel =
     outputMode === 'strip'
       ? '下载长条大图'
       : `打包下载 ZIP${processedCount > 0 ? ` (${processedCount})` : ''}`;
+  const primaryActionState = exporting
+    ? 'exporting'
+    : processing
+      ? 'processing'
+      : images.length === 0
+        ? 'empty'
+        : outputMode === 'single'
+          ? pendingCount > 0 ? 'idle' : 'ready'
+          : currentStripResult ? 'ready' : 'idle';
+  const primaryAction = getPrimaryAction(primaryActionState);
+  const imageRemovalAllowed = isImageRemovalAllowed(
+    processing,
+    activeBatchMode ?? outputMode,
+    exporting,
+  );
+  const runPrimaryAction = () => {
+    switch (primaryAction.command) {
+      case 'add':
+        fileInputRef.current?.click();
+        break;
+      case 'process':
+        void processAll();
+        break;
+      case 'stop':
+        stopProcessing();
+        break;
+      case 'download':
+        void downloadAll();
+        break;
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a] text-gray-200">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {processing ? processingMessage : exporting ? exportMessage : notice?.message ?? ''}
+      </div>
       {/* Sidebar Settings */}
-      <aside className="w-full md:w-80 bg-[#121212] border-r border-white/10 p-6 flex flex-col gap-6 overflow-y-auto max-h-screen z-10">
+      <aside
+        ref={settingsPanelRef}
+        id="film-settings"
+        tabIndex={-1}
+        className={`${settingsOpen ? 'flex' : 'hidden'} order-2 w-full flex-col gap-6 border-t border-white/10 bg-[#121212] p-5 pb-28 md:order-1 md:flex md:w-80 md:max-h-screen md:overflow-y-auto md:border-r md:border-t-0 md:p-6 md:pb-6 z-10`}
+      >
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0 transition-transform hover:scale-105">
             <FilmLogoIcon />
@@ -726,14 +1123,20 @@ const App: React.FC = () => {
         {/* Mode Toggle */}
         <div className="bg-white/5 p-1 rounded-lg flex border border-white/10">
           <button 
-            onClick={() => setOutputMode('single')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${outputMode === 'single' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
+            onClick={() => {
+              if (!processing && !exporting) setOutputMode('single');
+            }}
+            disabled={processing || exporting}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all disabled:opacity-40 ${outputMode === 'single' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
           >
             <GridIcon /> 单张卡片
           </button>
           <button 
-            onClick={() => setOutputMode('strip')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${outputMode === 'strip' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
+            onClick={() => {
+              if (!processing && !exporting) setOutputMode('strip');
+            }}
+            disabled={processing || exporting}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all disabled:opacity-40 ${outputMode === 'strip' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
           >
             <StripIcon /> 连底长条
           </button>
@@ -976,56 +1379,134 @@ const App: React.FC = () => {
           </div>
         </section>
 
+        <section className="space-y-3 border-t border-white/5 pt-5">
+          <div className="text-xs font-bold uppercase text-gray-500">我的配方</div>
+          {recipes.length > 0 && (
+            <div className="flex gap-2">
+              <select
+                aria-label="选择本地配方"
+                value={selectedRecipeId}
+                onChange={event => applyRecipe(event.target.value)}
+                className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              >
+                <option value="" className="bg-[#121212]">选择配方</option>
+                {recipes.map(recipe => <option key={recipe.id} value={recipe.id} className="bg-[#121212]">{recipe.name}</option>)}
+              </select>
+              <button
+                type="button"
+                aria-label="删除所选配方"
+                disabled={!selectedRecipeId}
+                onClick={() => selectedRecipeId && removeRecipe(selectedRecipeId)}
+                className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-red-300 disabled:opacity-25"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={recipeName}
+              maxLength={40}
+              onChange={event => setRecipeName(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Enter') saveCurrentRecipe();
+              }}
+              placeholder="为当前设置命名"
+              aria-label="配方名称"
+              className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-gray-600"
+            />
+            <button
+              type="button"
+              onClick={saveCurrentRecipe}
+              disabled={!recipeName.trim()}
+              className="min-h-11 rounded-md bg-white/10 px-3 text-xs font-medium text-white disabled:opacity-25"
+            >
+              保存
+            </button>
+          </div>
+          <p className="text-[10px] leading-relaxed text-gray-600">只保存设置，不保存照片或成片。</p>
+        </section>
+
         <div className="mt-auto pt-6 border-t border-white/5">
           <button 
-            onClick={processAll}
-            disabled={images.length === 0 || processing}
+            onClick={() => processing ? stopProcessing() : void processAll()}
+            disabled={images.length === 0 || (!processing && pendingCount === 0 && outputMode === 'single')}
             className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
               processing 
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
+                ? 'bg-white/10 text-white hover:bg-white/15'
                 : 'bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/20 active:scale-95'
             }`}
           >
             {processing ? (
               <>
                 <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-                {processingMessage || '生成中...'}
+                停止后续
               </>
             ) : processButtonLabel}
           </button>
+          {outputMode === 'single' && processedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => void processAll(true)}
+              disabled={processing || exporting}
+              className="mt-2 w-full rounded-md px-3 py-2 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300 disabled:opacity-30"
+            >
+              重新冲洗全部照片
+            </button>
+          )}
         </div>
       </aside>
 
       {/* Main Content */}
       <main
-        className={`flex-1 flex flex-col p-4 md:p-8 overflow-y-auto bg-[#0a0a0a] transition-colors ${isDraggingUpload ? 'bg-amber-500/[0.04]' : ''}`}
+        className={`order-1 flex-1 flex flex-col p-4 pb-28 md:order-2 md:p-8 md:pb-8 md:overflow-y-auto bg-[#0a0a0a] transition-colors ${isDraggingUpload ? 'bg-amber-500/[0.04]' : ''}`}
         onDragEnter={handleUploadDragEnter}
         onDragOver={handleUploadDragOver}
         onDragLeave={handleUploadDragLeave}
         onDrop={handleUploadDrop}
       >
         <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
+          <div className="flex items-center justify-between md:hidden">
+            <div className="flex items-center gap-3">
+              <FilmLogoIcon />
+              <div>
+                <h1 className="text-lg font-bold text-white">FilmFrame</h1>
+                <p className="text-[10px] text-amber-500">本地冲洗，不上传照片</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={event => toggleMobileSettings(event.currentTarget)}
+              aria-expanded={settingsOpen}
+              aria-controls="film-settings"
+              className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
+            >
+              <span className="sr-only">{settingsOpen ? '收起胶片设置' : '展开胶片设置'}</span>
+              <SettingsIcon />
+            </button>
+          </div>
           <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-white">工作室</h2>
               <p className="text-sm text-gray-500">
                 {outputMode === 'strip' 
                   ? '将多张照片拼接为连续的胶片印样 (Contact Sheet)。长按拖拽可调整叙事顺序。' 
-                  : '批量为每张照片添加独立的胶片边框。长按拖拽可调整处理顺序。'}
+                  : '批量为每张照片添加独立的胶片边框。照片仅在当前设备处理。'}
               </p>
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
               {(images.length > 0 && hasAnyResult) && (
                 <button 
                   onClick={downloadAll}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-sm transition-colors flex items-center justify-center gap-2"
+                  disabled={exporting || processing}
+                  className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 rounded-md text-sm transition-colors flex items-center justify-center gap-2"
                 >
-                  <DownloadIcon /> {downloadButtonLabel}
+                  <DownloadIcon /> {exporting ? exportMessage || '正在打包...' : downloadButtonLabel}
                 </button>
               )}
               <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-md text-sm transition-all flex items-center justify-center gap-2"
+                className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-md text-sm transition-all flex items-center justify-center gap-2"
               >
                 <PlusIcon /> 添加图片
               </button>
@@ -1036,15 +1517,31 @@ const App: React.FC = () => {
             type="file" 
             ref={fileInputRef} 
             multiple 
-            accept="image/*" 
+            accept="image/jpeg,image/png,image/webp"
             onChange={handleFileUpload} 
             className="hidden" 
           />
           
+          {notice && (
+            <div
+              className={`flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
+                notice.tone === 'warning'
+                  ? 'border-amber-400/20 bg-amber-400/10 text-amber-100'
+                  : notice.tone === 'success'
+                    ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100'
+                    : 'border-sky-400/20 bg-sky-400/10 text-sky-100'
+              }`}
+            >
+              <span>{notice.message}</span>
+              <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示" className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-current/70 hover:text-current"><CloseIcon /></button>
+            </div>
+          )}
+
           {images.length === 0 ? (
-            <div 
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className={`flex-1 min-h-[400px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${
+              className={`flex-1 min-h-[360px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${
                 isDraggingUpload
                   ? 'border-amber-500/80 bg-amber-500/[0.06]'
                   : 'border-white/10 hover:border-amber-500/50 hover:bg-amber-500/[0.02]'
@@ -1056,22 +1553,25 @@ const App: React.FC = () => {
               <div className="text-center">
                 <p className="text-lg font-medium text-gray-300">点击或拖拽上传图片</p>
                 <p className="text-sm text-gray-500">支持 JPG, PNG, WebP (建议保留 EXIF 信息)</p>
+                <p className="mt-2 text-xs text-emerald-300/80">照片仅在本机处理，不会上传</p>
               </div>
-            </div>
+            </button>
           ) : (
             <>
               {outputMode === 'single' ? (
                 // GRID VIEW
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {images.map((img, index) => (
-                    <div 
+                  {images.map((img, index) => {
+                    const status = imageWorkflowStatuses.get(img.id)!;
+                    return (
+                    <article
                       key={img.id} 
                       draggable
                       onDragStart={(e) => handleDragStart(e, index)}
                       onDragEnter={(e) => handleDragEnter(e, index)}
                       onDragEnd={handleDragEnd}
                       onDragOver={handleDragOver}
-                      className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all cursor-move active:cursor-grabbing hover:shadow-xl hover:shadow-black/50"
+                      className="group relative bg-[#181818] rounded-md overflow-hidden border border-white/5 hover:border-white/20 transition-all md:cursor-move md:active:cursor-grabbing hover:shadow-xl hover:shadow-black/50"
                     >
 	                      <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
 		                        <img
@@ -1079,45 +1579,51 @@ const App: React.FC = () => {
 	                          alt="Preview" 
 	                          className={`w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${processing ? 'opacity-40' : 'opacity-100'}`}
 	                        />
-	                        {img.processingError && (
-	                          <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/20 text-red-300 text-[10px] font-medium shadow-lg shadow-black/20">
-	                            <AlertCircleIcon />
-	                            <span>{img.processedUrl ? '重试失败，保留旧图' : '处理失败'}</span>
-	                          </div>
-	                        )}
-	                        <div className="absolute top-2 right-2 text-white/50 bg-black/50 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-	                          <GripIcon />
-	                        </div>
-	                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-	                          {img.processingError && (
-	                            <button
-	                              onClick={() => retryImage(img.id)}
-	                              disabled={processing}
-	                              title="重试此张"
-	                              className="p-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-red-200 transition-colors"
-	                            >
-	                              <RetryIcon />
-	                            </button>
-	                          )}
-                          <button onClick={() => setPreview({ type: 'single', imageId: img.id })} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
+		                        <div className={`absolute top-2 left-2 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium shadow-lg shadow-black/20 ${statusBadgeClass(status)}`}>
+		                          {status.kind === 'failed' && <AlertCircleIcon />}
+		                          <span>{status.label}</span>
+		                        </div>
+		                        <div className="absolute top-2 right-2 hidden text-white/50 bg-black/50 p-1 rounded-md md:block md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+		                          <GripIcon />
+		                        </div>
+		                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/90 to-transparent px-3 pb-3 pt-10 opacity-100 transition-opacity md:inset-0 md:bg-black/60 md:p-0 md:opacity-0 md:group-hover:opacity-100">
+		                          {img.processingError && (
+		                            <button
+		                              type="button"
+		                              onClick={() => retryImage(img.id)}
+		                              disabled={processing || exporting}
+		                              aria-label={`重试 ${img.file.name}`}
+		                              className="min-h-11 min-w-11 p-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-red-200 transition-colors"
+		                            >
+		                              <RetryIcon />
+		                            </button>
+		                          )}
+                          <button type="button" aria-label={`编辑并预览 ${img.file.name}`} onClick={() => setPreview({ type: 'single', imageId: img.id })} className="min-h-11 min-w-11 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
                             <MaximizeIcon />
                           </button>
-		                          {currentImageArtifacts.has(img.id) && (
-	                              <button onClick={() => downloadImage(currentImageArtifacts.get(img.id)!, img.file.name)} className="p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
+			                          {currentImageArtifacts.has(img.id) && (
+		                              <button type="button" aria-label={`下载 ${img.file.name}`} onClick={() => downloadImage(currentImageArtifacts.get(img.id)!, img.file.name)} className="min-h-11 min-w-11 p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
                                 <DownloadIcon />
                               </button>
                           )}
-                          <button onClick={() => removeImage(img.id)} className="p-3 bg-red-500/20 hover:bg-red-500/40 rounded-full text-red-500 transition-colors">
+                          <button type="button" aria-label={`删除 ${img.file.name}`} disabled={!imageRemovalAllowed} onClick={() => removeImage(img.id)} className="min-h-11 min-w-11 p-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-30 rounded-full text-red-300 transition-colors">
                             <TrashIcon />
                           </button>
                         </div>
                       </div>
-	                      <div className="p-3 flex items-center justify-between border-t border-white/5">
-	                        <span className={`text-xs font-medium truncate max-w-[120px] ${img.processingError ? 'text-red-300' : 'text-gray-400'}`}>{img.file.name}</span>
-	                        <span className="text-[10px] text-gray-600 mono uppercase">{img.exifDate ? img.exifDate : `NO EXIF`}</span>
-	                      </div>
-                    </div>
-                  ))}
+		                      <div className="flex items-center justify-between gap-2 border-t border-white/5 p-3">
+		                        <div className="min-w-0">
+		                          <div className={`truncate text-xs font-medium ${img.processingError ? 'text-red-300' : 'text-gray-300'}`}>{img.file.name}</div>
+		                          <div className="mt-0.5 text-[10px] text-gray-500">{status.detail ?? (img.exifDate || '无 EXIF 日期')}</div>
+		                        </div>
+		                        <div className="flex shrink-0 gap-1">
+		                          <button type="button" onClick={() => moveImage(img.id, 'up')} disabled={index === 0} aria-label={`上移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-gray-300 disabled:opacity-25"><ArrowUpIcon /></button>
+		                          <button type="button" onClick={() => moveImage(img.id, 'down')} disabled={index === images.length - 1} aria-label={`下移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-gray-300 disabled:opacity-25"><ArrowDownIcon /></button>
+		                        </div>
+		                      </div>
+                    </article>
+                    );
+                  })}
                 </div>
               ) : (
                 // STRIP VIEW
@@ -1131,8 +1637,8 @@ const App: React.FC = () => {
 	                    ) : currentStripResult ? (
 	                      <div className="relative group">
 	                        <img src={currentStripResult.url} alt="Film Strip" className="max-h-[600px] shadow-2xl" />
-                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => setPreview({ type: 'strip' })} className="p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><MaximizeIcon /></button>
+	                        <div className="absolute top-4 right-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+	                           <button type="button" aria-label="预览胶片长条" onClick={() => setPreview({ type: 'strip' })} className="min-h-11 min-w-11 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><MaximizeIcon /></button>
                         </div>
                       </div>
                     ) : (
@@ -1157,10 +1663,11 @@ const App: React.FC = () => {
                         className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-white/5 border border-white/10 group cursor-move hover:scale-105 transition-transform active:scale-95 shadow-md"
                       >
                         <img src={img.previewUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                        <button onClick={() => removeImage(img.id)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
+                        <button type="button" aria-label={`删除 ${img.file.name}`} disabled={!imageRemovalAllowed} onClick={() => removeImage(img.id)} className="absolute top-1 right-1 min-h-11 min-w-11 p-2 bg-red-500/90 text-white rounded-full opacity-100 disabled:opacity-30 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
                         <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 px-1 rounded text-white">{idx+1}</span>
-                        <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-white drop-shadow-md">
-                           <GripIcon />
+                        <div className="absolute bottom-1 right-1 flex gap-1">
+                          <button type="button" onClick={() => moveImage(img.id, 'up')} disabled={idx === 0} aria-label={`上移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md bg-black/70 p-2 text-white disabled:opacity-25"><ArrowUpIcon /></button>
+                          <button type="button" onClick={() => moveImage(img.id, 'down')} disabled={idx === images.length - 1} aria-label={`下移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md bg-black/70 p-2 text-white disabled:opacity-25"><ArrowDownIcon /></button>
                         </div>
                       </div>
                     ))}
@@ -1172,69 +1679,159 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-white/10 bg-[#111]/95 p-3 backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={event => toggleMobileSettings(event.currentTarget)}
+          aria-expanded={settingsOpen}
+          aria-controls="film-settings"
+          className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
+          aria-label={settingsOpen ? '收起胶片设置' : '展开胶片设置'}
+        >
+          <SettingsIcon />
+        </button>
+        <button
+          type="button"
+          onClick={runPrimaryAction}
+          disabled={primaryAction.disabled}
+          className={`min-h-11 flex-1 rounded-md px-4 py-2 text-sm font-bold ${primaryAction.command === 'stop' ? 'bg-white/10 text-white' : 'bg-amber-500 text-black'} disabled:opacity-50`}
+        >
+          {primaryAction.label}
+        </button>
+      </div>
+
       {/* Fullscreen Preview Modal */}
       {preview && previewImageSource && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+        <div ref={dialogRootRef} role="dialog" aria-modal="true" aria-label="成片预览" className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
           <button 
+            ref={dialogCloseRef}
             onClick={() => setPreview(null)}
-            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            className="absolute top-6 right-6 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
             aria-label="关闭预览"
           >
             <CloseIcon />
           </button>
-          {previewDownload && (
+          {!isCropping && previewDownload && (
             <a
               href={previewDownload.href}
               download={previewDownload.download}
-              className="absolute top-6 right-20 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+              className="absolute top-6 right-20 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
               aria-label="下载当前预览"
             >
               <DownloadIcon />
             </a>
+          )}
+          {!isCropping && preview.type === 'single' && previewImageArtifact && (
+            <button
+              type="button"
+              onClick={() => void shareCurrentPreview()}
+              className="absolute top-6 right-32 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+              aria-label="分享当前成片"
+            >
+              <ShareIcon />
+            </button>
           )}
           <div className="absolute top-6 left-6 right-32 flex items-center gap-3 min-w-0 pointer-events-none">
             <div className="min-w-0 rounded-full bg-black/45 border border-white/10 px-4 py-2 text-white shadow-xl">
               <div className="max-w-[52vw] truncate text-sm font-medium">{previewTitle}</div>
               {preview.type === 'single' && previewImageIndex >= 0 && (
                 <div className="mt-0.5 text-[11px] text-white/55 mono">
-                  {previewImageIndex + 1} / {images.length}
+                  {previewImageIndex + 1} / {images.length} · {isCropping ? '调整构图' : previewSourceMode === 'before' ? '原图' : previewRendering ? '正在生成预览' : '成片预览'}
                 </div>
               )}
             </div>
           </div>
-          {preview.type === 'single' && images.length > 1 && (
-            <>
+          {isCropping && preview.type === 'single' && previewImageItem ? (
+            <CropEditor
+              sourceUrl={previewImageItem.previewUrl}
+              initialTransform={previewImageItem.transform}
+              landscapeFrameAspect={isReal135Mode
+                ? (settings.useFilmOverlayTemplate === false ? 3 / 2 : KODAK_GOLD_APERTURE_ASPECT)
+                : undefined}
+              onCancel={closeCropEditor}
+              onCommit={transform => {
+                if (processing || exporting) return;
+                updateImageTransform(previewImageItem.id, transform);
+                setPreviewSourceMode('after');
+                closeCropEditor();
+                setNotice({ tone: 'info', message: '构图已更新，可继续冲洗此张照片。' });
+              }}
+            />
+          ) : (
+          <>
+          <div data-preview-media className="relative flex min-h-0 w-full flex-1 items-center justify-center pt-16 md:pt-14">
+            {preview.type === 'single' && images.length > 1 && (
+              <>
+                <button
+                  onClick={() => navigatePreview('previous')}
+                  className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
+                  aria-label="上一张"
+                >
+                  <ChevronLeftIcon />
+                </button>
+                <button
+                  onClick={() => navigatePreview('next')}
+                  className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
+                  aria-label="下一张"
+                >
+                  <ChevronRightIcon />
+                </button>
+              </>
+            )}
+            <img
+              src={effectivePreviewSource ?? previewImageSource}
+              className={`max-h-full max-w-full object-contain transition-opacity ${previewRendering && previewSourceMode === 'after' ? 'opacity-60' : 'opacity-100'}`}
+              alt={previewTitle || 'Fullscreen preview'}
+            />
+          </div>
+          {preview.type === 'single' && previewImageItem && (
+            <div data-preview-controls className="relative z-10 mx-auto mt-3 flex w-full max-w-3xl shrink-0 flex-wrap items-center justify-center gap-3 rounded-md border border-white/10 bg-[#151515]/95 p-3 text-white shadow-2xl backdrop-blur">
+              <div className="flex rounded-md border border-white/10 bg-black/30 p-1">
+                <button type="button" onClick={() => setPreviewSourceMode('before')} className={`min-h-11 rounded px-3 text-xs ${previewSourceMode === 'before' ? 'bg-white text-black' : 'text-gray-300'}`}>原图</button>
+                <button type="button" onClick={() => setPreviewSourceMode('after')} className={`min-h-11 rounded px-3 text-xs ${previewSourceMode === 'after' ? 'bg-amber-500 text-black' : 'text-gray-300'}`}>成片</button>
+              </div>
               <button
-                onClick={() => navigatePreview('previous')}
-                className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
-                aria-label="上一张"
+                ref={cropTriggerRef}
+                type="button"
+                onClick={() => setIsCropping(true)}
+                disabled={processing || exporting}
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-xs font-medium text-gray-100 hover:bg-white/10 disabled:opacity-40"
               >
-                <ChevronLeftIcon />
+                <CropIcon />
+                调整构图
               </button>
               <button
-                onClick={() => navigatePreview('next')}
-                className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
-                aria-label="下一张"
+                type="button"
+                onClick={() => updateImageTransform(previewImageItem.id, { quarterTurns: ((previewTransform.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3 })}
+                className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
+                aria-label="顺时针旋转 90 度"
               >
-                <ChevronRightIcon />
+                <RotateIcon />
               </button>
-            </>
+              <button
+                type="button"
+                onClick={() => void retryImage(previewImageItem.id)}
+                disabled={processing || previewRendering}
+                className="min-h-11 rounded-md bg-amber-500 px-4 text-xs font-bold text-black disabled:opacity-40"
+              >
+                应用并冲洗此张
+              </button>
+            </div>
           )}
-          <img 
-            src={previewImageSource} 
-            className="max-w-full max-h-full object-contain"
-            alt={previewTitle || 'Fullscreen preview'} 
-          />
+          </>
+          )}
         </div>
       )}
 
       {/* Error Modal */}
       {errorMsg && (
-        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div ref={dialogRootRef} role="dialog" aria-modal="true" aria-labelledby="error-dialog-title" className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#181818] border border-red-500/20 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
             <button 
+                ref={dialogCloseRef}
                 onClick={() => setErrorMsg(null)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                aria-label="关闭错误提示"
+                className="absolute top-3 right-3 inline-flex min-h-11 min-w-11 items-center justify-center text-gray-500 hover:text-white transition-colors"
             >
                 <CloseIcon />
             </button>
@@ -1243,7 +1840,7 @@ const App: React.FC = () => {
                     <AlertCircleIcon />
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold text-white mb-2">出错了</h3>
+                    <h3 id="error-dialog-title" className="text-lg font-bold text-white mb-2">需要处理</h3>
                     <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
                         {errorMsg}
                     </p>
@@ -1262,6 +1859,10 @@ const App: React.FC = () => {
       {/* Donate Modal */}
       {showDonate && (
         <div 
+          ref={dialogRootRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="donate-dialog-title"
           className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setShowDonate(false)}
         >
@@ -1270,8 +1871,10 @@ const App: React.FC = () => {
             onClick={e => e.stopPropagation()}
           >
              <button 
+                ref={dialogCloseRef}
                 onClick={() => setShowDonate(false)}
-                className="absolute top-3 right-3 p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
+                aria-label="关闭赞助窗口"
+                className="absolute top-3 right-3 inline-flex min-h-11 min-w-11 items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
               >
                 <CloseIcon />
               </button>
@@ -1280,7 +1883,7 @@ const App: React.FC = () => {
                 <div className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center mx-auto text-pink-500 mb-2">
                    <CoffeeIcon />
                 </div>
-                <h3 className="text-lg font-bold text-gray-800">请作者喝一杯奶茶</h3>
+                <h3 id="donate-dialog-title" className="text-lg font-bold text-gray-800">请作者喝一杯奶茶</h3>
                 <p className="text-xs text-gray-500 mt-1">感谢您对 FilmFrame 的支持！❤️</p>
              </div>
 

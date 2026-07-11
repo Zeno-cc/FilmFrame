@@ -5,6 +5,7 @@ export const KODAK_GOLD_APERTURE_SHADOW_URL = '/film-overlays/aperture-shadow-de
 
 const TEMPLATE_W = 1307;
 const TEMPLATE_H = 1203;
+export const KODAK_GOLD_APERTURE_ASPECT = 1123 / 800;
 
 const APERTURE = {
   x: 92 / TEMPLATE_W,

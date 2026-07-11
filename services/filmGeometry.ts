@@ -1,3 +1,6 @@
+import type { RenderTransform } from '../types';
+import { createCoverPlacement } from './renderTransform';
+
 export const PHYS_135 = {
   filmWidthMm: 35,
   frameWidthMm: 36,
@@ -139,23 +142,7 @@ export function drawImageCover(
   dw: number,
   dh: number
 ) {
-  const srcRatio = img.width / img.height;
-  const dstRatio = dw / dh;
-
-  let sx = 0;
-  let sy = 0;
-  let sw = img.width;
-  let sh = img.height;
-
-  if (srcRatio > dstRatio) {
-    sw = img.height * dstRatio;
-    sx = (img.width - sw) / 2;
-  } else {
-    sh = img.width / dstRatio;
-    sy = (img.height - sh) / 2;
-  }
-
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  drawImageCoverWithTransform(ctx, img, dx, dy, dw, dh);
 }
 
 export function shouldAutoRotateForFilmFrame(
@@ -188,32 +175,63 @@ export function getOutputRestoreRotationRadiansForFilmFrame(
 }
 
 export function drawImageCoverAutoRotate(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  ctx: RenderContext,
+  img: RenderImage,
   dx: number,
   dy: number,
   dw: number,
-  dh: number
+  dh: number,
+  transform?: RenderTransform,
 ) {
-  if (!shouldAutoRotateForFilmFrame(img.width, img.height, dw, dh)) {
-    drawImageCover(ctx, img, dx, dy, dw, dh);
-    return;
-  }
+  drawImageCoverWithTransform(ctx, img, dx, dy, dw, dh, transform, true);
+}
+
+type RenderContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+type RenderImage = HTMLImageElement | ImageBitmap;
+
+export function drawImageCoverWithTransform(
+  ctx: RenderContext,
+  img: RenderImage,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+  transform?: RenderTransform,
+  autoRotatePortrait = false,
+) {
+  const placement = createCoverPlacement(
+    img.width,
+    img.height,
+    dw,
+    dh,
+    transform,
+    autoRotatePortrait,
+  );
+  const sourceDrawWidth = img.width * placement.scale;
+  const sourceDrawHeight = img.height * placement.scale;
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(dx, dy, dw, dh);
   ctx.clip();
 
-  ctx.translate(dx + dw / 2, dy + dh / 2);
-  ctx.rotate(getAutoRotateRadiansForFilmFrame(img.width, img.height, dw, dh));
+  ctx.translate(dx + placement.offsetX, dy + placement.offsetY);
 
-  const rotatedW = img.height;
-  const rotatedH = img.width;
-  const scale = Math.max(dw / rotatedW, dh / rotatedH);
-  const drawW = img.width * scale;
-  const drawH = img.height * scale;
+  switch (placement.totalQuarterTurns) {
+    case 1:
+      ctx.translate(placement.drawWidth, 0);
+      ctx.rotate(Math.PI / 2);
+      break;
+    case 2:
+      ctx.translate(placement.drawWidth, placement.drawHeight);
+      ctx.rotate(Math.PI);
+      break;
+    case 3:
+      ctx.translate(0, placement.drawHeight);
+      ctx.rotate(-Math.PI / 2);
+      break;
+  }
 
-  ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.drawImage(img, 0, 0, sourceDrawWidth, sourceDrawHeight);
   ctx.restore();
 }

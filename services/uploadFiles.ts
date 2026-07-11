@@ -2,12 +2,18 @@ import type { ImageItem } from '../types';
 
 export const LARGE_FILE_BYTES = 25 * 1024 * 1024;
 export const LARGE_IMAGE_EDGE = 8000;
+export const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
 
 type UploadFile = Pick<File, 'name' | 'size' | 'type'>;
 
 type PrepareUploadDeps<TFile extends UploadFile> = {
   createId: (file: TFile) => string;
   createObjectUrl: (file: TFile) => string;
+  revokeObjectUrl: (url: string) => void;
   readImageSize: (url: string) => Promise<{ width: number; height: number }>;
   readExifDate: (file: TFile) => Promise<string>;
 };
@@ -27,8 +33,8 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
   const warnings: string[] = [];
 
   for (const file of files) {
-    if (!file.type.startsWith('image/')) {
-      errors.push(`"${file.name}" 不是有效的图片文件`);
+    if (!SUPPORTED_IMAGE_MIME_TYPES.has(file.type)) {
+      errors.push(`"${file.name}" 不是支持的图片格式（仅支持 JPEG、PNG、WebP）`);
       continue;
     }
 
@@ -41,6 +47,9 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
       }
     } catch (error) {
       console.warn('Image dimension check failed', error);
+      deps.revokeObjectUrl(previewUrl);
+      errors.push(`"${file.name}" 无法读取或图片已损坏`);
+      continue;
     }
 
     let exifDate = '';

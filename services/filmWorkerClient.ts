@@ -1,5 +1,5 @@
 import { FilmType } from '../types';
-import type { FilmSettings, ImageItem } from '../types';
+import type { FilmSettings, ImageItem, RenderTransform } from '../types';
 import * as mainThreadEngine from './filmEngine';
 
 type WorkerResponse =
@@ -7,7 +7,7 @@ type WorkerResponse =
   | { id: number; ok: false; error: string };
 
 type WorkerRequestPayload =
-  | { type: 'processImage'; file: File; settings: FilmSettings; dateOverride?: string }
+  | { type: 'processImage'; file: File; settings: FilmSettings; dateOverride?: string; transform?: RenderTransform }
   | { type: 'generateFilmStrip'; images: ImageItem[]; settings: FilmSettings };
 
 type WorkerLike = {
@@ -22,7 +22,8 @@ export type WorkerRenderer = {
   processImage: (
     file: File,
     settings: FilmSettings,
-    dateOverride?: string
+    dateOverride?: string,
+    transform?: RenderTransform,
   ) => Promise<string>;
   generateFilmStrip: (images: ImageItem[], settings: FilmSettings) => Promise<string>;
   dispose: () => void;
@@ -172,8 +173,8 @@ export function createWorkerRenderer(
   };
 
   return {
-    processImage: (file, settings, dateOverride) =>
-      request({ type: 'processImage', file, settings, dateOverride }),
+    processImage: (file, settings, dateOverride, transform) =>
+      request({ type: 'processImage', file, settings, dateOverride, transform }),
     generateFilmStrip: (images, settings) =>
       request({ type: 'generateFilmStrip', images, settings }),
     dispose: () => {
@@ -227,14 +228,15 @@ export const processImage = async (
   fileOrSource: File | string,
   settings: FilmSettings,
   dateOverride?: string,
-  previewUrlFallback?: string
+  previewUrlFallback?: string,
+  transform?: RenderTransform,
 ): Promise<string> => {
   const canSendFile = typeof File !== 'undefined' && fileOrSource instanceof File;
   if (canSendFile && shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
     if (renderer) {
       try {
-        return await renderer.processImage(fileOrSource, settings, dateOverride);
+        return await renderer.processImage(fileOrSource, settings, dateOverride, transform);
       } catch (error) {
         if (isWorkerCancelledError(error)) throw error;
         console.warn('Worker image processing failed; falling back to main thread.', error);
@@ -243,7 +245,7 @@ export const processImage = async (
   }
 
   return withImageSourceUrl(fileOrSource, previewUrlFallback, (sourceUrl) =>
-    mainThreadEngine.processImage(sourceUrl, settings, dateOverride)
+    mainThreadEngine.processImage(sourceUrl, settings, dateOverride, transform)
   );
 };
 

@@ -1,11 +1,17 @@
 # 稳定化交付快照
 
-> 快照时间：2026-07-11（Asia/Shanghai）
+> 快照时间：2026-07-12（Asia/Shanghai）
 >
 > 分支：`main`
 >
-> 前序基线：`a036da628e1538573769fc27950c1fee6b33aff6`
+> 当前 HEAD：`e5c5a84`
 > 范围：此前开发内容与本轮 P0 稳定化作为同一提交边界交付。实时 HEAD、远端和 dirty 状态以 `git status --short --branch` 为准。
+
+## 当前未提交 P0/P1 体验升级
+
+- P0：严格上传、可见状态、仅处理待更新、停止后续、ZIP 互斥进度、移动工作室优先、触屏排序与 dialog 无障碍。
+- P1：共享 RenderTransform、连续自由裁切与 1-3x 缩放、四分之一旋转、即时 preview、Before/After、本地配方和 Web Share。
+- 执行规约位于 `docs/plans/2026-07-12-p0-workflow-experience/`、`docs/plans/2026-07-12-p1-creative-loop/` 和 `docs/plans/2026-07-12-free-crop-editor/`。
 
 ## 交付范围
 
@@ -74,8 +80,8 @@ docs/plans/2026-07-11-project-stabilization/PLAN.md
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm run check` | 成功：66 tests + typecheck + 54-module build |
-| Vitest | 11 个文件、66 项断言通过 |
+| `npm run check` | 成功：117 tests + typecheck + 60-module build |
+| Vitest | 16 个文件、117 项断言通过 |
 | Chromium smoke | 上传、未处理预览、处理、下载出现、格式切换 stale 均通过 |
 | 浏览器 console | 仅 React DevTools 开发提示 |
 | `git diff --check` | 通过 |
