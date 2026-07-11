@@ -167,6 +167,26 @@ export function shouldAutoRotateForFilmFrame(
   return imageHeight > imageWidth && frameWidth > frameHeight;
 }
 
+export function getAutoRotateRadiansForFilmFrame(
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number
+) {
+  return shouldAutoRotateForFilmFrame(imageWidth, imageHeight, frameWidth, frameHeight)
+    ? Math.PI / 2
+    : 0;
+}
+
+export function getOutputRestoreRotationRadiansForFilmFrame(
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number
+) {
+  return -getAutoRotateRadiansForFilmFrame(imageWidth, imageHeight, frameWidth, frameHeight);
+}
+
 export function drawImageCoverAutoRotate(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -186,7 +206,7 @@ export function drawImageCoverAutoRotate(
   ctx.clip();
 
   ctx.translate(dx + dw / 2, dy + dh / 2);
-  ctx.rotate(-Math.PI / 2);
+  ctx.rotate(getAutoRotateRadiansForFilmFrame(img.width, img.height, dw, dh));
 
   const rotatedW = img.height;
   const rotatedH = img.width;

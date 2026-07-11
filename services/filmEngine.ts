@@ -1,7 +1,7 @@
 
 import { FilmSettings, FILM_PRESETS, FilmType, ImageItem } from '../types';
 import { applyGold200Look } from './filmColor';
-import { drawKodakGoldFrameNumbers } from './filmFrameNumber';
+import { drawKodakGoldFrameNumbers, getFrameNumberForIndex } from './filmFrameNumber';
 import {
   create135LandscapeLayout,
   create135SidePerforationLayout,
@@ -9,6 +9,7 @@ import {
   drawImageCoverAutoRotate,
   Film135Layout,
   Film135SideLayout,
+  getOutputRestoreRotationRadiansForFilmFrame,
   PHYS_135,
 } from './filmGeometry';
 import { draw135Markings, draw135SideMarkings } from './filmMarkings';
@@ -19,7 +20,6 @@ import {
   createKodakGoldStripLayout,
   createKodakGoldOverlayLayout,
   drawKodakGoldOverlayLayer,
-  getKodakGoldStripSegment,
   KodakGoldOverlayLayout,
   KODAK_GOLD_OVERLAY_URL,
 } from './filmOverlay';
@@ -30,6 +30,14 @@ import {
   drawRealFilmStockTexture,
 } from './filmTexture';
 import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from './filmResolution';
+import { validateCanvasBudget } from './renderBudget';
+
+function assertCanvasBudget(width: number, height: number) {
+  const budget = validateCanvasBudget(width, height);
+  if (!budget.ok) {
+    throw new Error(`Render canvas exceeds the safe budget: ${budget.reason}`);
+  }
+}
 
 /**
  * 绘制圆角矩形 polyfill
@@ -113,6 +121,37 @@ const exportCanvasToObjectUrl = (
     );
   });
 };
+
+function rotateCanvas(canvas: HTMLCanvasElement, radians: number): HTMLCanvasElement {
+  if (radians === 0) return canvas;
+
+  const quarterTurn = Math.abs(Math.abs(radians) - Math.PI / 2) < 0.0001;
+  const output = document.createElement('canvas');
+  output.width = quarterTurn ? canvas.height : canvas.width;
+  output.height = quarterTurn ? canvas.width : canvas.height;
+
+  const ctx = output.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
+
+  ctx.fillStyle = '#e8e3d8';
+  ctx.fillRect(0, 0, output.width, output.height);
+  ctx.translate(output.width / 2, output.height / 2);
+  ctx.rotate(radians);
+  ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+  return output;
+}
+
+function restoreOutputOrientationForSource(
+  canvas: HTMLCanvasElement,
+  img: HTMLImageElement,
+  frameWidth: number,
+  frameHeight: number
+): HTMLCanvasElement {
+  return rotateCanvas(
+    canvas,
+    getOutputRestoreRotationRadiansForFilmFrame(img.width, img.height, frameWidth, frameHeight)
+  );
+}
 
 function createLuminanceAlphaMask(
   mask: HTMLImageElement,
@@ -460,12 +499,7 @@ function composeOnScannerCanvas(filmCanvas: HTMLCanvasElement): HTMLCanvasElemen
   const x = Math.round((canvasW - filmCanvas.width) / 2);
   const y = Math.round((canvasH - filmCanvas.height) / 2);
 
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.28)';
-  ctx.shadowBlur = Math.round(canvasW * 0.012);
-  ctx.shadowOffsetY = Math.round(canvasW * 0.004);
   ctx.drawImage(filmCanvas, x, y);
-  ctx.restore();
 
   return canvas;
 }
@@ -508,7 +542,8 @@ export const processImageReal135 = async (
       ? composeOnScannerCanvas(filmCanvas)
       : filmCanvas;
 
-  return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, layout.imageW, layout.imageH);
+  return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
 };
 
 const processImageWithTemplateOverlay = async (
@@ -533,7 +568,8 @@ const processImageWithTemplateOverlay = async (
           ? composeOnScannerCanvas(canvas)
           : canvas;
 
-      return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+      const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3));
+      return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
     } catch (legacyError) {
       console.warn('Film overlay template not available, falling back to programmatic renderer.', legacyError);
       return null;
@@ -556,7 +592,8 @@ const processImageWithTemplateOverlay = async (
       ? composeOnScannerCanvas(canvas)
       : canvas;
 
-  return exportCanvasToObjectUrl(finalCanvas, settings.outputFormat, settings.outputQuality);
+  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3));
+  return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
 };
 
 function renderKodakGoldTemplateFrameCanvas(
@@ -635,7 +672,8 @@ function drawKodakGoldLayeredFrame(
 
   ctx.drawImage(emulsion, 0, 0);
   ctx.drawImage(base, 0, 0, layout.filmW, layout.filmH);
-  ctx.drawImage(apertureShadow, 0, 0, layout.filmW, layout.filmH);
+  // Temporarily disabled to avoid darkening the photo edges.
+  // ctx.drawImage(apertureShadow, 0, 0, layout.filmW, layout.filmH);
   drawKodakGoldFrameNumbers(ctx, layout, settings);
 }
 
@@ -661,23 +699,6 @@ function drawKodakGoldTemplateFrame(
   drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
   drawKodakGoldOverlayLayer(ctx, overlay, layout);
   drawKodakGoldFrameNumbers(ctx, layout, settings);
-}
-
-function drawKodakGoldTemplateFrameSegment(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  overlay: HTMLImageElement,
-  layout: KodakGoldOverlayLayout,
-  settings: FilmSettings,
-  clipX: number,
-  clipW: number
-) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(clipX, 0, clipW, layout.filmH);
-  ctx.clip();
-  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings);
-  ctx.restore();
 }
 
 function drawContinuousFilmRowBase(
@@ -846,6 +867,7 @@ const generateReal135FilmStrip = async (
 
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
   const layout = createKodakGoldStripLayout(targetImageWidthPx, images.length, 4);
+  assertCanvasBudget(layout.totalW, layout.totalH);
   const canvas = document.createElement('canvas');
   canvas.width = layout.totalW;
   canvas.height = layout.totalH;
@@ -869,7 +891,11 @@ const generateReal135FilmStrip = async (
     const img = await loadImage(images[index].previewUrl);
     const frameSettings = {
       ...settings,
-      frameNumber: ((settings.frameNumber + index - 1) % (settings.maxRollFrames ?? 36)) + 1,
+      frameNumber: getFrameNumberForIndex(
+        settings.frameNumber,
+        index,
+        settings.maxRollFrames ?? 36,
+      ),
     };
 
     const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
@@ -910,21 +936,18 @@ export const processImage = async (
   if (!preset) throw new Error("Invalid Preset");
 
   const img = await loadImage(imageSource);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
-  if (!ctx) throw new Error('Canvas context not found');
-
   const isPortrait = img.height > img.width;
   const baseDim = isPortrait ? img.height : img.width;
   const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
-  
-  if (isPortrait) {
-    canvas.width = img.width + borderSize * 2;
-    canvas.height = img.height;
-  } else {
-    canvas.width = img.width;
-    canvas.height = img.height + borderSize * 2;
-  }
+  const canvasWidth = isPortrait ? img.width + borderSize * 2 : img.width;
+  const canvasHeight = isPortrait ? img.height : img.height + borderSize * 2;
+  assertCanvasBudget(canvasWidth, canvasHeight);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas context not found');
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -1107,6 +1130,7 @@ export const generateFilmStrip = async (
   
   const totalWidth = START_GAP + (FRAME_WIDTH * colsInMaxRow) + (FRAME_GAP * (Math.max(0, colsInMaxRow - 1))) + END_GAP;
   const totalHeight = (numRows * STRIP_HEIGHT_PX) + ((numRows - 1) * ROW_GAP);
+  assertCanvasBudget(totalWidth, totalHeight);
 
   const canvas = document.createElement('canvas');
   canvas.width = totalWidth;
@@ -1146,7 +1170,7 @@ export const generateFilmStrip = async (
             const centerX = frameX + FRAME_WIDTH / 2;
             const centerY = frameY + imageAreaHeight / 2;
             ctx.translate(centerX, centerY);
-            ctx.rotate(-Math.PI / 2);
+            ctx.rotate(Math.PI / 2);
             
             const scale = Math.max(FRAME_WIDTH / img.height, imageAreaHeight / img.width);
             ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
@@ -1204,7 +1228,11 @@ export const generateFilmStrip = async (
     rowImages.forEach((item, idx) => {
       const frameX = START_GAP + idx * (FRAME_WIDTH + FRAME_GAP);
       const globalIdx = startGlobalIdx + idx;
-      const frameNum = settings.frameNumber + globalIdx;
+      const frameNum = getFrameNumberForIndex(
+        settings.frameNumber,
+        globalIdx,
+        settings.maxRollFrames ?? 36,
+      );
       const dateStr = item.exifDate || settings.dateStr;
 
       const paddingX = FRAME_WIDTH * 0.02;

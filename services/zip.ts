@@ -8,6 +8,7 @@ const ZIP_UINT32_MAX = 0xffffffff;
 const LOCAL_HEADER_BASE_SIZE = 30;
 const CENTRAL_HEADER_BASE_SIZE = 46;
 const END_HEADER_SIZE = 22;
+export const MAX_ZIP_INPUT_BYTES = 256 * 1024 * 1024;
 
 const crcTable = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
@@ -67,6 +68,12 @@ export async function createZipBlob(files: ZipFileEntry[]): Promise<Blob> {
   assertZip32Limit(
     files.length <= ZIP_UINT16_MAX,
     `ZIP64 is not supported: too many files (${files.length}; max ${ZIP_UINT16_MAX}).`,
+  );
+
+  const totalInputBytes = files.reduce((total, file) => total + file.blob.size, 0);
+  assertZip32Limit(
+    Number.isFinite(totalInputBytes) && totalInputBytes <= MAX_ZIP_INPUT_BYTES,
+    `ZIP input exceeds the safe memory budget (${totalInputBytes} bytes; max ${MAX_ZIP_INPUT_BYTES}).`,
   );
 
   const encoder = new TextEncoder();

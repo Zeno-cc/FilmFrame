@@ -39,12 +39,6 @@ export interface KodakGoldStripLayout {
   totalH: number;
 }
 
-export interface KodakGoldStripSegment {
-  targetX: number;
-  clipX: number;
-  clipW: number;
-}
-
 export function createKodakGoldOverlayLayout(targetImageWidthPx: number): KodakGoldOverlayLayout {
   const filmW = Math.round(targetImageWidthPx / APERTURE.w);
   const filmH = Math.round(filmW * TEMPLATE_H / TEMPLATE_W);
@@ -101,34 +95,9 @@ export function createKodakGoldStripLayout(
   };
 }
 
-export function getKodakGoldStripSegment(
-  layout: KodakGoldStripLayout,
-  col: number,
-  rowCount: number
-): KodakGoldStripSegment {
-  const halfGap = Math.round(layout.frameGap / 2);
-  const clipX = col === 0 ? 0 : layout.frame.imageX - halfGap;
-  const clipRight =
-    col === rowCount - 1
-      ? layout.frame.filmW
-      : layout.frame.imageX + layout.frame.imageW + halfGap;
-  const firstSegmentW = layout.frame.imageX + layout.frame.imageW + halfGap;
-  const middleSegmentW = layout.frame.imageW + layout.frameGap;
-  const targetX =
-    col === 0
-      ? layout.padding
-      : layout.padding + firstSegmentW + (col - 1) * middleSegmentW;
-
-  return {
-    targetX,
-    clipX,
-    clipW: clipRight - clipX,
-  };
-}
-
 export function drawKodakGoldOverlayLayer(
   ctx: CanvasRenderingContext2D,
-  overlay: HTMLImageElement,
+  overlay: CanvasImageSource,
   layout: KodakGoldOverlayLayout
 ) {
   drawOverlayBand(ctx, overlay, layout, 0, 0, layout.filmW, layout.imageY + 12);
@@ -139,7 +108,7 @@ export function drawKodakGoldOverlayLayer(
 
 function drawOverlayBand(
   ctx: CanvasRenderingContext2D,
-  overlay: HTMLImageElement,
+  overlay: CanvasImageSource,
   layout: KodakGoldOverlayLayout,
   x: number,
   y: number,

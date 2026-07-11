@@ -11,6 +11,14 @@ export function normalizeFrameNumber(frameNumber: number, maxRollFrames = 36): n
   return wrapped <= 0 ? wrapped + max : wrapped;
 }
 
+export function getFrameNumberForIndex(
+  startFrameNumber: number,
+  index: number,
+  maxRollFrames = 36,
+): number {
+  return normalizeFrameNumber(startFrameNumber + index, maxRollFrames);
+}
+
 export function getKodakGoldFrameNumberPositions(layout: KodakGoldOverlayLayout) {
   return {
     topCenterX: layout.filmW * 0.5,

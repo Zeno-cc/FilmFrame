@@ -1,14 +1,8 @@
+import { describe, expect, it } from 'vitest';
 import {
   getNextPreviewImageId,
   getPreviewImageIndex,
-  getSinglePreviewSource,
 } from '../services/previewNavigation';
-
-function assert(condition: unknown, message: string) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
 
 const images = [
   { id: 'a', previewUrl: 'preview-a' },
@@ -16,12 +10,20 @@ const images = [
   { id: 'c', previewUrl: 'preview-c' },
 ];
 
-assert(getPreviewImageIndex(images, 'b') === 1, 'should find the preview image index by id');
-assert(getPreviewImageIndex(images, 'missing') === -1, 'should return -1 for missing preview image ids');
-assert(getNextPreviewImageId(images, 'a', 'next') === 'b', 'next should advance by current order');
-assert(getNextPreviewImageId(images, 'a', 'previous') === 'c', 'previous should wrap from first to last');
-assert(getNextPreviewImageId(images, 'c', 'next') === 'a', 'next should wrap from last to first');
-assert(getNextPreviewImageId([], 'a', 'next') === null, 'empty image lists should not navigate');
-assert(getNextPreviewImageId(images, 'missing', 'next') === 'a', 'missing current image should recover to first image');
-assert(getSinglePreviewSource(images[0]) === 'preview-a', 'unprocessed images should preview the original image');
-assert(getSinglePreviewSource(images[1]) === 'processed-b', 'processed images should preview the rendered result');
+describe('preview navigation', () => {
+  it('finds preview images by id', () => {
+    expect(getPreviewImageIndex(images, 'b')).toBe(1);
+    expect(getPreviewImageIndex(images, 'missing')).toBe(-1);
+  });
+
+  it('navigates in current order and wraps at either end', () => {
+    expect(getNextPreviewImageId(images, 'a', 'next')).toBe('b');
+    expect(getNextPreviewImageId(images, 'a', 'previous')).toBe('c');
+    expect(getNextPreviewImageId(images, 'c', 'next')).toBe('a');
+  });
+
+  it('handles empty lists and missing current images', () => {
+    expect(getNextPreviewImageId([], 'a', 'next')).toBeNull();
+    expect(getNextPreviewImageId(images, 'missing', 'next')).toBe('a');
+  });
+});

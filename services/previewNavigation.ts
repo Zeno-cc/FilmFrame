@@ -1,6 +1,6 @@
 import type { ImageItem } from '../types';
 
-type PreviewImage = Pick<ImageItem, 'id' | 'previewUrl' | 'processedUrl'>;
+type PreviewImage = Pick<ImageItem, 'id'>;
 export type PreviewDirection = 'previous' | 'next';
 
 export function getPreviewImageIndex(images: PreviewImage[], imageId: string): number {
@@ -20,8 +20,4 @@ export function getNextPreviewImageId(
   const offset = direction === 'next' ? 1 : -1;
   const nextIndex = (currentIndex + offset + images.length) % images.length;
   return images[nextIndex].id;
-}
-
-export function getSinglePreviewSource(image: PreviewImage): string {
-  return image.processedUrl || image.previewUrl;
 }

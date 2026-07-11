@@ -1,79 +1,113 @@
+import { describe, expect, it } from 'vitest';
 import {
   PHYS_135,
   create135LandscapeLayout,
   create135SidePerforationLayout,
+  getAutoRotateRadiansForFilmFrame,
+  getOutputRestoreRotationRadiansForFilmFrame,
   shouldAutoRotateForFilmFrame,
 } from '../services/filmGeometry';
-import { getKodakGoldFrameNumberPositions, normalizeFrameNumber } from '../services/filmFrameNumber';
-import { getReal135TargetImageWidth, getReal135StripTargetImageWidth } from '../services/filmResolution';
-import { createKodakGoldOverlayLayout, createKodakGoldStripLayout, getKodakGoldStripSegment } from '../services/filmOverlay';
+import {
+  getFrameNumberForIndex,
+  getKodakGoldFrameNumberPositions,
+  normalizeFrameNumber,
+} from '../services/filmFrameNumber';
+import { createKodakGoldOverlayLayout, createKodakGoldStripLayout } from '../services/filmOverlay';
+import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from '../services/filmResolution';
 
-function assert(condition: unknown, message: string) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
+describe('135 film geometry', () => {
+  it('models the landscape frame dimensions and perforations', () => {
+    const layout = create135LandscapeLayout(3600);
 
-const layout = create135LandscapeLayout(3600);
+    expect(PHYS_135.perforationsPerFrame).toBe(8);
+    expect(layout.imageW).toBe(3600);
+    expect(layout.imageH).toBe(2400);
+    expect(layout.filmW).toBe(3800);
+    expect(layout.filmH).toBe(3500);
+    expect(layout.topRebateH).toBe(550);
+    expect(layout.bottomRebateH).toBe(550);
+    expect(Math.round(layout.perfPitch)).toBe(475);
+  });
 
-assert(PHYS_135.perforationsPerFrame === 8, '135 frame should use 8 perforations');
-assert(layout.imageW === 3600, 'image width should match target width');
-assert(layout.imageH === 2400, 'image area should keep 36x24mm 3:2 ratio');
-assert(layout.filmW === 3800, 'film width should model 38mm frame advance');
-assert(layout.filmH === 3500, 'film height should model 35mm film width');
-assert(layout.topRebateH === 550, 'top rebate should be 5.5mm');
-assert(layout.bottomRebateH === 550, 'bottom rebate should be 5.5mm');
-assert(Math.round(layout.perfPitch) === 475, 'perforation pitch should be 4.75mm');
+  it('models the side-perforation frame dimensions', () => {
+    const layout = create135SidePerforationLayout(3600);
 
-const sideLayout = create135SidePerforationLayout(3600);
+    expect(layout.imageW).toBe(3600);
+    expect(layout.imageH).toBe(2400);
+    expect(layout.filmW).toBe(4200);
+    expect(layout.filmH).toBe(2800);
+    expect(layout.sideRailW).toBe(300);
+    expect(layout.verticalRebateH).toBe(200);
+    expect(layout.perfCount).toBe(8);
+  });
+});
 
-assert(sideLayout.imageW === 3600, 'side layout image width should match target width');
-assert(sideLayout.imageH === 2400, 'side layout image should remain 3:2');
-assert(sideLayout.filmW === 4200, 'side layout should include left and right film rails');
-assert(sideLayout.filmH === 2800, 'side layout should include slim top and bottom rebate');
-assert(sideLayout.sideRailW === 300, 'each side rail should be 3mm wide at 100px/mm');
-assert(sideLayout.verticalRebateH === 200, 'top and bottom rebate should be 2mm at 100px/mm');
-assert(sideLayout.perfCount === 8, 'side layout should draw 8 perforations per side');
+describe('frame numbers', () => {
+  it('normalizes numbers to the roll range', () => {
+    expect(normalizeFrameNumber(1)).toBe(1);
+    expect(normalizeFrameNumber(36)).toBe(36);
+    expect(normalizeFrameNumber(37)).toBe(1);
+    expect(normalizeFrameNumber(0)).toBe(36);
+    expect(normalizeFrameNumber(24 + 13)).toBe(1);
+  });
 
-assert(normalizeFrameNumber(1) === 1, 'frame 1 should stay 1');
-assert(normalizeFrameNumber(36) === 36, 'frame 36 should stay 36');
-assert(normalizeFrameNumber(37) === 1, 'frame 37 should wrap to 1');
-assert(normalizeFrameNumber(0) === 36, 'frame 0 should wrap to 36');
-assert(normalizeFrameNumber(24 + 13) === 1, 'frame sequence should wrap after 36');
+  it('wraps indexed frame numbers at 24 and 36 frame roll boundaries', () => {
+    expect(getFrameNumberForIndex(36, 0, 36)).toBe(36);
+    expect(getFrameNumberForIndex(36, 1, 36)).toBe(1);
+    expect(getFrameNumberForIndex(24, 0, 24)).toBe(24);
+    expect(getFrameNumberForIndex(24, 1, 24)).toBe(1);
+  });
 
-const overlayLayout = createKodakGoldOverlayLayout(3600);
-assert(overlayLayout.imageW === 3600, 'overlay image width should match target width');
-assert(overlayLayout.filmW > overlayLayout.imageW, 'overlay should include real template border');
-assert(overlayLayout.imageX > 0 && overlayLayout.imageY > 0, 'overlay aperture should be inset');
-assert(overlayLayout.filmW / overlayLayout.filmH > 1, 'overlay template should remain landscape');
+  it('does not expose the removed previous-frame suffix position', () => {
+    const positions = getKodakGoldFrameNumberPositions(createKodakGoldOverlayLayout(3600));
+    expect('previousSuffixX' in positions).toBe(false);
+  });
+});
 
-const frameNumberPositions = getKodakGoldFrameNumberPositions(overlayLayout);
-assert(
-  !('previousSuffixX' in frameNumberPositions),
-  'Kodak Gold overlay should not draw the previous frame suffix'
-);
+describe('Kodak Gold overlay geometry', () => {
+  it('keeps the image aperture inset in a landscape template', () => {
+    const layout = createKodakGoldOverlayLayout(3600);
 
-assert(shouldAutoRotateForFilmFrame(1200, 1800, 3600, 2400) === true, 'portrait images should rotate into landscape film frames');
-assert(shouldAutoRotateForFilmFrame(1800, 1200, 3600, 2400) === false, 'landscape images should not rotate');
-assert(shouldAutoRotateForFilmFrame(1200, 1800, 2400, 3600) === false, 'portrait targets should not auto-rotate portrait images');
+    expect(layout.imageW).toBe(3600);
+    expect(layout.filmW).toBeGreaterThan(layout.imageW);
+    expect(layout.imageX > 0 && layout.imageY > 0).toBe(true);
+    expect(layout.filmW / layout.filmH).toBeGreaterThan(1);
+  });
 
-const stripLayout = createKodakGoldStripLayout(1400, 5, 4);
-assert(stripLayout.frame.imageW === 1400, 'strip frame image width should match target width');
-assert(stripLayout.rows === 2, '5 frames with max 4 per row should use 2 rows');
-assert(stripLayout.cols === 4, 'strip should use max 4 columns on first row');
-assert(stripLayout.frameGap >= Math.round(stripLayout.frame.imageW * 0.055), 'continuous strip should keep a real black frame gap between photos');
-assert(stripLayout.frameStride === stripLayout.frame.imageW + stripLayout.frameGap, 'continuous strip frame stride should be image width plus a narrow frame gap');
-assert(stripLayout.totalW === stripLayout.padding * 2 + stripLayout.rowFilmW, 'strip canvas should wrap one continuous row film width');
-assert(stripLayout.totalH > stripLayout.frame.filmH * 2, 'strip height should include row gap and padding');
+  it('creates a continuous multi-row strip layout', () => {
+    const layout = createKodakGoldStripLayout(1400, 5, 4);
 
-const segment0 = getKodakGoldStripSegment(stripLayout, 0, 4);
-const segment1 = getKodakGoldStripSegment(stripLayout, 1, 4);
-const segment2 = getKodakGoldStripSegment(stripLayout, 2, 4);
-assert(segment1.targetX - segment0.targetX === stripLayout.frameStride, 'second frame should align to one continuous frame pitch');
-assert(segment2.targetX - segment1.targetX === stripLayout.frameStride, 'third frame should align to one continuous frame pitch');
+    expect(layout.frame.imageW).toBe(1400);
+    expect(layout.rows).toBe(2);
+    expect(layout.cols).toBe(4);
+    expect(layout.frameGap).toBeGreaterThanOrEqual(Math.round(layout.frame.imageW * 0.055));
+    expect(layout.frameStride).toBe(layout.frame.imageW + layout.frameGap);
+    expect(layout.totalW).toBe(layout.padding * 2 + layout.rowFilmW);
+    expect(layout.totalH).toBeGreaterThan(layout.frame.filmH * 2);
+  });
+});
 
-assert(getReal135TargetImageWidth(4000, 'preview') === 1200, 'preview mode should render single frames at preview width');
-assert(getReal135TargetImageWidth(4000, 'high') === 3600, 'high mode should keep existing high-resolution cap');
-assert(getReal135TargetImageWidth(900, 'high') === 1800, 'high mode should keep existing minimum output width');
-assert(getReal135StripTargetImageWidth('preview') === 900, 'preview mode should render strip frames at preview width');
-assert(getReal135StripTargetImageWidth('high') === 1400, 'high mode should keep existing strip frame width');
+describe('film frame orientation', () => {
+  it('auto-rotates only portrait sources entering landscape frames', () => {
+    expect(shouldAutoRotateForFilmFrame(1200, 1800, 3600, 2400)).toBe(true);
+    expect(shouldAutoRotateForFilmFrame(1800, 1200, 3600, 2400)).toBe(false);
+    expect(shouldAutoRotateForFilmFrame(1200, 1800, 2400, 3600)).toBe(false);
+  });
+
+  it('returns matching input and output rotation angles', () => {
+    expect(getAutoRotateRadiansForFilmFrame(1200, 1800, 3600, 2400)).toBe(Math.PI / 2);
+    expect(getAutoRotateRadiansForFilmFrame(1800, 1200, 3600, 2400)).toBe(0);
+    expect(getOutputRestoreRotationRadiansForFilmFrame(1200, 1800, 3600, 2400)).toBe(-Math.PI / 2);
+    expect(getOutputRestoreRotationRadiansForFilmFrame(1800, 1200, 3600, 2400) === 0).toBe(true);
+  });
+});
+
+describe('render resolution', () => {
+  it('selects the established single and strip widths', () => {
+    expect(getReal135TargetImageWidth(4000, 'preview')).toBe(1200);
+    expect(getReal135TargetImageWidth(4000, 'high')).toBe(3600);
+    expect(getReal135TargetImageWidth(900, 'high')).toBe(1800);
+    expect(getReal135StripTargetImageWidth('preview')).toBe(900);
+    expect(getReal135StripTargetImageWidth('high')).toBe(1400);
+  });
+});

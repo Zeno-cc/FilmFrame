@@ -1,13 +1,21 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
-import { processImage, generateFilmStrip } from './services/filmWorkerClient';
+import { disposeFilmWorkerClient, processImage, generateFilmStrip } from './services/filmWorkerClient';
 import { createZipBlob } from './services/zip';
 import { loadPreferences, savePreferences } from './services/settingsStorage';
+import { buildPreviewDownload } from './services/previewDownload';
+import { prepareUploadedImages } from './services/uploadFiles';
+import { acceptImageRenderResult } from './services/imageBatch';
+import {
+  createArtifactFilename,
+  createImageRenderKey,
+  createOrderedStripKey,
+  type RenderArtifact,
+} from './services/renderResult';
 import {
   getNextPreviewImageId,
   getPreviewImageIndex,
-  getSinglePreviewSource,
   PreviewDirection,
 } from './services/previewNavigation';
 // Security Fix: Import EXIF from local dependency instead of external CDN
@@ -85,9 +93,6 @@ const DEFAULT_SETTINGS: FilmSettings = {
   filmOverlayUrl: '/film-overlays/kodak-gold-200.png'
 };
 
-const LARGE_FILE_BYTES = 25 * 1024 * 1024;
-const LARGE_IMAGE_EDGE = 8000;
-
 type PreviewState =
   | { type: 'single'; imageId: string }
   | { type: 'strip' };
@@ -98,17 +103,41 @@ function revokeObjectUrl(url?: string | null) {
   }
 }
 
-function sanitizeFilename(filename: string): string {
-  const baseName = filename.replace(/\.[^/.]+$/, '');
-  return baseName.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_') || 'image';
-}
-
 function timestampForFilename(): string {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '_');
 }
 
 function frameNumberForIndex(settings: FilmSettings, index: number): number {
   return ((settings.frameNumber + index - 1) % (settings.maxRollFrames ?? 36)) + 1;
+}
+
+function settingsForImage(settings: FilmSettings, index: number): FilmSettings {
+  return {
+    ...settings,
+    frameNumber: frameNumberForIndex(settings, index),
+  };
+}
+
+function getCurrentImageArtifact(
+  item: ImageItem,
+  index: number,
+  settings: FilmSettings,
+): RenderArtifact | null {
+  if (!item.processedUrl || !item.processedMime || !item.processedSettingsKey) {
+    return null;
+  }
+
+  const imageSettings = settingsForImage(settings, index);
+  const settingsKey = createImageRenderKey(imageSettings, item.exifDate);
+  if (item.processedMime !== settings.outputFormat || item.processedSettingsKey !== settingsKey) {
+    return null;
+  }
+
+  return {
+    url: item.processedUrl,
+    mime: item.processedMime,
+    settingsKey: item.processedSettingsKey,
+  };
 }
 
 function readImageSize(src: string): Promise<{ width: number; height: number }> {
@@ -127,14 +156,19 @@ const App: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>(() => initialPreferences.outputMode);
-  const [stripResult, setStripResult] = useState<string | null>(null);
+  const [stripResult, setStripResult] = useState<RenderArtifact | null>(null);
   const [showDonate, setShowDonate] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<ImageItem[]>([]);
-  const stripResultRef = useRef<string | null>(null);
-  const isReal135Mode = (settings.frameRenderMode ?? 'real135') === 'real135';
+  const settingsRef = useRef<FilmSettings>(settings);
+  const stripResultRef = useRef<RenderArtifact | null>(null);
+  const renderGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const supportsReal135Template = settings.brandText === FilmType.KODAK_GOLD_200;
+  const isReal135Mode = supportsReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
 
   // Drag and drop refs
   const dragItem = useRef<number | null>(null);
@@ -144,16 +178,24 @@ const App: React.FC = () => {
   }, [images]);
 
   useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
     stripResultRef.current = stripResult;
   }, [stripResult]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
+      renderGenerationRef.current += 1;
+      disposeFilmWorkerClient();
       imagesRef.current.forEach(img => {
         revokeObjectUrl(img.previewUrl);
         revokeObjectUrl(img.processedUrl);
       });
-      revokeObjectUrl(stripResultRef.current);
+      revokeObjectUrl(stripResultRef.current?.url);
     };
   }, []);
 
@@ -219,7 +261,8 @@ const App: React.FC = () => {
       setSettings(prev => ({ 
         ...prev, 
         textColor: preset.brandColor,
-        holeType: recommendedHoleType
+        holeType: recommendedHoleType,
+        frameRenderMode: settings.brandText === FilmType.KODAK_GOLD_200 ? prev.frameRenderMode : 'classic',
       }));
     }
   }, [settings.brandText]);
@@ -227,67 +270,36 @@ const App: React.FC = () => {
   // 清除 Strip 结果当图片变化时
   useEffect(() => {
     setStripResult(prev => {
-      revokeObjectUrl(prev);
+      revokeObjectUrl(prev?.url);
       stripResultRef.current = null;
       return null;
     });
   }, [images]);
 
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
+  const readExifDate = useCallback(async (file: File): Promise<string> => {
+    let exifDate = '';
+    await Promise.race([
+      new Promise((resolve) => {
+        EXIF.getData(file as any, function(this: any) {
+          const date = EXIF.getTag(this, "DateTimeOriginal");
+          if (date) {
+            exifDate = date.split(' ')[0].replace(/:/g, '/');
+          }
+          resolve(null);
+        });
+      }),
+      new Promise((resolve) => setTimeout(resolve, 1000))
+    ]);
+    return exifDate;
+  }, []);
 
-    const newImages: ImageItem[] = [];
-    const uploadErrors: string[] = [];
-    const uploadWarnings: string[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        uploadErrors.push(`"${file.name}" 不是有效的图片文件`);
-        continue;
-      }
-
-      const previewUrl = URL.createObjectURL(file);
-      try {
-        const { width, height } = await readImageSize(previewUrl);
-        const sizeMb = file.size / 1024 / 1024;
-        if (file.size > LARGE_FILE_BYTES || Math.max(width, height) > LARGE_IMAGE_EDGE) {
-          uploadWarnings.push(`"${file.name}" 较大（${width}×${height}, ${sizeMb.toFixed(1)}MB），处理时可能较慢或占用较多内存`);
-        }
-      } catch (e) {
-        console.warn("Image dimension check failed", e);
-      }
-      
-      let exifDate = '';
-      try {
-        // 使用 Promise.race 防止 EXIF 读取卡死
-        await Promise.race([
-          new Promise((resolve) => {
-            EXIF.getData(file as any, function(this: any) {
-              const date = EXIF.getTag(this, "DateTimeOriginal");
-              if (date) {
-                exifDate = date.split(' ')[0].replace(/:/g, '/');
-              }
-              resolve(null);
-            });
-          }),
-          new Promise((resolve) => setTimeout(resolve, 1000)) // 1秒超时，防止读取大文件元数据卡死
-        ]);
-      } catch (e) {
-        console.warn("EXIF extraction failed or timed out", e);
-        // 不报错，只是没有日期
-      }
-
-      newImages.push({
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        previewUrl,
-        exifDate
-      });
-    }
+  const addFiles = useCallback(async (files: Iterable<File>) => {
+    const { images: newImages, errors: uploadErrors, warnings: uploadWarnings } = await prepareUploadedImages(files, {
+      createId: () => Math.random().toString(36).substr(2, 9),
+      createObjectUrl: file => URL.createObjectURL(file),
+      readImageSize,
+      readExifDate,
+    });
 
     if (uploadErrors.length > 0 || uploadWarnings.length > 0) {
       const messages = [];
@@ -302,15 +314,22 @@ const App: React.FC = () => {
       return nextImages;
     });
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
+  }, [readExifDate]);
+
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    await addFiles(Array.from(files));
+  }, [addFiles]);
 
   const removeImage = (id: string) => {
-    const targetIndex = images.findIndex(img => img.id === id);
-    const target = targetIndex >= 0 ? images[targetIndex] : undefined;
+    const currentImages = imagesRef.current;
+    const targetIndex = currentImages.findIndex(img => img.id === id);
+    const target = targetIndex >= 0 ? currentImages[targetIndex] : undefined;
     revokeObjectUrl(target?.processedUrl);
     revokeObjectUrl(target?.previewUrl);
 
-    const nextImages = images.filter(img => img.id !== id);
+    const nextImages = currentImages.filter(img => img.id !== id);
     imagesRef.current = nextImages;
     setImages(nextImages);
 
@@ -321,50 +340,92 @@ const App: React.FC = () => {
   };
 
   const processAll = async () => {
-    if (images.length === 0) return;
+    if (processing) return;
+
+    const batchImages = [...imagesRef.current];
+    const batchSettings = settings;
+    const batchMode = outputMode;
+    if (batchImages.length === 0) return;
+
+    const generation = ++renderGenerationRef.current;
     setProcessing(true);
     setErrorMsg(null);
-    setProcessingMessage(outputMode === 'strip' ? '正在拼合胶片长条...' : `正在处理 1/${images.length}`);
+    setProcessingMessage(batchMode === 'strip' ? '正在拼合胶片长条...' : `正在处理 1/${batchImages.length}`);
 
     try {
-      if (outputMode === 'strip') {
-        setProcessingMessage(`正在拼合 ${images.length} 张照片...`);
-        const url = await generateFilmStrip(images, settings);
+      if (batchMode === 'strip') {
+        const settingsKey = createOrderedStripKey(batchSettings, batchImages.map(item => item.id));
+        setProcessingMessage(`正在拼合 ${batchImages.length} 张照片...`);
+        const url = await generateFilmStrip(batchImages, batchSettings);
+        const currentKey = createOrderedStripKey(
+          settingsRef.current,
+          imagesRef.current.map(item => item.id),
+        );
+
+        if (!mountedRef.current || generation !== renderGenerationRef.current || currentKey !== settingsKey) {
+          revokeObjectUrl(url);
+          return;
+        }
+
+        const artifact: RenderArtifact = {
+          url,
+          mime: batchSettings.outputFormat,
+          settingsKey,
+        };
         setStripResult(prev => {
-          revokeObjectUrl(prev);
-          stripResultRef.current = url;
-          return url;
+          revokeObjectUrl(prev?.url);
+          stripResultRef.current = artifact;
+          return artifact;
         });
       } else {
-        const updatedImages = [...images];
         const failedFiles: string[] = [];
-        const processedUrlsToRevoke: string[] = [];
-        for (let i = 0; i < updatedImages.length; i++) {
-          const item = updatedImages[i];
-          setProcessingMessage(`正在处理 ${i + 1}/${updatedImages.length}`);
+        for (let i = 0; i < batchImages.length; i++) {
+          const item = batchImages[i];
+          const imageSettings = settingsForImage(batchSettings, i);
+          const settingsKey = createImageRenderKey(imageSettings, item.exifDate);
+          setProcessingMessage(`正在处理 ${i + 1}/${batchImages.length}`);
           try {
             const resultUrl = await processImage(
               item.file,
-              {
-                ...settings,
-                frameNumber: frameNumberForIndex(settings, i),
-              },
+              imageSettings,
               item.exifDate,
               item.previewUrl
             );
-            if (item.processedUrl) {
-              processedUrlsToRevoke.push(item.processedUrl);
+
+            const merged = acceptImageRenderResult(
+              imagesRef.current,
+              item.id,
+              {
+                processedUrl: resultUrl,
+                processedMime: batchSettings.outputFormat,
+                processedSettingsKey: settingsKey,
+                processingError: undefined,
+              },
+              { result: generation, current: renderGenerationRef.current },
+            );
+
+            if (!mountedRef.current || !merged.accepted) {
+              revokeObjectUrl(resultUrl);
+              continue;
             }
-            updatedImages[i] = { ...item, processedUrl: resultUrl, processingError: undefined };
+
+            imagesRef.current = merged.items;
+            setImages(merged.items);
+            revokeObjectUrl(merged.replacedUrl);
           } catch (err) {
             console.error('Processing failed for image', i, err);
             failedFiles.push(item.file.name);
-            updatedImages[i] = { ...item, processingError: '处理失败，请重试' };
+            if (generation === renderGenerationRef.current) {
+              const nextImages = imagesRef.current.map(current =>
+                current.id === item.id
+                  ? { ...current, processingError: '处理失败，请重试' }
+                  : current
+              );
+              imagesRef.current = nextImages;
+              setImages(nextImages);
+            }
           }
         }
-        imagesRef.current = updatedImages;
-        setImages(updatedImages);
-        processedUrlsToRevoke.forEach(revokeObjectUrl);
         if (failedFiles.length > 0) {
           setErrorMsg(`以下文件处理失败，其他图片已保留处理结果：\n${failedFiles.map(name => `"${name}"`).join('\n')}`);
         }
@@ -373,8 +434,10 @@ const App: React.FC = () => {
       console.error(e);
       setErrorMsg('处理过程中发生错误，可能是图片文件损坏或内存不足。');
     } finally {
-      setProcessing(false);
-      setProcessingMessage('');
+      if (mountedRef.current && generation === renderGenerationRef.current) {
+        setProcessing(false);
+        setProcessingMessage('');
+      }
     }
   };
 
@@ -385,6 +448,10 @@ const App: React.FC = () => {
     const index = currentImages.findIndex(img => img.id === id);
     const item = currentImages[index];
     if (!item) return;
+
+    const generation = ++renderGenerationRef.current;
+    const retrySettings = settingsForImage(settings, index);
+    const settingsKey = createImageRenderKey(retrySettings, item.exifDate);
 
     setProcessing(true);
     setErrorMsg(null);
@@ -400,25 +467,31 @@ const App: React.FC = () => {
     try {
       const resultUrl = await processImage(
         item.file,
-        {
-          ...settings,
-          frameNumber: frameNumberForIndex(settings, index),
-        },
+        retrySettings,
         item.exifDate,
         item.previewUrl
       );
 
-      let oldProcessedUrl: string | undefined;
-      setImages(prev => {
-        const nextImages = prev.map(img => {
-          if (img.id !== id) return img;
-          oldProcessedUrl = img.processedUrl;
-          return { ...img, processedUrl: resultUrl, processingError: undefined };
-        });
-        imagesRef.current = nextImages;
-        return nextImages;
-      });
-      revokeObjectUrl(oldProcessedUrl);
+      const merged = acceptImageRenderResult(
+        imagesRef.current,
+        id,
+        {
+          processedUrl: resultUrl,
+          processedMime: settings.outputFormat,
+          processedSettingsKey: settingsKey,
+          processingError: undefined,
+        },
+        { result: generation, current: renderGenerationRef.current },
+      );
+
+      if (!mountedRef.current || !merged.accepted) {
+        revokeObjectUrl(resultUrl);
+        return;
+      }
+
+      imagesRef.current = merged.items;
+      setImages(merged.items);
+      revokeObjectUrl(merged.replacedUrl);
     } catch (err) {
       console.error('Retry failed for image', id, err);
       setImages(prev => {
@@ -430,19 +503,17 @@ const App: React.FC = () => {
       });
       setErrorMsg(`"${item.file.name}" 重试失败，可能是图片文件损坏或内存不足。`);
     } finally {
-      setProcessing(false);
-      setProcessingMessage('');
+      if (mountedRef.current && generation === renderGenerationRef.current) {
+        setProcessing(false);
+        setProcessingMessage('');
+      }
     }
   };
 
-  const downloadImage = (url: string, filename: string) => {
+  const downloadImage = (artifact: RenderArtifact, filename: string) => {
     const link = document.createElement('a');
-    link.href = url;
-    // 根据输出格式决定后缀
-    const ext = settings.outputFormat === 'image/jpeg' ? 'jpg' : 'png';
-    const safeBaseName = sanitizeFilename(filename);
-    
-    link.download = `${safeBaseName}.${ext}`;
+    link.href = artifact.url;
+    link.download = createArtifactFilename(filename, artifact.mime);
     link.click();
   };
 
@@ -456,26 +527,33 @@ const App: React.FC = () => {
   };
 
   const downloadAll = async () => {
-    const ext = settings.outputFormat === 'image/jpeg' ? 'jpg' : 'png';
     if (outputMode === 'strip') {
-      if (stripResult) downloadImage(stripResult, `film_strip_${Date.now()}.${ext}`);
+      const currentKey = createOrderedStripKey(settings, images.map(item => item.id));
+      if (stripResult?.settingsKey === currentKey && stripResult.mime === settings.outputFormat) {
+        downloadImage(stripResult, `film_strip_${Date.now()}`);
+      }
     } else {
-      const processedImages = images.filter((img): img is ImageItem & { processedUrl: string } => Boolean(img.processedUrl));
+      const processedImages = images.flatMap((img, index) => {
+        const artifact = getCurrentImageArtifact(img, index, settings);
+        return artifact ? [{ img, artifact }] : [];
+      });
       if (processedImages.length === 0) {
         setErrorMsg('暂无可下载的成片，请先点击“处理全部单张”。');
         return;
       }
 
       try {
-        const zipFiles = await Promise.all(processedImages.map(async (img, idx) => {
-          const response = await fetch(img.processedUrl);
+        const zipFiles = [];
+        for (let idx = 0; idx < processedImages.length; idx++) {
+          const { img, artifact } = processedImages[idx];
+          const response = await fetch(artifact.url);
           if (!response.ok) throw new Error(`Failed to read generated image ${idx + 1}`);
 
-          return {
-            name: `${String(idx + 1).padStart(2, '0')}_${sanitizeFilename(img.file.name)}.${ext}`,
+          zipFiles.push({
+            name: `${String(idx + 1).padStart(2, '0')}_${createArtifactFilename(img.file.name, artifact.mime)}`,
             blob: await response.blob(),
-          };
-        }));
+          });
+        }
 
         const zipBlob = await createZipBlob(zipFiles);
         downloadBlob(zipBlob, `filmframe_${timestampForFilename()}.zip`);
@@ -515,16 +593,59 @@ const App: React.FC = () => {
     e.preventDefault(); // Necessary for onDrop/onDragEnter to work smoothly
   };
 
-  const processedCount = images.filter(img => img.processedUrl).length;
-  const hasAnyResult = outputMode === 'single' ? processedCount > 0 : Boolean(stripResult);
+  const hasUploadFiles = (event: React.DragEvent<HTMLElement>) => {
+    return Array.from(event.dataTransfer.types).includes('Files');
+  };
+
+  const handleUploadDragEnter = (event: React.DragEvent<HTMLElement>) => {
+    if (!hasUploadFiles(event)) return;
+    event.preventDefault();
+    setIsDraggingUpload(true);
+  };
+
+  const handleUploadDragOver = (event: React.DragEvent<HTMLElement>) => {
+    if (!hasUploadFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsDraggingUpload(true);
+  };
+
+  const handleUploadDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setIsDraggingUpload(false);
+  };
+
+  const handleUploadDrop = async (event: React.DragEvent<HTMLElement>) => {
+    if (!hasUploadFiles(event)) return;
+    event.preventDefault();
+    setIsDraggingUpload(false);
+    await addFiles(Array.from(event.dataTransfer.files));
+  };
+
+  const currentImageArtifacts = new Map(
+    images.flatMap((img, index) => {
+      const artifact = getCurrentImageArtifact(img, index, settings);
+      return artifact ? [[img.id, artifact] as const] : [];
+    }),
+  );
+  const currentStripKey = createOrderedStripKey(settings, images.map(item => item.id));
+  const currentStripResult =
+    stripResult?.settingsKey === currentStripKey && stripResult.mime === settings.outputFormat
+      ? stripResult
+      : null;
+  const processedCount = currentImageArtifacts.size;
+  const hasAnyResult = outputMode === 'single' ? processedCount > 0 : Boolean(currentStripResult);
   const previewImageIndex =
     preview?.type === 'single' ? getPreviewImageIndex(images, preview.imageId) : -1;
   const previewImageItem = previewImageIndex >= 0 ? images[previewImageIndex] : null;
+  const previewImageArtifact = previewImageItem
+    ? currentImageArtifacts.get(previewImageItem.id) ?? null
+    : null;
   const previewImageSource =
     preview?.type === 'single' && previewImageItem
-      ? getSinglePreviewSource(previewImageItem)
+      ? previewImageArtifact?.url ?? previewImageItem.previewUrl
       : preview?.type === 'strip'
-        ? stripResult
+        ? currentStripResult?.url ?? null
         : null;
   const previewTitle =
     preview?.type === 'single' && previewImageItem
@@ -532,11 +653,19 @@ const App: React.FC = () => {
       : preview?.type === 'strip'
         ? 'Film Strip'
         : '';
+  const previewDownload = preview
+    ? buildPreviewDownload(
+        preview,
+        previewImageItem?.file.name ?? null,
+        previewImageArtifact,
+        currentStripResult,
+      )
+    : null;
   const processButtonLabel =
     images.length === 0
       ? '先添加图片'
       : outputMode === 'strip'
-        ? (stripResult ? '重新生成胶片长条' : '生成胶片长条')
+        ? (currentStripResult ? '重新生成胶片长条' : '生成胶片长条')
         : processedCount > 0
           ? `重新处理全部单张 (${images.length})`
           : `处理全部单张 (${images.length})`;
@@ -674,6 +803,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+             {supportsReal135Template && (
              <div className="space-y-2">
                 <span className="text-xs text-gray-400">边框模式</span>
                 <div className="grid grid-cols-2 gap-1 bg-white/5 p-1 rounded-md border border-white/10">
@@ -691,6 +821,7 @@ const App: React.FC = () => {
                    </button>
                 </div>
              </div>
+             )}
 
              {isReal135Mode && outputMode === 'single' && (
              <div className="space-y-2">
@@ -866,7 +997,13 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto bg-[#0a0a0a]">
+      <main
+        className={`flex-1 flex flex-col p-4 md:p-8 overflow-y-auto bg-[#0a0a0a] transition-colors ${isDraggingUpload ? 'bg-amber-500/[0.04]' : ''}`}
+        onDragEnter={handleUploadDragEnter}
+        onDragOver={handleUploadDragOver}
+        onDragLeave={handleUploadDragLeave}
+        onDrop={handleUploadDrop}
+      >
         <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
           <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
@@ -907,7 +1044,11 @@ const App: React.FC = () => {
           {images.length === 0 ? (
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 min-h-[400px] border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/[0.02] transition-all"
+              className={`flex-1 min-h-[400px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${
+                isDraggingUpload
+                  ? 'border-amber-500/80 bg-amber-500/[0.06]'
+                  : 'border-white/10 hover:border-amber-500/50 hover:bg-amber-500/[0.02]'
+              }`}
             >
               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-gray-500">
                 <PlusIcon />
@@ -932,9 +1073,9 @@ const App: React.FC = () => {
                       onDragOver={handleDragOver}
                       className="group relative bg-[#181818] rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all cursor-move active:cursor-grabbing hover:shadow-xl hover:shadow-black/50"
                     >
-                      <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
-	                        <img 
-	                          src={img.processedUrl || img.previewUrl} 
+	                      <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
+		                        <img
+		                          src={currentImageArtifacts.get(img.id)?.url || img.previewUrl}
 	                          alt="Preview" 
 	                          className={`w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${processing ? 'opacity-40' : 'opacity-100'}`}
 	                        />
@@ -961,8 +1102,8 @@ const App: React.FC = () => {
                           <button onClick={() => setPreview({ type: 'single', imageId: img.id })} className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
                             <MaximizeIcon />
                           </button>
-	                          {img.processedUrl && (
-                              <button onClick={() => downloadImage(img.processedUrl!, img.file.name)} className="p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
+		                          {currentImageArtifacts.has(img.id) && (
+	                              <button onClick={() => downloadImage(currentImageArtifacts.get(img.id)!, img.file.name)} className="p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
                                 <DownloadIcon />
                               </button>
                           )}
@@ -987,9 +1128,9 @@ const App: React.FC = () => {
                           <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
                           <span className="text-xs text-gray-500">{processingMessage || '正在拼合胶片长条...'}</span>
                        </div>
-                    ) : stripResult ? (
-                      <div className="relative group">
-                        <img src={stripResult} alt="Film Strip" className="max-h-[600px] shadow-2xl" />
+	                    ) : currentStripResult ? (
+	                      <div className="relative group">
+	                        <img src={currentStripResult.url} alt="Film Strip" className="max-h-[600px] shadow-2xl" />
                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                            <button onClick={() => setPreview({ type: 'strip' })} className="p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><MaximizeIcon /></button>
                         </div>
@@ -1041,7 +1182,17 @@ const App: React.FC = () => {
           >
             <CloseIcon />
           </button>
-          <div className="absolute top-6 left-6 right-20 flex items-center gap-3 min-w-0 pointer-events-none">
+          {previewDownload && (
+            <a
+              href={previewDownload.href}
+              download={previewDownload.download}
+              className="absolute top-6 right-20 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+              aria-label="下载当前预览"
+            >
+              <DownloadIcon />
+            </a>
+          )}
+          <div className="absolute top-6 left-6 right-32 flex items-center gap-3 min-w-0 pointer-events-none">
             <div className="min-w-0 rounded-full bg-black/45 border border-white/10 px-4 py-2 text-white shadow-xl">
               <div className="max-w-[52vw] truncate text-sm font-medium">{previewTitle}</div>
               {preview.type === 'single' && previewImageIndex >= 0 && (
@@ -1071,7 +1222,7 @@ const App: React.FC = () => {
           )}
           <img 
             src={previewImageSource} 
-            className="max-w-full max-h-full object-contain shadow-2xl" 
+            className="max-w-full max-h-full object-contain"
             alt={previewTitle || 'Fullscreen preview'} 
           />
         </div>

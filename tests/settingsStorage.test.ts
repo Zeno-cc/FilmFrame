@@ -1,3 +1,4 @@
+import { beforeAll, describe, expect, it } from 'vitest';
 import { FilmType } from '../types';
 import type { FilmSettings } from '../types';
 import {
@@ -7,12 +8,6 @@ import {
   normalizeSettingsPatch,
   savePreferences,
 } from '../services/settingsStorage';
-
-function assert(condition: unknown, message: string) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
 
 const defaults: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
@@ -38,80 +33,96 @@ const defaults: FilmSettings = {
   filmOverlayUrl: '/film-overlays/kodak-gold-200.png',
 };
 
-const patch = normalizeSettingsPatch({
-  brandText: FilmType.ILFORD_HP5,
-  customText: 'SHOT BY ZENO',
-  frameNumber: -10,
-  showDate: false,
-  dateStr: '2024/02/03',
-  borderColor: '#abcdef',
-  holeColor: '#123456',
-  textColor: '#fedcba',
-  borderSize: 99,
-  grainIntensity: -5,
-  holeType: 'square',
-  outputFormat: 'image/png',
-  outputQuality: 5,
-  processingMode: 'high',
-  frameRenderMode: 'classic',
-  scanOutputAspect: 'native',
-  autoCropToFilmRatio: false,
-  enableRealisticRebate: false,
-  maxRollFrames: 24,
-  useFilmOverlayTemplate: false,
-  filmOverlayUrl: '/should-not-persist.png',
+describe('settings normalization', () => {
+  it('persists valid fields, clamps numbers, and excludes the runtime overlay URL', () => {
+    const patch = normalizeSettingsPatch({
+      brandText: FilmType.ILFORD_HP5,
+      customText: 'SHOT BY ZENO',
+      frameNumber: -10,
+      showDate: false,
+      dateStr: '2024/02/03',
+      borderColor: '#abcdef',
+      holeColor: '#123456',
+      textColor: '#fedcba',
+      borderSize: 99,
+      grainIntensity: -5,
+      holeType: 'square',
+      outputFormat: 'image/png',
+      outputQuality: 5,
+      processingMode: 'high',
+      frameRenderMode: 'classic',
+      scanOutputAspect: 'native',
+      autoCropToFilmRatio: false,
+      enableRealisticRebate: false,
+      maxRollFrames: 24,
+      useFilmOverlayTemplate: false,
+      filmOverlayUrl: '/should-not-persist.png',
+    });
+
+    expect(patch.brandText).toBe(FilmType.ILFORD_HP5);
+    expect(patch.frameNumber).toBe(1);
+    expect(patch.borderSize).toBe(25);
+    expect(patch.grainIntensity).toBe(0);
+    expect(patch.outputQuality).toBe(1);
+    expect(patch.maxRollFrames).toBe(24);
+    expect(patch.textColor).toBe('#fedcba');
+    expect(patch.holeType).toBe('square');
+    expect('filmOverlayUrl' in patch).toBe(false);
+  });
+
+  it('merges normalized values over defaults', () => {
+    const merged = mergeSettings(defaults, {
+      brandText: 'not a film',
+      borderSize: 1,
+      outputQuality: 0.1,
+      maxRollFrames: 99,
+      filmOverlayUrl: '/should-not-override.png',
+    });
+
+    expect(merged.brandText).toBe(defaults.brandText);
+    expect(merged.borderSize).toBe(5);
+    expect(merged.outputQuality).toBe(0.5);
+    expect(merged.maxRollFrames).toBe(defaults.maxRollFrames);
+    expect(merged.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
+  });
+
+  it('normalizes output modes', () => {
+    expect(normalizeOutputMode('strip', 'single')).toBe('strip');
+    expect(normalizeOutputMode('grid', 'single')).toBe('single');
+  });
 });
 
-assert(patch.brandText === FilmType.ILFORD_HP5, 'valid film type should persist');
-assert(patch.frameNumber === 1, 'frameNumber should clamp to at least 1');
-assert(patch.borderSize === 25, 'borderSize should clamp to 25');
-assert(patch.grainIntensity === 0, 'grainIntensity should clamp to 0');
-assert(patch.outputQuality === 1, 'outputQuality should clamp to 1');
-assert(patch.maxRollFrames === 24, 'maxRollFrames should accept 24');
-assert(patch.textColor === '#fedcba', 'textColor should persist when it is a string');
-assert(patch.holeType === 'square', 'holeType should persist when it is valid');
-assert(!('filmOverlayUrl' in patch), 'filmOverlayUrl should not persist');
+describe('settings storage', () => {
+  const savedValues = new Map<string, string>();
 
-const merged = mergeSettings(defaults, {
-  brandText: 'not a film',
-  borderSize: 1,
-  outputQuality: 0.1,
-  maxRollFrames: 99,
-  filmOverlayUrl: '/should-not-override.png',
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => savedValues.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          savedValues.set(key, value);
+        },
+      },
+    });
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {},
+    });
+    savePreferences({ ...defaults, filmOverlayUrl: '/runtime-overlay.png', frameNumber: 42 }, 'strip');
+  });
+
+  it('saves supported settings and excludes the runtime overlay URL', () => {
+    const rawSaved = Array.from(savedValues.values()).join('\n');
+    expect(rawSaved).toContain('"outputMode":"strip"');
+    expect(rawSaved).toContain('"frameNumber":42');
+    expect(rawSaved).not.toContain('runtime-overlay');
+  });
+
+  it('loads saved preferences while retaining the default overlay URL', () => {
+    const loaded = loadPreferences(defaults, 'single');
+    expect(loaded.outputMode).toBe('strip');
+    expect(loaded.settings.frameNumber).toBe(42);
+    expect(loaded.settings.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
+  });
 });
-
-assert(merged.brandText === defaults.brandText, 'invalid film type should fall back to defaults');
-assert(merged.borderSize === 5, 'merge should use normalized numeric values');
-assert(merged.outputQuality === 0.5, 'merge should clamp output quality to 0.5');
-assert(merged.maxRollFrames === defaults.maxRollFrames, 'invalid maxRollFrames should fall back to defaults');
-assert(merged.filmOverlayUrl === defaults.filmOverlayUrl, 'merge should keep default filmOverlayUrl');
-
-assert(normalizeOutputMode('strip', 'single') === 'strip', 'valid output mode should persist');
-assert(normalizeOutputMode('grid', 'single') === 'single', 'invalid output mode should fall back');
-
-const savedValues = new Map<string, string>();
-Object.defineProperty(globalThis, 'localStorage', {
-  configurable: true,
-  value: {
-    getItem: (key: string) => savedValues.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      savedValues.set(key, value);
-    },
-  },
-});
-Object.defineProperty(globalThis, 'window', {
-  configurable: true,
-  value: {},
-});
-
-savePreferences({ ...defaults, filmOverlayUrl: '/runtime-overlay.png', frameNumber: 42 }, 'strip');
-
-const rawSaved = Array.from(savedValues.values()).join('\n');
-assert(rawSaved.includes('"outputMode":"strip"'), 'output mode should be saved');
-assert(rawSaved.includes('"frameNumber":42'), 'settings should be saved');
-assert(!rawSaved.includes('runtime-overlay'), 'filmOverlayUrl should not be saved');
-
-const loaded = loadPreferences(defaults, 'single');
-assert(loaded.outputMode === 'strip', 'output mode should load from storage');
-assert(loaded.settings.frameNumber === 42, 'settings should load from storage');
-assert(loaded.settings.filmOverlayUrl === defaults.filmOverlayUrl, 'loaded settings should keep default filmOverlayUrl');

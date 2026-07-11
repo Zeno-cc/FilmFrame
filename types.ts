@@ -59,6 +59,8 @@ export interface ImageItem {
   file: File;
   previewUrl: string;
   processedUrl?: string;
+  processedMime?: OutputFormat;
+  processedSettingsKey?: string;
   exifDate?: string;
   processingError?: string;
 }

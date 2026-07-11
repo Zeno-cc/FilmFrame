@@ -1,17 +1,22 @@
 import { FilmSettings } from '../types';
 import { Film135SideLayout } from './filmGeometry';
 
-let cachedNoiseCanvas: HTMLCanvasElement | null = null;
+type GrainCanvas = HTMLCanvasElement | OffscreenCanvas;
+type GrainContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-function getNoisePatternCanvas(): HTMLCanvasElement {
+let cachedNoiseCanvas: GrainCanvas | null = null;
+
+function getNoisePatternCanvas(): GrainCanvas {
   if (cachedNoiseCanvas) return cachedNoiseCanvas;
 
   const size = 256;
-  const canvas = document.createElement('canvas');
+  const canvas = typeof OffscreenCanvas !== 'undefined'
+    ? new OffscreenCanvas(size, size)
+    : document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d') as GrainContext | null;
   if (!ctx) throw new Error('Canvas context not found');
 
   const imageData = ctx.createImageData(size, size);
@@ -39,7 +44,7 @@ function getNoisePatternCanvas(): HTMLCanvasElement {
 
 // Overlay grain is applied only to bounded regions to keep large exports responsive.
 export function drawGrain(
-  ctx: CanvasRenderingContext2D,
+  ctx: GrainContext,
   x: number,
   y: number,
   width: number,
