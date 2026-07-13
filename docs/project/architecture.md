@@ -102,7 +102,7 @@ createImageBitmap
 ### 策略条件
 
 - classic：暂不允许 Worker，统一走主线程，避免当前双实现的尺寸和标记差异暴露给用户。
-- real135：Gold 200 与 Portra 160 由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，Portra 160 走主线程扁平模板路径。
+- real135：Gold 200、Portra 160、Portra 400、Ektar 100 与 Portra 800 由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，其余已注册型号走主线程扁平模板路径。
 - 不满足时直接主线程。
 
 ### 请求协议

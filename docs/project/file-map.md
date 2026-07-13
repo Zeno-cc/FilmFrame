@@ -94,9 +94,13 @@
 | `film-overlays/film-base.png` | 运行时分层素材 |
 | `film-overlays/aperture-mask-derived.png` | 运行时分层 mask |
 | `film-overlays/aperture-shadow-derived.png` | 运行时加载但不绘制 |
-| `film-overlays/kodak-gold-200.png` | legacy fallback |
+| `film-overlays/kodak-gold-200.png` | Gold 200 legacy fallback |
+| `film-overlays/kodak-portra-160.png` | Portra 160 flattened real-135 template |
+| `film-overlays/kodak-portra-400.png` | Portra 400 flattened real-135 template |
+| `film-overlays/kodak-ektar-100.png` | Ektar 100 flattened real-135 template |
+| `film-overlays/kodak-portra-800.png` | Portra 800 flattened real-135 template |
 | 其他 mask/shadow PNG | 当前源码未引用，疑似中间素材 |
-| `film-overlays/README.md` | 过时，只解释 legacy 模板 |
+| `film-overlays/README.md` | runtime template geometry and normalization contract |
 
 Vite 会原样复制整个 `public/`，不是只复制被 import 的资源。
 

@@ -15,7 +15,7 @@
   <p align="center"><strong>真实 135 胶片边框生成器 (Digital Darkroom)</strong></p>
   
   <p align="center">
-    一个浏览器端 Canvas 胶片模拟工具，为照片生成 Kodak Gold 200 风格真实 135 底片边框。<br />
+    一个浏览器端 Canvas 胶片模拟工具，为照片生成 Kodak 多款真实 135 底片边框。<br />
     支持<strong>真实模板叠加</strong>、<strong>连续底片长条</strong>、<strong>批量处理</strong>与<strong>ZIP 打包下载</strong>。
   </p>
 
@@ -33,11 +33,11 @@
 
 ## ✨ 核心特性 (Features)
 
-**FilmFrame** 不仅是简单加黑边工具，它是基于 Canvas 像素级绘制的胶片模拟器，当前重点支持 Kodak Gold 200 真实 135 底片边框。
+**FilmFrame** 不仅是简单加黑边工具，它是基于 Canvas 像素级绘制的胶片模拟器，当前支持 Kodak Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 真实 135 底片边框。
 
 ### 1. 🎞️ 真实 135 工作流
-- **真实 135 单张**：使用无编号 Kodak Gold 200 片边模板，照片自动裁切/旋转进入底片窗口。
-- **连续底片长条**：按连续片基绘制齿孔、文字和帧号，不再简单平铺单张模板。
+- **真实 135 单张**：使用与所选胶片对应的模板，照片自动裁切/旋转进入底片窗口。
+- **连续底片长条**：Gold 200 按连续片基绘制；已注册扁平模板让完整帧直接相接，不产生额外帧间空隙。
 - **经典边框模式**：保留旧版程序化边框，继续支持自定义文字、边框颜色、齿孔形状等设置。
 
 ### 2. 🎨 输出控制
@@ -54,7 +54,7 @@
 
 ## 📸 胶片型号 (Film Stocks)
 
-真实 135 模式当前优先支持 Kodak Gold 200 模板。经典边框模式仍保留多胶卷预设：
+真实 135 模式支持 Kodak Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 模板。经典边框模式仍保留多胶卷预设：
 
 | 系列 | 型号 | 风格特点 |
 | :--- | :--- | :--- |
@@ -118,7 +118,7 @@ Output Directory: dist
 Node Version: >=20
 ```
 
-项目没有后端、数据库或必需环境变量。`public/film-overlays/kodak-gold-200.png` 会在构建时自动复制到 `dist/film-overlays/`。
+项目没有后端、数据库或必需环境变量。`public/film-overlays/` 下的 Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 模板会在构建时自动复制到 `dist/film-overlays/`。
 
 ## 🛠️ 技术栈 (Tech Stack)
 

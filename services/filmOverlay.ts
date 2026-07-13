@@ -2,6 +2,9 @@ import { FilmType } from '../types';
 
 export const KODAK_GOLD_OVERLAY_URL = '/film-overlays/kodak-gold-200.png';
 export const KODAK_PORTRA_160_OVERLAY_URL = '/film-overlays/kodak-portra-160.png';
+export const KODAK_PORTRA_400_OVERLAY_URL = '/film-overlays/kodak-portra-400.png';
+export const KODAK_EKTAR_100_OVERLAY_URL = '/film-overlays/kodak-ektar-100.png';
+export const KODAK_PORTRA_800_OVERLAY_URL = '/film-overlays/kodak-portra-800.png';
 export const KODAK_GOLD_BASE_URL = '/film-overlays/film-base.png';
 export const KODAK_GOLD_APERTURE_MASK_URL = '/film-overlays/aperture-mask-derived.png';
 export const KODAK_GOLD_APERTURE_SHADOW_URL = '/film-overlays/aperture-shadow-derived.png';
@@ -13,6 +16,9 @@ export const KODAK_GOLD_APERTURE_ASPECT = 1123 / 800;
 export const REAL135_TEMPLATE_URLS: Partial<Record<FilmType, string>> = {
   [FilmType.KODAK_GOLD_200]: KODAK_GOLD_OVERLAY_URL,
   [FilmType.KODAK_PORTRA_160]: KODAK_PORTRA_160_OVERLAY_URL,
+  [FilmType.KODAK_PORTRA_400]: KODAK_PORTRA_400_OVERLAY_URL,
+  [FilmType.KODAK_EKTAR_100]: KODAK_EKTAR_100_OVERLAY_URL,
+  [FilmType.KODAK_PORTRA_800]: KODAK_PORTRA_800_OVERLAY_URL,
 };
 
 export function getReal135OverlayUrl(brand: FilmType): string | undefined {

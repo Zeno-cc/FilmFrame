@@ -203,6 +203,9 @@ describe('worker routing policy', () => {
     expect(shouldUseWorkerForSettings(settings)).toBe(true);
     expect(shouldUseWorkerForSettings({ ...settings, frameRenderMode: 'classic' })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.KODAK_PORTRA_160 })).toBe(false);
+    expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.KODAK_PORTRA_400 })).toBe(false);
+    expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.KODAK_EKTAR_100 })).toBe(false);
+    expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.KODAK_PORTRA_800 })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.ILFORD_HP5 })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, useFilmOverlayTemplate: false })).toBe(false);
   });

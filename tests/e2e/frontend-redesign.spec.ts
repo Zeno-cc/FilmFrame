@@ -133,6 +133,28 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
   await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
 });
 
+for (const [name, stock] of [
+  ['Kodak Portra 400', 'KODAK PORTRA 400'],
+  ['Kodak Ektar 100', 'KODAK EKTAR 100'],
+  ['Kodak Portra 800', 'KODAK PORTRA 800'],
+] as const) {
+  test(`${name} supports real 135 single and template strip rendering`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const inspector = page.getByRole('complementary', { name: '暗房配方' });
+    await inspector.getByLabel('胶片型号').selectOption(stock);
+
+    await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('input[type="file"]').setInputFiles(fixture);
+    await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
+    await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('tab', { name: /连底长条/ }).click();
+    const stripStage = page.getByLabel('长条审片台');
+    await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
+    await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
+  });
+}
+
 test('crop editor returns focus to its trigger after Escape and cancel', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('input[type="file"]').setInputFiles(fixture);

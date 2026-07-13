@@ -23,6 +23,13 @@ git diff --check
 - Check resource ownership for every new Object URL, timer, Worker request, or event listener.
 - Check desktop, tablet, and 390px mobile behavior for layout changes.
 
+### Flattened Real-135 Template Assets
+
+- Every flattened real-135 template must be an RGB `1307x1203` PNG with a fully black aperture at `x=92`, `y=211`, `width=1123`, `height=800`.
+- Measure each generated source image's largest continuous black aperture before normalizing it. Source apertures differ by model, so never reuse another stock's crop coordinates.
+- Normalize a source template by splitting it around the measured aperture into a 3x3 grid, resizing the edge and center regions independently to `92/1123/92` columns and `211/800/192` rows, then stitching the regions together. A global affine resize can introduce black padding at the film edges.
+- Validate the result before registration: the aperture pixels are all black, all four outer edges retain non-black film material, and the asset renders in a browser for both single and strip workflows.
+
 ## Accessibility Review
 
 - Use role/name selectors in E2E tests; this verifies both interaction and accessible naming.

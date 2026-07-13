@@ -3,18 +3,27 @@ import { FilmType } from '../types';
 import {
   createFilmTemplateStripLayout,
   getReal135OverlayUrl,
+  KODAK_EKTAR_100_OVERLAY_URL,
   KODAK_GOLD_OVERLAY_URL,
   KODAK_PORTRA_160_OVERLAY_URL,
+  KODAK_PORTRA_400_OVERLAY_URL,
+  KODAK_PORTRA_800_OVERLAY_URL,
   supportsReal135Template,
 } from '../services/filmOverlay';
 
 describe('real 135 template registry', () => {
-  it('registers Gold 200 and Portra 160 without enabling unsupported stocks', () => {
+  it('registers all shipped templates without enabling unsupported stocks', () => {
     expect(getReal135OverlayUrl(FilmType.KODAK_GOLD_200)).toBe(KODAK_GOLD_OVERLAY_URL);
     expect(getReal135OverlayUrl(FilmType.KODAK_PORTRA_160)).toBe(KODAK_PORTRA_160_OVERLAY_URL);
+    expect(getReal135OverlayUrl(FilmType.KODAK_PORTRA_400)).toBe(KODAK_PORTRA_400_OVERLAY_URL);
+    expect(getReal135OverlayUrl(FilmType.KODAK_EKTAR_100)).toBe(KODAK_EKTAR_100_OVERLAY_URL);
+    expect(getReal135OverlayUrl(FilmType.KODAK_PORTRA_800)).toBe(KODAK_PORTRA_800_OVERLAY_URL);
     expect(supportsReal135Template(FilmType.KODAK_GOLD_200)).toBe(true);
     expect(supportsReal135Template(FilmType.KODAK_PORTRA_160)).toBe(true);
-    expect(supportsReal135Template(FilmType.KODAK_EKTAR_100)).toBe(false);
+    expect(supportsReal135Template(FilmType.KODAK_PORTRA_400)).toBe(true);
+    expect(supportsReal135Template(FilmType.KODAK_EKTAR_100)).toBe(true);
+    expect(supportsReal135Template(FilmType.KODAK_PORTRA_800)).toBe(true);
+    expect(supportsReal135Template(FilmType.KODAK_ULTRAMAX_400)).toBe(false);
   });
 
   it('keeps complete flattened frames separate in multi-row strips', () => {
