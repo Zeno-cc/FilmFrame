@@ -24,9 +24,14 @@ export type WorkerRenderer = {
     settings: FilmSettings,
     dateOverride?: string,
     transform?: RenderTransform,
-  ) => Promise<string>;
-  generateFilmStrip: (images: ImageItem[], settings: FilmSettings) => Promise<string>;
+  ) => Promise<RenderOutput>;
+  generateFilmStrip: (images: ImageItem[], settings: FilmSettings) => Promise<RenderOutput>;
   dispose: () => void;
+};
+
+export type RenderOutput = {
+  url: string;
+  byteSize: number;
 };
 
 export type WorkerRendererDependencies = {
@@ -39,7 +44,7 @@ export type WorkerRendererDependencies = {
 };
 
 type PendingRequest = {
-  resolve: (url: string) => void;
+  resolve: (output: RenderOutput) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof globalThis.setTimeout>;
 };
@@ -136,7 +141,10 @@ export function createWorkerRenderer(
     }
 
     try {
-      request.resolve(deps.createObjectURL(response.blob));
+      request.resolve({
+        url: deps.createObjectURL(response.blob),
+        byteSize: response.blob.size,
+      });
     } catch (error) {
       request.reject(error instanceof Error ? error : new Error('Failed to create result URL'));
     }
@@ -150,7 +158,7 @@ export function createWorkerRenderer(
     makeUnavailable(new Error('Worker response could not be deserialized'));
   };
 
-  const request = (message: WorkerRequestPayload): Promise<string> => {
+  const request = (message: WorkerRequestPayload): Promise<RenderOutput> => {
     if (disposed) return Promise.reject(new WorkerCancelledError());
     if (unavailableError) return Promise.reject(unavailableError);
 
@@ -224,13 +232,24 @@ const withImageSourceUrl = async <T>(
   }
 };
 
+const readRenderOutput = async (url: string, errorMessage: string): Promise<RenderOutput> => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(errorMessage);
+    return { url, byteSize: (await response.blob()).size };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+};
+
 export const processImage = async (
   fileOrSource: File | string,
   settings: FilmSettings,
   dateOverride?: string,
   previewUrlFallback?: string,
   transform?: RenderTransform,
-): Promise<string> => {
+): Promise<RenderOutput> => {
   const canSendFile = typeof File !== 'undefined' && fileOrSource instanceof File;
   if (canSendFile && shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
@@ -244,15 +263,16 @@ export const processImage = async (
     }
   }
 
-  return withImageSourceUrl(fileOrSource, previewUrlFallback, (sourceUrl) =>
-    mainThreadEngine.processImage(sourceUrl, settings, dateOverride, transform)
-  );
+  return withImageSourceUrl(fileOrSource, previewUrlFallback, async (sourceUrl) => {
+    const url = await mainThreadEngine.processImage(sourceUrl, settings, dateOverride, transform);
+    return readRenderOutput(url, 'Failed to read generated image');
+  });
 };
 
 export const generateFilmStrip = async (
   images: ImageItem[],
   settings: FilmSettings
-): Promise<string> => {
+): Promise<RenderOutput> => {
   if (shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
     if (renderer) {
@@ -265,5 +285,6 @@ export const generateFilmStrip = async (
     }
   }
 
-  return mainThreadEngine.generateFilmStrip(images, settings);
+  const url = await mainThreadEngine.generateFilmStrip(images, settings);
+  return readRenderOutput(url, 'Failed to read generated film strip');
 };

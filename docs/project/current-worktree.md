@@ -7,10 +7,11 @@
 > 当前 HEAD：`e5c5a84`
 > 范围：此前开发内容与本轮 P0 稳定化作为同一提交边界交付。实时 HEAD、远端和 dirty 状态以 `git status --short --branch` 为准。
 
-## 当前未提交 P0/P1 体验升级
+## 当前未提交 P0/P1 体验升级与前端重构
 
 - P0：严格上传、可见状态、仅处理待更新、停止后续、ZIP 互斥进度、移动工作室优先、触屏排序与 dialog 无障碍。
 - P1：共享 RenderTransform、连续自由裁切与 1-3x 缩放、四分之一旋转、即时 preview、Before/After、本地配方和 Web Share。
+- Darkroom Contact Sheet：设计 token、feature 组件、桌面 Inspector、平板 Drawer、手机 Sheet、接触印样/长条工作区、审片/反馈重构和 Playwright E2E。
 - 执行规约位于 `docs/plans/2026-07-12-p0-workflow-experience/`、`docs/plans/2026-07-12-p1-creative-loop/` 和 `docs/plans/2026-07-12-free-crop-editor/`。
 
 ## 交付范围
@@ -18,6 +19,10 @@
 | 文件 | 交付内容 |
 | --- | --- |
 | `App.tsx` | 上传拖放、结果身份、按 ID 批次合并、stale 判定、正确下载、Worker dispose |
+| `components/{app,workspace,settings,preview,feedback,mobile,ui,icons}` | Darkroom Contact Sheet 展示层、响应式布局、可访问 dialog/sheet、局部图标与 primitive |
+| `styles/{tokens,base,components}.css` | 语义色彩、排版、控件与 reduced-motion 样式 |
+| `tests/e2e/frontend-redesign.spec.ts` | 桌面、手机、平板、处理/预览/长条、二维码 fallback 浏览器旅程 |
+| `playwright.config.ts` | 本地 Chromium E2E 运行配置 |
 | `package.json` / lock | Vitest 2.1.9、真实 test/typecheck/check 脚本 |
 | `services/filmEngine.ts` | 竖图恢复、帧号统一、画布预算、阴影调整、classic 主线程渲染 |
 | `services/filmGeometry.ts` | 明确自动旋转角和输出恢复角 |
@@ -80,9 +85,9 @@ docs/plans/2026-07-11-project-stabilization/PLAN.md
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm run check` | 成功：117 tests + typecheck + 60-module build |
-| Vitest | 16 个文件、117 项断言通过 |
-| Chromium smoke | 上传、未处理预览、处理、下载出现、格式切换 stale 均通过 |
+| `npm run check` | 成功：137 tests + typecheck + production build |
+| Vitest | 18 个文件、137 项断言通过 |
+| Chromium E2E | 14 条旅程通过，包含选片同步、仅处理入选、长条 stale 与 390px 无横向溢出 |
 | 浏览器 console | 仅 React DevTools 开发提示 |
 | `git diff --check` | 通过 |
 | `public/alipay.jpg` | `file` 识别为 data，无法读尺寸 |

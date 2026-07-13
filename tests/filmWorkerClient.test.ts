@@ -151,6 +151,9 @@ describe('createWorkerRenderer', () => {
       id: 'one',
       file: {} as File,
       previewUrl: 'blob:one',
+      included: true,
+      sourceWidth: 1200,
+      sourceHeight: 800,
       transform,
     }], settings);
 
@@ -163,12 +166,43 @@ describe('createWorkerRenderer', () => {
     void single.catch(() => undefined);
     void strip.catch(() => undefined);
   });
+
+  it('preserves full-roll positions in curated strip worker payloads', () => {
+    const { renderer, worker } = createHarness();
+    const strip = renderer.generateFilmStrip([{
+      id: 'third',
+      file: {} as File,
+      previewUrl: 'blob:third',
+      included: true,
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      rollIndex: 2,
+    }], settings);
+
+    expect(worker.messages[0]).toMatchObject({
+      type: 'generateFilmStrip',
+      images: [{ id: 'third', rollIndex: 2 }],
+    });
+    renderer.dispose();
+    void strip.catch(() => undefined);
+  });
+
+  it('returns the worker Blob byte size with its object URL', async () => {
+    const { renderer, worker } = createHarness();
+    const pending = renderer.processImage({} as File, settings);
+    const id = worker.messages[0].id;
+    worker.respond({ id, ok: true, blob: new Blob(['12345']) });
+
+    await expect(pending).resolves.toEqual({ url: 'blob:worker-result', byteSize: 5 });
+    renderer.dispose();
+  });
 });
 
 describe('worker routing policy', () => {
   it('allows only the Kodak Gold real135 template path', () => {
     expect(shouldUseWorkerForSettings(settings)).toBe(true);
     expect(shouldUseWorkerForSettings({ ...settings, frameRenderMode: 'classic' })).toBe(false);
+    expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.KODAK_PORTRA_160 })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, brandText: FilmType.ILFORD_HP5 })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, useFilmOverlayTemplate: false })).toBe(false);
   });

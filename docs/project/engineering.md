@@ -1,6 +1,6 @@
 # 开发、测试与部署
 
-> 最后核验：2026-07-11。验证环境为 macOS arm64、Node v26.4.0、npm 11.17.0；项目声明的最低 Node 为 20。
+> 最后核验：2026-07-12。验证环境为 macOS arm64、Node v22.8.0、npm 11.17.0；项目声明的最低 Node 为 20。
 
 ## 安装与运行
 
@@ -9,6 +9,7 @@ npm ci
 npm run dev
 npm run build
 npm run preview
+npm run test:e2e
 ```
 
 开发使用 Vite。无 `.env`、`.nvmrc`、`.node-version`、Dockerfile 或 Makefile。建议团队增加 Node 20 锁定文件，CI 以最低支持版本为准，而不是依赖个人机器的 Node 26。
@@ -21,7 +22,7 @@ npm run preview
 tsc && vite build
 ```
 
-稳定化后实测成功：54 modules；主 JS 约 282.88KB（gzip 87.51KB），CSS 34.48KB（gzip 6.64KB），Worker 16.53KB。完整静态输出的大部分仍来自 `public` 素材。
+暗房重构后实测成功：95 modules；主 JS 约 344.32KB（gzip 105.20KB），CSS 51.29KB（gzip 10.06KB），Worker 18.28KB。完整静态输出的大部分仍来自 `public` 素材。
 
 构建会写入 `dist/`，并复制 `public/` 的所有文件，包括未被代码引用的 PNG、素材 README 和 `.DS_Store`。
 
@@ -34,9 +35,10 @@ npm test
 npm run typecheck
 npm run build
 npm run check
+npm run test:e2e
 ```
 
-`npm run check` 依次执行真实测试、类型检查和构建。2026-07-12 实测 16 个测试文件、117 项断言全部通过。新增覆盖连续 transform/zoom 几何、真实片窗比例、非中心缩放稳定性、结果 key、Worker payload、工作流状态与 task ownership、严格上传、即时预览 generation、配方和 Web Share。
+`npm run check` 依次执行真实测试、类型检查和构建。2026-07-12 实测 18 个测试文件、137 项断言全部通过；`npm run test:e2e` 的 14 条 Chromium 旅程也通过。E2E 覆盖桌面空态/Inspector、手机 Sheet 与底栏焦点恢复、平板 Drawer 焦点恢复、手机 secondary actions、上传冲洗预览/长条、裁切取消回焦、损坏二维码 fallback、单一 active modal、Header 更多菜单键盘导航和 Toast 位置，以及选片同步、仅处理入选、长条 stale 与移动端无横向溢出。新增单元覆盖连续 transform/zoom 几何、批次选片/准入、完整卷帧号、artifact 字节数、结果 key、Worker payload、工作流状态与 task ownership、严格上传、即时预览 generation、配方和 Web Share。
 
 旧 geometry 失败来自只被测试引用的 `getKodakGoldStripSegment()`；连续片基生产实现已不使用该 helper。本轮删除死 helper、死绘制函数和对应失真断言，其余几何断言保留。
 
@@ -47,9 +49,7 @@ Worker client 已支持注入 fake Worker，测试构造失败、dispose、timeo
 - 无 CI；
 - 无 ESLint/format；
 - 无 coverage；
-- 无自动浏览器测试；
 - 无完整的主线程/Worker 视觉等价性测试；
-- 浏览器 smoke 仍是手工 CLI 流程，尚未落为可重复 spec；
 - 无发布脚本、tag、CHANGELOG 或版本策略。
 
 审计初期的 `App.tsx` 行尾空白已清理，当前 `git diff --check` 通过。

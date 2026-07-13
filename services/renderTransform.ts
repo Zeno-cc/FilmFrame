@@ -154,16 +154,40 @@ export function changeZoomPreservingView(
   value: Partial<RenderTransform> | null | undefined,
   zoom: number,
 ): NormalizedRenderTransform {
+  return changeZoomPreservingPoint(
+    imageWidth,
+    imageHeight,
+    frameWidth,
+    frameHeight,
+    value,
+    zoom,
+    frameWidth / 2,
+    frameHeight / 2,
+  );
+}
+
+export function changeZoomPreservingPoint(
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number,
+  value: Partial<RenderTransform> | null | undefined,
+  zoom: number,
+  pointX: number,
+  pointY: number,
+): NormalizedRenderTransform {
   const current = normalizeRenderTransform(value);
   const currentPlacement = createCoverPlacement(imageWidth, imageHeight, frameWidth, frameHeight, current);
   const next = normalizeRenderTransform({ ...current, zoom });
   const nextPlacement = createCoverPlacement(imageWidth, imageHeight, frameWidth, frameHeight, next);
-  const sourceCenterX = (-currentPlacement.offsetX + frameWidth / 2) / currentPlacement.scale;
-  const sourceCenterY = (-currentPlacement.offsetY + frameHeight / 2) / currentPlacement.scale;
+  const clampedPointX = clamp(pointX, 0, frameWidth);
+  const clampedPointY = clamp(pointY, 0, frameHeight);
+  const sourcePointX = (-currentPlacement.offsetX + clampedPointX) / currentPlacement.scale;
+  const sourcePointY = (-currentPlacement.offsetY + clampedPointY) / currentPlacement.scale;
   const overflowX = Math.max(0, nextPlacement.drawWidth - frameWidth);
   const overflowY = Math.max(0, nextPlacement.drawHeight - frameHeight);
-  const desiredOffsetX = frameWidth / 2 - sourceCenterX * nextPlacement.scale;
-  const desiredOffsetY = frameHeight / 2 - sourceCenterY * nextPlacement.scale;
+  const desiredOffsetX = clampedPointX - sourcePointX * nextPlacement.scale;
+  const desiredOffsetY = clampedPointY - sourcePointY * nextPlacement.scale;
 
   return normalizeRenderTransform({
     ...next,

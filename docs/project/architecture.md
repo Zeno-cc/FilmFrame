@@ -1,6 +1,6 @@
 # 系统架构与数据流
 
-> 最后核验：2026-07-12。本文描述 `e5c5a84` 加当前 P0/P1 工作区。
+> 最后核验：2026-07-13。本文描述 `e5c5a84` 加当前 P0/P1 工作区。
 
 ## 总体结构
 
@@ -39,7 +39,7 @@ Browser main thread
 
 | 字段 | 类型/范围 | 当前用途 |
 | --- | --- | --- |
-| `brandText` | `FilmType` | 预设、文字、Gold 色彩和真实模式门控 |
+| `brandText` | `FilmType` | 预设、文字、Gold 色彩和真实模板注册表门控 |
 | `customText` | string | 经典边框替代型号文字 |
 | `frameNumber` | number | 起始帧号 |
 | `showDate` / `dateStr` | bool/string | 经典模式日期 |
@@ -56,12 +56,12 @@ Browser main thread
 | `autoCropToFilmRatio` | bool | 当前无生产读取 |
 | `enableRealisticRebate` | bool | 程序化纹理开关 |
 | `maxRollFrames` | 24/36 | 帧号循环 |
-| `useFilmOverlayTemplate` | bool | Gold 模板开关/Worker 策略 |
-| `filmOverlayUrl` | string | legacy 单模板 URL，不持久化 |
+| `useFilmOverlayTemplate` | bool | 真实 135 模板开关/Worker 策略 |
+| `filmOverlayUrl` | string | 当前模板 URL；仅 Gold legacy fallback 读取，不持久化 |
 
 ### `ImageItem`
 
-`ImageItem` 是页面会话内图片的所有权单元：原始 `File`、原始预览 URL、可选处理结果 URL、EXIF 日期、处理错误和可选 `RenderTransform`。transform 包含连续 `focusX/focusY`、`1-3x zoom` 与 `0/90/180/270` 用户旋转；数组顺序本身承载业务顺序。裁切编辑期间的 draft 只存在于 `CropEditor`，完成后才写回 ImageItem。
+`ImageItem` 是页面会话内图片的所有权单元：原始 `File`、自然尺寸、会话内入选状态、原始预览 URL、可选处理结果 URL/Blob 字节数、EXIF 日期、处理错误和可选 `RenderTransform`。transform 包含连续 `focusX/focusY`、`1-3x zoom` 与 `0/90/180/270` 用户旋转；数组顺序本身承载业务顺序。裁切编辑期间的 draft 只存在于 `CropEditor`，完成后才写回 ImageItem。
 
 ### React 状态
 
@@ -102,12 +102,12 @@ createImageBitmap
 ### 策略条件
 
 - classic：暂不允许 Worker，统一走主线程，避免当前双实现的尺寸和标记差异暴露给用户。
-- real135：仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker。
+- real135：Gold 200 与 Portra 160 由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，Portra 160 走主线程扁平模板路径。
 - 不满足时直接主线程。
 
 ### 请求协议
 
-请求为 `processImage` 或 `generateFilmStrip`，附递增整数 `id`。客户端用 `Map<id, {resolve,reject}>` 关联响应。Worker 返回 `{id, ok, blob}` 或 `{id, ok:false, error}`；客户端把 Blob 转为 Object URL。
+请求为 `processImage` 或 `generateFilmStrip`，附递增整数 `id`。客户端用 `Map<id, {resolve,reject}>` 关联响应。Worker 返回 `{id, ok, blob}` 或 `{id, ok:false, error}`；客户端把 Blob 转为 `{url, byteSize}`，供结果生命周期与 ZIP 预检共同使用。
 
 Worker client 懒创建；构造器被 CSP/策略阻止时返回 null 并走主线程。`onerror` 或 `messageerror` 会：
 
@@ -136,7 +136,7 @@ idle
   -> processing=false
 ```
 
-结果携带 MIME 与 settings key。单图 key 还包含 EXIF override 和 transform；长条 key 包含设置、有序图片 ID 和逐图 transform。当前签名不匹配时，旧结果显示为“待更新”且不可下载；新批次替换时回收旧 URL。
+结果携带 MIME、settings key 与 Blob 字节数。单图 key 还包含 EXIF override 和 transform；长条 key 包含设置、有序入选图片 ID、原卷位置和逐图 transform。当前签名不匹配时，旧结果显示为“待更新”且不可下载；新批次替换时回收旧 URL。
 
 ## Object URL 所有权
 

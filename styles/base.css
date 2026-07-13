@@ -1,0 +1,85 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--ff-bg-deep);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--ff-bg-deep);
+  color: var(--ff-paper);
+  font-family: var(--ff-font-ui);
+  font-size: 14px;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+img,
+canvas,
+svg {
+  display: block;
+}
+
+img,
+canvas {
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--ff-amber);
+  color: var(--ff-ink);
+}
+
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ff-focus);
+  outline-offset: 2px;
+}
+
+.ff-focus-ring:focus-visible {
+  outline: 2px solid var(--ff-focus);
+  outline-offset: 3px;
+}
+
+.ff-display {
+  font-family: var(--ff-font-display);
+}
+
+.ff-mono,
+.mono {
+  font-family: var(--ff-font-mono);
+}
+
+.ff-lab-label {
+  color: var(--ff-paper-dim);
+  font-family: var(--ff-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}

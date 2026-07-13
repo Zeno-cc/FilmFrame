@@ -5,6 +5,7 @@ export interface RenderableImageItem {
   processedUrl?: string;
   processedMime?: string;
   processedSettingsKey?: string;
+  processedByteSize?: number;
   processingError?: string;
 }
 
@@ -12,6 +13,7 @@ export interface ImageRenderResult {
   processedUrl: string;
   processedMime: string;
   processedSettingsKey: string;
+  processedByteSize?: number;
   processingError?: string;
 }
 

@@ -8,6 +8,7 @@ import {
   shouldAutoRotateForFilmFrame,
 } from '../services/filmGeometry';
 import {
+  getFrameNumberForImage,
   getFrameNumberForIndex,
   getKodakGoldFrameNumberPositions,
   normalizeFrameNumber,
@@ -56,6 +57,11 @@ describe('frame numbers', () => {
     expect(getFrameNumberForIndex(36, 1, 36)).toBe(1);
     expect(getFrameNumberForIndex(24, 0, 24)).toBe(24);
     expect(getFrameNumberForIndex(24, 1, 24)).toBe(1);
+  });
+
+  it('retains a curated image full-roll position instead of renumbering the subset', () => {
+    expect(getFrameNumberForImage(1, { rollIndex: 2 }, 1, 36)).toBe(3);
+    expect(getFrameNumberForImage(1, {}, 1, 36)).toBe(2);
   });
 
   it('does not expose the removed previous-frame suffix position', () => {

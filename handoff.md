@@ -2,7 +2,7 @@
 
 > 最后核验：2026-07-12
 >
-> 当前开发基线：`main` / `e5c5a84` 加 P0/P1 体验升级工作区
+> 当前开发基线：`main` / `e5c5a84` 加 P0/P1 体验升级与 Darkroom Contact Sheet 前端重构工作区
 >
 > 重要：分支、远端和工作区状态必须以当前 `git status` 为准。
 
@@ -40,8 +40,8 @@ FilmFrame 是一个纯浏览器端的单页图片处理应用。用户把本地�
 | 加速 | Gold 200 真实 135 在能力满足时走 Worker；classic 暂固定主线程 |
 | 状态 | React 内存状态；偏好和本地配方写入 `localStorage`，图片和结果不持久化 |
 | 部署 | `dist/` 静态站；没有已落盘的有效平台配置 |
-| 测试现状 | Vitest；16 个测试文件、117 项断言；`npm run check` 聚合验证 |
-| 当前开发 | P0 主流程/移动端与 P1 自由裁切创作闭环已实现，尚未提交 |
+| 测试现状 | Vitest：18 个测试文件、137 项断言；Playwright：14 条 Chromium E2E；`npm run check` 与 `npm run test:e2e` 均可验证 |
+| 当前开发 | P0/P1 创作闭环与 Darkroom Contact Sheet 前端重构已实现，尚未提交 |
 
 ## 2. 快速开始
 
@@ -80,7 +80,12 @@ npm run check
 ```text
 index.html
   -> index.tsx
-  -> App.tsx
+  -> App.tsx                         状态与工作流 controller
+       -> components/app              shell、Header、session、更多菜单
+       -> components/workspace        接触印样、照片卡片、长条审片台
+       -> components/settings         Inspector、平板 Drawer、手机 Sheet
+       -> components/preview          审片与构图入口
+       -> components/feedback         toast、错误与支持 dialog
        -> uploadFiles.ts             上传检查、尺寸、EXIF
        -> filmWorkerClient.ts        渲染门面和 Worker 降级
             -> filmWorker.ts         Worker / OffscreenCanvas
@@ -121,12 +126,13 @@ index.html
 
 ## 5. 不可误判的技术事实
 
-- `App.tsx` 是 1800 多行单体根组件，承担 UI、状态和工作流编排。没有组件目录、路由或状态库，下一轮应按已稳定契约拆分。
+- `App.tsx` 仍是状态与工作流 controller（约 1,250 行），但展示层已拆分到 feature 组件目录。没有路由或状态库；后续拆分必须保持现有 service 契约。
 - `filmEngine.ts` 和 `filmWorker.ts` 维护两套渲染实现，已经存在行为差异。涉及尺寸、旋转、纹理、长条、标记或导出时必须检查两边。
 - Worker client 懒创建；能力条件为 `Worker`、`OffscreenCanvas`、`convertToBlob`、`createImageBitmap` 全部存在，构造失败安全回退。
 - Worker 请求有 120 秒超时、`messageerror`、dispose 和卸载终止；晚到响应不会创建无主 Object URL。
 - 所有照片和成片由 `File`、Blob、Object URL 留在浏览器内存。偏好之外没有持久化。
 - 每张图可记录连续 focus、1-3x zoom 和四分之一旋转；`CropEditor` 只在完成时提交本地草稿。共享 RenderTransform 先应用用户旋转，再判断真实 135 自动旋入。单张只恢复自动旋入，不撤销用户旋转。
+- 左侧顶部“重置”恢复默认 FilmSettings 和单张输出模式，但保留照片与用户保存的本地配方；冲洗或导出期间禁用。
 - 视觉颗粒、灰尘、划痕和部分 DX 标记使用 `Math.random()`，同一输入不会得到逐像素确定的输出。
 - ZIP 是项目自研的 Store 模式 ZIP32，不压缩、无 ZIP64，单文件和总档案受约 4 GiB 边界约束。
 - 所有新画布受 32767 边长和 6400 万像素预算保护；ZIP 输入另限制为 256 MiB。
@@ -151,7 +157,7 @@ index.html
 ## 7. 当前最高优先级风险
 
 1. Worker 与主线程仍有重复渲染实现；classic 已固定主线程止血，但长期仍需共享渲染契约。
-2. 上传已严格限制 JPEG/PNG/WebP 并拒绝解码失败；仍缺批次总源像素预算和 HEIC 等格式的明确转码策略。
+2. 上传已严格限制 JPEG/PNG/WebP 并拒绝解码失败；批次总源像素与工作集准入已实现，仍缺 HEIC 等格式的明确转码策略。
 3. ZIP 有 256 MiB 输入预算并改为顺序读取，但仍是内存内 Store ZIP，不适合超大档案。
 4. transform 已有共享几何与 payload 测试，但尚无真实 Canvas/OffscreenCanvas 像素基准矩阵。
 5. 生产发布会复制 `public/` 全部内容，包括 `.DS_Store`、素材说明和多个可能仅为中间产物的 PNG。

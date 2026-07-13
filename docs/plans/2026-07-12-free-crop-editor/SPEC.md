@@ -29,7 +29,8 @@ transform semantics as main-thread, Worker, single-image, and strip rendering.
 - Opening `调整构图` shows a fixed crop aperture with the source photo beneath
   a rule-of-thirds guide.
 - Pointer or one-finger drag moves the photo. A zoom slider provides 100%-300%
-  scaling. Keyboard arrow keys move the photo; Shift uses a larger step.
+  scaling; mouse wheel zoom preserves the image point under the cursor. Keyboard
+  arrow keys move the photo; Shift uses a larger step.
 - Rotate and reset are explicit icon commands with accessible names.
 - `取消` discards the draft. `完成` commits one transform update and starts the
   debounced film preview render.

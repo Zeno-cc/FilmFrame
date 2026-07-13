@@ -4,7 +4,7 @@
 
 ## 已完成的 P0 稳定化
 
-- Vitest 已接管真实测试，`npm run check` 聚合 117 项断言、类型检查和构建。
+- Vitest 已接管真实测试，`npm run check` 聚合 137 项断言、类型检查和构建。
 - 单图和长条结果记录 MIME 与设置/顺序签名；stale 结果不再显示或下载。
 - 批次按图片 ID 合并，删除晚到结果会 revoke，不再整体覆盖最新数组。
 - Worker client 已有懒创建、构造失败回退、120 秒超时、`messageerror`、dispose 和晚到保护。
@@ -29,9 +29,9 @@ Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路�
 
 ### 内存峰值
 
-来源：解码后的源图、多个 Object URL、内存内 ZIP 和随机纹理中间画布。画布已限制为 32767 边长/6400 万像素，ZIP 输入限制为 256 MiB 并顺序 fetch。
+来源：解码后的源图、多个 Object URL、内存内 ZIP 和随机纹理中间画布。画布已限制为 32767 边长/6400 万像素，ZIP 输入限制为 256 MiB 并顺序 fetch。当前已在上传后提示批次压力，并在冲洗、长条和 ZIP 前执行源像素、工作集、Canvas 与已知 Blob 字节准入。
 
-建议：下一步增加上传批次总源像素预算和用户可见的预估；长期使用流式 ZIP。25 MiB/8000px 上传提示目前仍只是警告。
+建议：长期使用流式 ZIP，继续补真实设备阈值数据。25 MiB/8000px 单图提示仍只是 warning，最终是否阻断由整批准入决定。
 
 ### 损坏二维码
 
@@ -60,7 +60,7 @@ Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路�
 ## P2：可维护性与体验
 
 - 拆分 `App.tsx` 的 settings/sidebar、workspace、preview dialogs 和 workflow hooks，但避免引入重型状态框架。
-- 把 2026-07-12 的手工移动验收落为自动浏览器 spec。
+- 扩展现有 Playwright E2E 至排序、stale、Crop、部分失败、ZIP gate、reduced motion 和 200% 缩放场景。
 - 增加真实 Canvas/OffscreenCanvas 的 transform 构图基准矩阵。
 - 删除死配置或真正实现 `autoCropToFilmRatio`。
 - 决定是否加载 JetBrains Mono，或从预设说明移除。
@@ -132,6 +132,6 @@ Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路�
 
 1. 提交或至少继续保护当前稳定化开发态。
 2. 修二维码、清理发布素材、补 LICENSE/CI。
-3. 增加上传总源像素预算和自动浏览器 smoke。
+3. 增加跨浏览器 E2E 与视觉回归基线。
 4. 逐步统一 Gold Worker/主线程 RenderPlan 契约。
 5. 再处理移动端、可访问性和组件拆分。

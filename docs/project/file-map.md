@@ -6,14 +6,15 @@
 
 | 文件 | 职责 | 维护注意 |
 | --- | --- | --- |
-| `App.tsx` | 唯一根组件；UI、状态、上传、处理、重试、预览、下载、URL 生命周期 | 单体且高耦合；当前有未提交改动 |
+| `App.tsx` | 根 controller；状态、上传、处理、重试、预览、下载、URL 生命周期与 feature 组件编排 | 展示层已拆分，仍需保留 service 业务契约 |
 | `types.ts` | 领域类型、16 种 FilmType、预设 | 新设置必须同步 storage 和两套引擎 |
 | `index.tsx` | React 挂载 | StrictMode 开启 |
 | `index.html` | 页面壳、favicon、process polyfill | 无 CSP/meta description |
-| `styles.css` | Tailwind v4 导入、全局字体、滚动条 | UI 样式大多不在这里 |
+| `styles.css` | Tailwind v4 source、token/base/component 样式入口 | 扫描根组件与 `components/` |
 | `package.json` | 脚本、依赖、Node >=20 | Vitest、typecheck、build 和聚合 check |
 | `package-lock.json` | npm lockfile v3 | 已加入 Vitest 2.1.9，当前直接依赖树干净 |
-| `vite.config.ts` | React 插件 | 无 alias、代理、测试配置 |
+| `vite.config.ts` | React/Vitest 配置 | 排除 Playwright E2E 文件，避免被 Vitest 发现 |
+| `playwright.config.ts` | Chromium E2E web server 与输出配置 | 使用已安装的系统 Chrome channel |
 | `tsconfig.json` | strict TS、ES2020、bundler resolution | unused 检查关闭 |
 | `postcss.config.cjs` | Tailwind v4 PostCSS + autoprefixer | 当前实际 CSS 管线 |
 | `tailwind.config.cjs` | 旧式 content/font 配置 | v4 主要通过 CSS `@source` 扫描，需确认此文件是否仍生效 |
@@ -25,9 +26,17 @@
 
 ## `components/`
 
-| 文件 | 职责 | 维护注意 |
+| 目录/文件 | 职责 | 维护注意 |
 | --- | --- | --- |
 | `CropEditor.tsx` | 自由裁切本地草稿、直接拖动、缩放、旋转、复位与提交 | 只在完成时提交；预览几何必须继续复用 renderTransform 语义 |
+| `app/` | AppShell、Header、SessionMeter、MoreMenu | Header 只派发既有 callback，不复制业务判断 |
+| `workspace/` | 空态、Toolbar、接触印样、卡片、长条审片台、序列 Rail | 图片排序/状态来自 App 与 workflow service |
+| `settings/` | Recipe Inspector、桌面栏与移动/平板设置面板 | 所有字段仍通过 App 的 FilmSettings 更新 |
+| `preview/` | Preview Dialog、Before/After、导航与构图入口 | 正式 artifact 与临时 preview URL 必须分离 |
+| `feedback/` | Toast、错误和支持 Dialog | QR 加载失败必须保留 fallback，不伪造二维码 |
+| `mobile/` | 固定底部主操作栏 | Sheet 打开时必须隐藏，避免双 CTA |
+| `ui/` | Button、Field、Sheet、Modal 等通用 primitive | 维持 focus-visible 与 reduced-motion 行为 |
+| `icons/` | FilmFrame 本地 SVG 图标 | 保持 `currentColor`、明确的 aria label |
 
 ## `services/`
 
@@ -74,7 +83,7 @@
 | `renderBudget.test.ts` | 画布边长/面积和长条边界 | Vitest 真实执行通过 |
 | `zip.test.ts` | ZIP 签名和输入内存预算 | Vitest 真实执行通过 |
 
-测试由 Vitest 执行，当前 16 个文件、117 项断言。新增 transform、workflow、preview controller、recipe 和 share 覆盖；仍没有 coverage 和自动浏览器 spec。
+测试由 Vitest 执行，当前 18 个文件、137 项断言。新增 transform、batch curation/admission、workflow、preview controller、recipe 和 share 覆盖；`tests/e2e/frontend-redesign.spec.ts` 使用 Playwright 覆盖桌面空态、移动/平板设置、上传冲洗审片、选片、长条和二维码 fallback。
 
 ## `public/`
 

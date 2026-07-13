@@ -19,7 +19,7 @@ type PrepareUploadDeps<TFile extends UploadFile> = {
 };
 
 export type PreparedUpload<TFile extends UploadFile = File> = {
-  images: Array<Pick<ImageItem, 'id' | 'previewUrl' | 'exifDate'> & { file: TFile }>;
+  images: Array<Pick<ImageItem, 'id' | 'previewUrl' | 'exifDate' | 'included' | 'sourceWidth' | 'sourceHeight'> & { file: TFile }>;
   errors: string[];
   warnings: string[];
 };
@@ -39,8 +39,15 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
     }
 
     const previewUrl = deps.createObjectUrl(file);
+    let sourceWidth: number;
+    let sourceHeight: number;
     try {
       const { width, height } = await deps.readImageSize(previewUrl);
+      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
+        throw new Error('Invalid image dimensions');
+      }
+      sourceWidth = width;
+      sourceHeight = height;
       const sizeMb = file.size / 1024 / 1024;
       if (file.size > LARGE_FILE_BYTES || Math.max(width, height) > LARGE_IMAGE_EDGE) {
         warnings.push(`"${file.name}" 较大（${width}×${height}, ${sizeMb.toFixed(1)}MB），处理时可能较慢或占用较多内存`);
@@ -64,6 +71,9 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
       file,
       previewUrl,
       exifDate,
+      included: true,
+      sourceWidth,
+      sourceHeight,
     });
   }
 

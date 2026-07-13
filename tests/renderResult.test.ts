@@ -111,4 +111,14 @@ describe('render result identity', () => {
       { id: 'b', transform: rotated },
     ]));
   });
+
+  it('changes a strip key when a curated image retains a different full-roll position', () => {
+    expect(createOrderedStripKey(settings, [
+      { id: 'a', rollIndex: 0 },
+      { id: 'c', rollIndex: 2 },
+    ])).not.toBe(createOrderedStripKey(settings, [
+      { id: 'a', rollIndex: 0 },
+      { id: 'c', rollIndex: 1 },
+    ]));
+  });
 });

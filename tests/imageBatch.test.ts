@@ -11,6 +11,7 @@ type TestImage = {
   processedUrl?: string;
   processedMime?: string;
   processedSettingsKey?: string;
+  processedByteSize?: number;
 };
 
 const result: ImageRenderResult = {
@@ -71,6 +72,15 @@ describe('acceptImageRenderResult', () => {
     expect(merged.replacedUrl).toBe('blob:old-a');
     expect(merged.items[0]).toEqual({ id: 'a', name: 'A', ...result });
     expect(current[0].processedUrl).toBe('blob:old-a');
+  });
+
+  it('retains the known artifact byte size when accepting a render result', () => {
+    const merged = acceptImageRenderResult<TestImage>([{ id: 'a', name: 'A' }], 'a', {
+      ...result,
+      processedByteSize: 4096,
+    });
+
+    expect(merged.items[0].processedByteSize).toBe(4096);
   });
 
   it('rejects a result from a stale generation', () => {

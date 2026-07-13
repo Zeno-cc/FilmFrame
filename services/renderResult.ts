@@ -5,6 +5,7 @@ export interface RenderArtifact {
   url: string;
   mime: OutputFormat;
   settingsKey: string;
+  byteSize?: number;
 }
 
 export function createRenderSettingsKey(settings: FilmSettings): string {
@@ -34,13 +35,13 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
 
 export function createOrderedStripKey(
   settings: FilmSettings,
-  orderedImages: readonly (string | { id: string; transform?: RenderTransform })[]
+  orderedImages: readonly (string | { id: string; transform?: RenderTransform; rollIndex?: number })[]
 ): string {
   return JSON.stringify([
     createRenderSettingsKey(settings),
     orderedImages.map(image => typeof image === 'string'
       ? [image, createRenderTransformKey()]
-      : [image.id, createRenderTransformKey(image.transform)]),
+      : [image.id, image.rollIndex ?? null, createRenderTransformKey(image.transform)]),
   ]);
 }
 

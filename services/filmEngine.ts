@@ -1,7 +1,7 @@
 
 import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
-import { drawKodakGoldFrameNumbers, getFrameNumberForIndex } from './filmFrameNumber';
+import { drawKodakGoldFrameNumbers, getFrameNumberForImage } from './filmFrameNumber';
 import {
   create135LandscapeLayout,
   create135SidePerforationLayout,
@@ -17,11 +17,13 @@ import {
   KODAK_GOLD_APERTURE_MASK_URL,
   KODAK_GOLD_APERTURE_SHADOW_URL,
   KODAK_GOLD_BASE_URL,
+  createFilmTemplateStripLayout,
   createKodakGoldStripLayout,
   createKodakGoldOverlayLayout,
   drawKodakGoldOverlayLayer,
+  getReal135OverlayUrl,
   KodakGoldOverlayLayout,
-  KODAK_GOLD_OVERLAY_URL,
+  supportsReal135Template,
 } from './filmOverlay';
 import {
   drawDust,
@@ -562,50 +564,68 @@ const processImageWithTemplateOverlay = async (
   transform?: RenderTransform,
 ): Promise<string | null> => {
   if (settings.useFilmOverlayTemplate === false) return null;
+  const registeredOverlayUrl = getReal135OverlayUrl(settings.brandText);
+  if (!registeredOverlayUrl) return null;
 
-  let layeredAssets: KodakGoldLayeredAssets;
-  try {
-    layeredAssets = await loadKodakGoldLayeredAssets();
-  } catch (error) {
-    console.warn('Layered film assets not available, falling back to legacy template.', error);
+  if (settings.brandText === FilmType.KODAK_GOLD_200) {
     try {
-      const overlay = await loadImage(settings.filmOverlayUrl || KODAK_GOLD_OVERLAY_URL);
+      const layeredAssets = await loadKodakGoldLayeredAssets();
       const img = await loadImage(imageSource);
       const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-      const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx, transform);
+      const canvas = renderKodakGoldLayeredFrameCanvas(
+        img,
+        layeredAssets.base,
+        layeredAssets.apertureMask,
+        layeredAssets.apertureShadow,
+        settings,
+        targetImageWidthPx,
+        transform,
+      );
 
       const finalCanvas =
         (settings.scanOutputAspect ?? 'native') === '4:3'
           ? composeOnScannerCanvas(canvas)
           : canvas;
 
-      const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3), transform);
+      const outputCanvas = restoreOutputOrientationForSource(
+        finalCanvas,
+        img,
+        targetImageWidthPx,
+        Math.round(targetImageWidthPx * 2 / 3),
+        transform,
+      );
       return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
-    } catch (legacyError) {
-      console.warn('Film overlay template not available, falling back to programmatic renderer.', legacyError);
-      return null;
+    } catch (error) {
+      console.warn('Layered film assets not available, falling back to flattened template.', error);
     }
   }
 
-  const img = await loadImage(imageSource);
-  const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-  const canvas = renderKodakGoldLayeredFrameCanvas(
-    img,
-    layeredAssets.base,
-    layeredAssets.apertureMask,
-    layeredAssets.apertureShadow,
-    settings,
-    targetImageWidthPx,
-    transform,
-  );
+  try {
+    const overlayUrl = settings.brandText === FilmType.KODAK_GOLD_200
+      ? settings.filmOverlayUrl || registeredOverlayUrl
+      : registeredOverlayUrl;
+    const overlay = await loadImage(overlayUrl);
+    const img = await loadImage(imageSource);
+    const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
+    const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx, transform);
 
-  const finalCanvas =
-    (settings.scanOutputAspect ?? 'native') === '4:3'
-      ? composeOnScannerCanvas(canvas)
-      : canvas;
+    const finalCanvas =
+      (settings.scanOutputAspect ?? 'native') === '4:3'
+        ? composeOnScannerCanvas(canvas)
+        : canvas;
 
-  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, targetImageWidthPx, Math.round(targetImageWidthPx * 2 / 3), transform);
-  return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
+    const outputCanvas = restoreOutputOrientationForSource(
+      finalCanvas,
+      img,
+      targetImageWidthPx,
+      Math.round(targetImageWidthPx * 2 / 3),
+      transform,
+    );
+    return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
+  } catch (error) {
+    console.warn('Film overlay template not available, falling back to programmatic renderer.', error);
+    return null;
+  }
 };
 
 function renderKodakGoldTemplateFrameCanvas(
@@ -879,7 +899,60 @@ const generateReal135FilmStrip = async (
   images: ImageItem[],
   settings: FilmSettings
 ): Promise<string | null> => {
-  if (settings.useFilmOverlayTemplate === false) return null;
+  if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) return null;
+  if (settings.brandText !== FilmType.KODAK_GOLD_200) {
+    const overlayUrl = getReal135OverlayUrl(settings.brandText);
+    if (!overlayUrl) return null;
+
+    let overlay: HTMLImageElement;
+    try {
+      overlay = await loadImage(overlayUrl);
+    } catch (error) {
+      console.warn('Film strip overlay template not available, falling back to classic strip.', error);
+      return null;
+    }
+
+    const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
+    const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
+    assertCanvasBudget(layout.totalW, layout.totalH);
+    const canvas = document.createElement('canvas');
+    canvas.width = layout.totalW;
+    canvas.height = layout.totalH;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('Canvas context not found');
+
+    ctx.fillStyle = '#161514';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let index = 0; index < images.length; index++) {
+      const row = Math.floor(index / layout.maxPerRow);
+      const col = index % layout.maxPerRow;
+      const x = layout.padding + col * layout.frameStride;
+      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+      const img = await loadImage(images[index].previewUrl);
+      const frameSettings = {
+        ...settings,
+        frameNumber: getFrameNumberForImage(
+          settings.frameNumber,
+          images[index],
+          index,
+          settings.maxRollFrames ?? 36,
+        ),
+      };
+
+      ctx.save();
+      ctx.translate(x, y);
+      drawKodakGoldTemplateFrame(ctx, img, overlay, layout.frame, frameSettings, images[index].transform);
+      ctx.restore();
+    }
+
+    return exportCanvasToObjectUrl(
+      canvas,
+      settings.outputFormat,
+      settings.outputQuality,
+      'Failed to export template film strip blob',
+    );
+  }
 
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
   const layout = createKodakGoldStripLayout(targetImageWidthPx, images.length, 4);
@@ -907,8 +980,9 @@ const generateReal135FilmStrip = async (
     const img = await loadImage(images[index].previewUrl);
     const frameSettings = {
       ...settings,
-      frameNumber: getFrameNumberForIndex(
+      frameNumber: getFrameNumberForImage(
         settings.frameNumber,
+        images[index],
         index,
         settings.maxRollFrames ?? 36,
       ),
@@ -1233,8 +1307,9 @@ export const generateFilmStrip = async (
     rowImages.forEach((item, idx) => {
       const frameX = START_GAP + idx * (FRAME_WIDTH + FRAME_GAP);
       const globalIdx = startGlobalIdx + idx;
-      const frameNum = getFrameNumberForIndex(
+      const frameNum = getFrameNumberForImage(
         settings.frameNumber,
+        item,
         globalIdx,
         settings.maxRollFrames ?? 36,
       );

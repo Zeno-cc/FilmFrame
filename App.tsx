@@ -13,7 +13,6 @@ import {
   isImageTaskContextCurrent,
   isImageRemovalAllowed,
   moveItem,
-  type ImageWorkflowStatus,
 } from './services/workflowState';
 import {
   createArtifactFilename,
@@ -30,63 +29,47 @@ import { DEFAULT_RENDER_TRANSFORM, normalizeRenderTransform } from './services/r
 import { deleteRecipe, loadRecipes, saveRecipe } from './services/recipeStorage';
 import { shareArtifact } from './services/shareArtifact';
 import { createPreviewRenderController } from './services/previewRenderController';
-import { KODAK_GOLD_APERTURE_ASPECT } from './services/filmOverlay';
+import {
+  createFilmTemplateStripLayout,
+  createKodakGoldStripLayout,
+  getReal135OverlayUrl,
+  KODAK_GOLD_APERTURE_ASPECT,
+  supportsReal135Template,
+} from './services/filmOverlay';
+import { getReal135StripTargetImageWidth } from './services/filmResolution';
+import {
+  evaluateBatchAdmission,
+  formatBatchAdmission,
+  type BatchAdmissionResult,
+} from './services/batchAdmission';
+import {
+  getIncludedImageCount,
+  getIncludedImages,
+  getIncludedStripImages,
+  isImageIncluded,
+  setAllImagesIncluded,
+  toggleImageIncluded,
+} from './services/batchCuration';
 import CropEditor from './components/CropEditor';
+import { AppHeader } from './components/app/AppHeader';
+import { AppShell } from './components/app/AppShell';
+import {
+  ContactSheet,
+  EmptyDarkroom,
+  FilmStripWorkspace,
+  Workspace,
+  WorkspaceToolbar,
+  type FilmStripStageState,
+} from './components/workspace';
+import { RecipeInspector, type RecipeInspectorProps } from './components/settings/RecipeInspector';
+import { MobileSettingsSheet } from './components/settings/MobileSettingsSheet';
+import { MobileActionBar } from './components/mobile/MobileActionBar';
+import { PreviewDialog } from './components/preview/PreviewDialog';
+import { NoticeToast as DarkroomNoticeToast } from './components/feedback/NoticeToast';
+import { ErrorDialog } from './components/feedback/ErrorDialog';
+import { SupportDialog } from './components/feedback/SupportDialog';
 // Security Fix: Import EXIF from local dependency instead of external CDN
 import EXIF from 'exif-js';
-
-// --- Icons ---
-const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
-const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>;
-const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
-const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
-const MaximizeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>;
-const ChevronLeftIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>;
-const ChevronRightIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>;
-const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
-const GridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
-const StripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>;
-const GripIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>;
-const GithubIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>;
-const CoffeeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4 4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>;
-const AlertCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
-const RetryIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 8h5V3"/></svg>;
-const ArrowUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
-const ArrowDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
-const RotateIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>;
-const ShareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51 8.59 10.49"/></svg>;
-const CropIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>;
-
-const FilmLogoIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-    <defs>
-      <linearGradient id="film-gradient" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stopColor="#fbbf24" />
-        <stop offset="1" stopColor="#b45309" />
-      </linearGradient>
-      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="2" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-    {/* Outer Frame with Rounded Corners */}
-    <rect x="2" y="2" width="28" height="28" rx="6" fill="url(#film-gradient)" className="drop-shadow-lg" />
-    
-    {/* Inner Cutout (The Frame) */}
-    <rect x="8" y="8" width="16" height="16" rx="1" fill="#121212" />
-    
-    {/* Sprocket Holes Left */}
-    <rect x="4.5" y="10" width="2" height="3" rx="0.5" fill="#121212" />
-    <rect x="4.5" y="19" width="2" height="3" rx="0.5" fill="#121212" />
-    
-    {/* Sprocket Holes Right */}
-    <rect x="25.5" y="10" width="2" height="3" rx="0.5" fill="#121212" />
-    <rect x="25.5" y="19" width="2" height="3" rx="0.5" fill="#121212" />
-    
-    {/* Gloss/Highlight overlay for glass effect */}
-    <path d="M2 8C2 4.68629 4.68629 2 8 2H24C27.3137 2 30 4.68629 30 8V14L2 10V8Z" fill="white" fillOpacity="0.1" />
-  </svg>
-);
 
 const DEFAULT_SETTINGS: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
@@ -167,24 +150,8 @@ function getCurrentImageArtifact(
     url: item.processedUrl,
     mime: item.processedMime,
     settingsKey: item.processedSettingsKey,
+    byteSize: item.processedByteSize,
   };
-}
-
-function statusBadgeClass(status: ImageWorkflowStatus): string {
-  switch (status.kind) {
-    case 'complete':
-      return 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200';
-    case 'processing':
-      return 'border-amber-400/30 bg-amber-400/10 text-amber-100';
-    case 'queued':
-      return 'border-sky-400/25 bg-sky-400/10 text-sky-200';
-    case 'failed':
-      return 'border-red-400/30 bg-red-400/10 text-red-200';
-    case 'stale':
-      return 'border-orange-400/25 bg-orange-400/10 text-orange-200';
-    default:
-      return 'border-white/10 bg-black/45 text-gray-300';
-  }
 }
 
 function readImageSize(src: string): Promise<{ width: number; height: number }> {
@@ -194,6 +161,60 @@ function readImageSize(src: string): Promise<{ width: number; height: number }> 
     img.onerror = () => reject(new Error('Failed to read image dimensions'));
     img.src = src;
   });
+}
+
+function getStripCanvasSize(settings: FilmSettings, frameCount: number): { width: number; height: number } {
+  if (
+    (settings.frameRenderMode ?? 'real135') === 'real135'
+    && settings.useFilmOverlayTemplate !== false
+    && supportsReal135Template(settings.brandText)
+  ) {
+    const layout = settings.brandText === FilmType.KODAK_GOLD_200
+      ? createKodakGoldStripLayout(
+        getReal135StripTargetImageWidth(settings.processingMode),
+        frameCount,
+        4,
+      )
+      : createFilmTemplateStripLayout(
+      getReal135StripTargetImageWidth(settings.processingMode),
+      frameCount,
+      4,
+    );
+    return { width: layout.totalW, height: layout.totalH };
+  }
+
+  // Mirrors the classic renderer's fixed geometry so admission happens before Canvas allocation.
+  const maxPerRow = 6;
+  const stripHeight = 1600;
+  const rowGap = 120;
+  const borderSize = Math.floor(stripHeight * 0.16);
+  const imageAreaHeight = stripHeight - borderSize * 2;
+  const frameWidth = imageAreaHeight * 1.5;
+  const frameGap = frameWidth * 0.055;
+  const columns = Math.min(frameCount, maxPerRow);
+  const rows = Math.ceil(frameCount / maxPerRow);
+  const width = frameWidth * 0.2 * 2
+    + frameWidth * columns
+    + frameGap * Math.max(0, columns - 1);
+
+  return {
+    width: Math.ceil(width),
+    height: rows * stripHeight + Math.max(0, rows - 1) * rowGap,
+  };
+}
+
+const ADMISSION_ACTION_COPY: Record<BatchAdmissionResult['recommendations'][number], string> = {
+  'select-images': '取消部分入选',
+  'remove-largest-images': '移除最大图片',
+  'use-preview-mode': '切换预览质量',
+};
+
+function formatAdmissionFeedback(result: BatchAdmissionResult, operation: string): string {
+  const advice = result.recommendations
+    .map(action => ADMISSION_ACTION_COPY[action])
+    .join('、');
+  const suffix = advice ? ` 建议：${advice}。` : '';
+  return `${operation}前预检：${formatBatchAdmission(result)}${suffix}`;
 }
 
 const App: React.FC = () => {
@@ -223,19 +244,16 @@ const App: React.FC = () => {
   const [isCropping, setIsCropping] = useState(false);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const settingsPanelRef = useRef<HTMLElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const cropTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreCropFocusRef = useRef(false);
   const imagesRef = useRef<ImageItem[]>([]);
   const settingsRef = useRef<FilmSettings>(settings);
   const stripResultRef = useRef<RenderArtifact | null>(null);
   const renderGenerationRef = useRef(0);
   const mountedRef = useRef(true);
-  const dialogCloseRef = useRef<HTMLButtonElement>(null);
-  const dialogRootRef = useRef<HTMLDivElement>(null);
-  const cropTriggerRef = useRef<HTMLButtonElement>(null);
-  const isCroppingRef = useRef(false);
-  const supportsReal135Template = settings.brandText === FilmType.KODAK_GOLD_200;
-  const isReal135Mode = supportsReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
+  const hasReal135Template = supportsReal135Template(settings.brandText);
+  const isReal135Mode = hasReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
 
   // Drag and drop refs
   const dragItem = useRef<number | null>(null);
@@ -270,6 +288,16 @@ const App: React.FC = () => {
     savePreferences(settings, outputMode);
   }, [settings, outputMode]);
 
+  useEffect(() => {
+    const desktopLayout = window.matchMedia('(min-width: 1180px)');
+    const closeDrawerOnDesktop = () => {
+      if (desktopLayout.matches) setSettingsOpen(false);
+    };
+    closeDrawerOnDesktop();
+    desktopLayout.addEventListener('change', closeDrawerOnDesktop);
+    return () => desktopLayout.removeEventListener('change', closeDrawerOnDesktop);
+  }, []);
+
   const navigatePreview = useCallback((direction: PreviewDirection) => {
     setPreview(current => {
       if (current?.type !== 'single') return current;
@@ -280,20 +308,28 @@ const App: React.FC = () => {
   }, []);
 
   const closeCropEditor = useCallback(() => {
-    isCroppingRef.current = false;
+    restoreCropFocusRef.current = true;
     setIsCropping(false);
-    window.requestAnimationFrame(() => cropTriggerRef.current?.focus({ preventScroll: true }));
   }, []);
 
   useEffect(() => {
-    isCroppingRef.current = isCropping;
+    if (isCropping || !restoreCropFocusRef.current) return;
+    restoreCropFocusRef.current = false;
+    window.requestAnimationFrame(() => cropTriggerRef.current?.focus({ preventScroll: true }));
   }, [isCropping]);
 
   useEffect(() => {
     if (!preview) return;
 
     if (preview.type === 'strip') {
-      if (!stripResult) setPreview(null);
+      const currentKey = createOrderedStripKey(settings, getIncludedStripImages(images));
+      if (
+        !stripResult
+        || stripResult.settingsKey !== currentKey
+        || stripResult.mime !== settings.outputFormat
+      ) {
+        setPreview(null);
+      }
       return;
     }
 
@@ -305,63 +341,7 @@ const App: React.FC = () => {
     if (getPreviewImageIndex(images, preview.imageId) === -1) {
       setPreview({ type: 'single', imageId: images[0].id });
     }
-  }, [images, preview, stripResult]);
-
-  useEffect(() => {
-    if (!preview) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (preview.type !== 'single') return;
-      if (isCropping) return;
-
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        navigatePreview('previous');
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        navigatePreview('next');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCropping, navigatePreview, preview]);
-
-  const activeDialog = errorMsg ? 'error' : showDonate ? 'donate' : preview ? 'preview' : null;
-  useEffect(() => {
-    if (!activeDialog) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = window.requestAnimationFrame(() => dialogCloseRef.current?.focus());
-    const handleDialogKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (activeDialog === 'error') setErrorMsg(null);
-        else if (activeDialog === 'donate') setShowDonate(false);
-        else if (isCroppingRef.current) closeCropEditor();
-        else setPreview(null);
-        return;
-      }
-      if (event.key !== 'Tab' || !dialogRootRef.current) return;
-      const focusable = Array.from(
-        dialogRootRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')
-      ).filter(element => element.offsetParent !== null);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener('keydown', handleDialogKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('keydown', handleDialogKeyDown);
-      previousFocus?.focus();
-    };
-  }, [activeDialog, closeCropEditor]);
+  }, [images, preview, settings, stripResult]);
 
   useEffect(() => {
     const preset = FILM_PRESETS[settings.brandText];
@@ -371,19 +351,11 @@ const App: React.FC = () => {
         ...prev, 
         textColor: preset.brandColor,
         holeType: recommendedHoleType,
-        frameRenderMode: settings.brandText === FilmType.KODAK_GOLD_200 ? prev.frameRenderMode : 'classic',
+        frameRenderMode: hasReal135Template ? prev.frameRenderMode : 'classic',
+        filmOverlayUrl: getReal135OverlayUrl(settings.brandText) ?? prev.filmOverlayUrl,
       }));
     }
   }, [settings.brandText]);
-
-  // 清除 Strip 结果当图片变化时
-  useEffect(() => {
-    setStripResult(prev => {
-      revokeObjectUrl(prev?.url);
-      stripResultRef.current = null;
-      return null;
-    });
-  }, [images]);
 
   const readExifDate = useCallback(async (file: File): Promise<string> => {
     let exifDate = '';
@@ -410,21 +382,32 @@ const App: React.FC = () => {
       readImageSize,
       readExifDate,
     });
+    const nextImages = [...imagesRef.current, ...newImages];
+    const admission = newImages.length > 0
+      ? evaluateBatchAdmission({
+        operation: 'process',
+        includedImages: getIncludedImages(nextImages),
+        totalImageCount: nextImages.length,
+      })
+      : null;
 
     if (uploadErrors.length > 0) {
       setErrorMsg(`无法添加以下文件：\n${uploadErrors.join('\n')}`);
     }
-    if (uploadWarnings.length > 0) {
-      setNotice({ tone: 'warning', message: `大图提示：${uploadWarnings.join('；')}` });
+    if (uploadWarnings.length > 0 || (admission && admission.status !== 'ok')) {
+      const messages = [
+        uploadWarnings.length > 0 ? `大图提示：${uploadWarnings.join('；')}` : '',
+        admission && admission.status !== 'ok'
+          ? formatAdmissionFeedback(admission, '批次处理')
+          : '',
+      ].filter(Boolean);
+      setNotice({ tone: 'warning', message: messages.join('\n') });
     } else if (newImages.length > 0) {
       setNotice({ tone: 'success', message: `已添加 ${newImages.length} 张照片，照片仅在本机处理。` });
     }
 
-    setImages(prev => {
-      const nextImages = [...prev, ...newImages];
-      imagesRef.current = nextImages;
-      return nextImages;
-    });
+    imagesRef.current = nextImages;
+    setImages(nextImages);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [readExifDate]);
 
@@ -446,6 +429,14 @@ const App: React.FC = () => {
     imagesRef.current = nextImages;
     setImages(nextImages);
 
+    if (nextImages.length === 0) {
+      setStripResult(prev => {
+        revokeObjectUrl(prev?.url);
+        stripResultRef.current = null;
+        return null;
+      });
+    }
+
     if (preview?.type === 'single' && preview.imageId === id) {
       const nextPreviewImage = nextImages[Math.min(targetIndex, nextImages.length - 1)];
       setPreview(nextPreviewImage ? { type: 'single', imageId: nextPreviewImage.id } : null);
@@ -460,8 +451,15 @@ const App: React.FC = () => {
     const batchMode = outputMode;
     if (sourceImages.length === 0) return;
 
-    const batchEntries = sourceImages
+    const includedEntries = sourceImages
       .map((item, index) => ({ item, index }))
+      .filter(({ item }) => isImageIncluded(item));
+    if (includedEntries.length === 0) {
+      setNotice({ tone: 'info', message: '请先选择至少一张照片，再开始冲洗。' });
+      return;
+    }
+
+    const batchEntries = includedEntries
       .filter(({ item, index }) => {
         if (batchMode === 'strip' || force) return true;
         const imageSettings = settingsForImage(batchSettings, index);
@@ -476,33 +474,57 @@ const App: React.FC = () => {
       return;
     }
 
+    const admission = batchMode === 'strip'
+      ? evaluateBatchAdmission({
+        operation: 'strip',
+        includedImages: batchImages,
+        totalImageCount: sourceImages.length,
+        stripCanvas: getStripCanvasSize(batchSettings, batchImages.length),
+      })
+      : evaluateBatchAdmission({
+        operation: 'process',
+        includedImages: batchImages,
+        totalImageCount: sourceImages.length,
+      });
+    if (admission.status === 'blocked') {
+      setErrorMsg(formatAdmissionFeedback(
+        admission,
+        batchMode === 'strip' ? '生成胶片长条' : '开始冲洗',
+      ));
+      return;
+    }
+
     const generation = ++renderGenerationRef.current;
     setProcessing(true);
     setActiveBatchMode(batchMode);
     setErrorMsg(null);
-    setNotice(null);
+    setNotice(admission.status === 'warning'
+      ? { tone: 'warning', message: formatAdmissionFeedback(admission, batchMode === 'strip' ? '生成胶片长条' : '开始冲洗') }
+      : null);
     setQueuedImageIds(batchMode === 'single' ? batchImages.map(item => item.id) : []);
     setProcessingMessage(batchMode === 'strip' ? '正在拼合胶片长条...' : `正在处理 1/${batchImages.length}`);
 
     try {
       if (batchMode === 'strip') {
-        const settingsKey = createOrderedStripKey(batchSettings, batchImages);
+        const stripImages = getIncludedStripImages(sourceImages);
+        const settingsKey = createOrderedStripKey(batchSettings, stripImages);
         setProcessingMessage(`正在拼合 ${batchImages.length} 张照片...`);
-        const url = await generateFilmStrip(batchImages, batchSettings);
+        const result = await generateFilmStrip(stripImages, batchSettings);
         const currentKey = createOrderedStripKey(
           settingsRef.current,
-          imagesRef.current,
+          getIncludedStripImages(imagesRef.current),
         );
 
         if (!mountedRef.current || generation !== renderGenerationRef.current || currentKey !== settingsKey) {
-          revokeObjectUrl(url);
+          revokeObjectUrl(result.url);
           return;
         }
 
         const artifact: RenderArtifact = {
-          url,
+          url: result.url,
           mime: batchSettings.outputFormat,
           settingsKey,
+          byteSize: result.byteSize,
         };
         setStripResult(prev => {
           revokeObjectUrl(prev?.url);
@@ -522,7 +544,7 @@ const App: React.FC = () => {
           setQueuedImageIds(batchEntries.slice(i + 1).map(entry => entry.item.id));
           setProcessingMessage(`正在处理 ${i + 1}/${batchImages.length}`);
           try {
-            const resultUrl = await processImage(
+            const result = await processImage(
               item.file,
               imageSettings,
               item.exifDate,
@@ -540,7 +562,7 @@ const App: React.FC = () => {
                 )
               : null;
             if (currentSettingsKey !== settingsKey) {
-              revokeObjectUrl(resultUrl);
+              revokeObjectUrl(result.url);
               continue;
             }
 
@@ -548,16 +570,17 @@ const App: React.FC = () => {
               imagesRef.current,
               item.id,
               {
-                processedUrl: resultUrl,
+                processedUrl: result.url,
                 processedMime: batchSettings.outputFormat,
                 processedSettingsKey: settingsKey,
+                processedByteSize: result.byteSize,
                 processingError: undefined,
               },
               { result: generation, current: renderGenerationRef.current },
             );
 
             if (!mountedRef.current || !merged.accepted) {
-              revokeObjectUrl(resultUrl);
+              revokeObjectUrl(result.url);
               continue;
             }
 
@@ -634,6 +657,20 @@ const App: React.FC = () => {
     const index = currentImages.findIndex(img => img.id === id);
     const item = currentImages[index];
     if (!item) return;
+    if (!isImageIncluded(item)) {
+      setNotice({ tone: 'info', message: '这张照片未入选，请先加入本次冲洗。' });
+      return;
+    }
+
+    const admission = evaluateBatchAdmission({
+      operation: 'process',
+      includedImages: [item],
+      totalImageCount: currentImages.length,
+    });
+    if (admission.status === 'blocked') {
+      setErrorMsg(formatAdmissionFeedback(admission, '重新冲洗此张照片'));
+      return;
+    }
 
     const generation = ++renderGenerationRef.current;
     const retrySettings = settingsForImage(settings, index);
@@ -642,6 +679,9 @@ const App: React.FC = () => {
     setProcessing(true);
     setActiveBatchMode('single');
     setErrorMsg(null);
+    if (admission.status === 'warning') {
+      setNotice({ tone: 'warning', message: formatAdmissionFeedback(admission, '重新冲洗此张照片') });
+    }
     setActiveImageId(id);
     setProcessingMessage(`正在重试 ${item.file.name}`);
     setImages(prev => {
@@ -653,7 +693,7 @@ const App: React.FC = () => {
     });
 
     try {
-      const resultUrl = await processImage(
+      const result = await processImage(
         item.file,
         retrySettings,
         item.exifDate,
@@ -671,7 +711,7 @@ const App: React.FC = () => {
           )
         : null;
       if (currentSettingsKey !== settingsKey) {
-        revokeObjectUrl(resultUrl);
+        revokeObjectUrl(result.url);
         return;
       }
 
@@ -679,16 +719,17 @@ const App: React.FC = () => {
         imagesRef.current,
         id,
         {
-          processedUrl: resultUrl,
+          processedUrl: result.url,
           processedMime: settings.outputFormat,
           processedSettingsKey: settingsKey,
+          processedByteSize: result.byteSize,
           processingError: undefined,
         },
         { result: generation, current: renderGenerationRef.current },
       );
 
       if (!mountedRef.current || !merged.accepted) {
-        revokeObjectUrl(resultUrl);
+        revokeObjectUrl(result.url);
         return;
       }
 
@@ -739,19 +780,45 @@ const App: React.FC = () => {
 
   const downloadAll = async () => {
     if (exporting || processing) return;
+    const includedImages = getIncludedImages(images);
+    if (includedImages.length === 0) {
+      setNotice({ tone: 'info', message: '请先选择至少一张照片，再导出成片。' });
+      return;
+    }
+
     if (outputMode === 'strip') {
-      const currentKey = createOrderedStripKey(settings, images);
+      const currentKey = createOrderedStripKey(settings, getIncludedStripImages(images));
       if (stripResult?.settingsKey === currentKey && stripResult.mime === settings.outputFormat) {
         downloadImage(stripResult, `film_strip_${Date.now()}`);
       }
     } else {
       const processedImages = images.flatMap((img, index) => {
+        if (!isImageIncluded(img)) return [];
         const artifact = getCurrentImageArtifact(img, index, settings);
-        return artifact ? [{ img, artifact }] : [];
+        return artifact ? [{ img, artifact, index }] : [];
       });
       if (processedImages.length === 0) {
         setErrorMsg('暂无可下载的成片，请先点击“处理全部单张”。');
         return;
+      }
+      if (processedImages.some(({ artifact }) => artifact.byteSize === undefined)) {
+        setErrorMsg('部分成片缺少容量信息，请重新冲洗这些照片后再打包。');
+        return;
+      }
+
+      const zipSourceImages = processedImages.map(({ img }) => img);
+      const initialZipAdmission = evaluateBatchAdmission({
+        operation: 'zip',
+        includedImages: zipSourceImages,
+        totalImageCount: images.length,
+        zipInputBytes: processedImages.reduce((total, { artifact }) => total + artifact.byteSize!, 0),
+      });
+      if (initialZipAdmission.status === 'blocked') {
+        setErrorMsg(formatAdmissionFeedback(initialZipAdmission, '打包下载'));
+        return;
+      }
+      if (initialZipAdmission.status === 'warning') {
+        setNotice({ tone: 'warning', message: formatAdmissionFeedback(initialZipAdmission, '打包下载') });
       }
 
       try {
@@ -760,13 +827,13 @@ const App: React.FC = () => {
         const zipFiles = [];
         for (let idx = 0; idx < processedImages.length; idx++) {
           setExportMessage(`正在打包 ${idx + 1}/${processedImages.length}`);
-          const { img, artifact } = processedImages[idx];
+          const { img, artifact, index } = processedImages[idx];
           const response = await fetch(artifact.url);
           if (!response.ok) throw new Error(`Failed to read generated image ${idx + 1}`);
-
+          const blob = await response.blob();
           zipFiles.push({
-            name: `${String(idx + 1).padStart(2, '0')}_${createArtifactFilename(img.file.name, artifact.mime)}`,
-            blob: await response.blob(),
+            name: `${String(index + 1).padStart(2, '0')}_${createArtifactFilename(img.file.name, artifact.mime)}`,
+            blob,
           });
         }
 
@@ -783,11 +850,29 @@ const App: React.FC = () => {
   };
 
   const moveImage = (id: string, direction: 'up' | 'down') => {
-    if (exporting) return;
+    if (processing || exporting) return;
     const nextImages = moveItem(imagesRef.current, id, direction);
     if (nextImages === imagesRef.current) return;
     imagesRef.current = [...nextImages];
     setImages([...nextImages]);
+  };
+
+  const toggleImageSelection = (id: string) => {
+    if (processing || exporting) return;
+    const currentImages = imagesRef.current;
+    const nextImages = toggleImageIncluded(currentImages, id);
+    if (nextImages === currentImages) return;
+    imagesRef.current = nextImages;
+    setImages(nextImages);
+  };
+
+  const setAllImageSelections = (included: boolean) => {
+    if (processing || exporting) return;
+    const currentImages = imagesRef.current;
+    const nextImages = setAllImagesIncluded(currentImages, included);
+    if (nextImages === currentImages) return;
+    imagesRef.current = nextImages;
+    setImages(nextImages);
   };
 
   const updateImageTransform = (id: string, patch: Partial<NonNullable<ImageItem['transform']>>) => {
@@ -800,20 +885,19 @@ const App: React.FC = () => {
     setImages(nextImages);
   };
 
-  const toggleMobileSettings = (trigger: HTMLButtonElement) => {
-    settingsTriggerRef.current = trigger;
-    setSettingsOpen(open => {
-      const next = !open;
-      if (next) {
-        window.requestAnimationFrame(() => {
-          settingsPanelRef.current?.scrollIntoView({ block: 'start' });
-          settingsPanelRef.current?.focus({ preventScroll: true });
-        });
-      } else {
-        window.requestAnimationFrame(() => settingsTriggerRef.current?.focus());
-      }
-      return next;
-    });
+  const toggleMobileSettings = (trigger?: HTMLButtonElement) => {
+    if (trigger) settingsTriggerRef.current = trigger;
+    setSettingsOpen(open => !open);
+  };
+
+  const closeMobileSettings = () => {
+    setSettingsOpen(false);
+    window.requestAnimationFrame(() => settingsTriggerRef.current?.focus({ preventScroll: true }));
+  };
+
+  const openSupportFromSettings = () => {
+    setSettingsOpen(false);
+    window.requestAnimationFrame(() => setShowDonate(true));
   };
 
   const saveCurrentRecipe = () => {
@@ -863,12 +947,14 @@ const App: React.FC = () => {
 
   // --- Drag and Drop Handlers ---
   const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
+    if (processing || exporting) return;
     dragItem.current = index;
     // Set effect
     e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragEnter = (e: React.DragEvent<HTMLElement>, index: number) => {
+     if (processing || exporting) return;
      if (dragItem.current === null) return;
      if (dragItem.current === index) return;
 
@@ -887,6 +973,7 @@ const App: React.FC = () => {
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    if (processing || exporting) return;
     e.preventDefault(); // Necessary for onDrop/onDragEnter to work smoothly
   };
 
@@ -897,12 +984,21 @@ const App: React.FC = () => {
   const handleUploadDragEnter = (event: React.DragEvent<HTMLElement>) => {
     if (!hasUploadFiles(event)) return;
     event.preventDefault();
+    if (processing || exporting) {
+      setIsDraggingUpload(false);
+      return;
+    }
     setIsDraggingUpload(true);
   };
 
   const handleUploadDragOver = (event: React.DragEvent<HTMLElement>) => {
     if (!hasUploadFiles(event)) return;
     event.preventDefault();
+    if (processing || exporting) {
+      event.dataTransfer.dropEffect = 'none';
+      setIsDraggingUpload(false);
+      return;
+    }
     event.dataTransfer.dropEffect = 'copy';
     setIsDraggingUpload(true);
   };
@@ -916,6 +1012,7 @@ const App: React.FC = () => {
     if (!hasUploadFiles(event)) return;
     event.preventDefault();
     setIsDraggingUpload(false);
+    if (processing || exporting) return;
     await addFiles(Array.from(event.dataTransfer.files));
   };
 
@@ -925,12 +1022,17 @@ const App: React.FC = () => {
       return artifact ? [[img.id, artifact] as const] : [];
     }),
   );
-  const currentStripKey = createOrderedStripKey(settings, images);
+  const includedImages = getIncludedImages(images);
+  const includedCount = getIncludedImageCount(images);
+  const currentStripKey = createOrderedStripKey(settings, getIncludedStripImages(images));
   const currentStripResult =
     stripResult?.settingsKey === currentStripKey && stripResult.mime === settings.outputFormat
       ? stripResult
       : null;
-  const processedCount = currentImageArtifacts.size;
+  const includedProcessedCount = includedImages.reduce(
+    (count, image) => count + Number(currentImageArtifacts.has(image.id)),
+    0,
+  );
   const imageWorkflowStatuses = new Map(
     images.map((img, index) => {
       const imageSettings = settingsForImage(settings, index);
@@ -945,10 +1047,11 @@ const App: React.FC = () => {
       ] as const;
     }),
   );
-  const pendingCount = [...imageWorkflowStatuses.values()]
+  const includedPendingCount = includedImages
+    .map(image => imageWorkflowStatuses.get(image.id)!)
     .filter(status => status.kind === 'unprocessed' || status.kind === 'stale' || status.kind === 'failed')
     .length;
-  const hasAnyResult = outputMode === 'single' ? processedCount > 0 : Boolean(currentStripResult);
+  const hasAnyResult = outputMode === 'single' ? includedProcessedCount > 0 : Boolean(currentStripResult);
   const previewImageIndex =
     preview?.type === 'single' ? getPreviewImageIndex(images, preview.imageId) : -1;
   const previewImageItem = previewImageIndex >= 0 ? images[previewImageIndex] : null;
@@ -989,13 +1092,13 @@ const App: React.FC = () => {
 
     setPreviewRendering(true);
     const controller = createPreviewRenderController<PreviewRenderRequest>({
-      render: request => processImage(
+      render: async request => (await processImage(
         request.item.file,
         { ...settingsForImage(request.settings, request.index), processingMode: 'preview' },
         request.item.exifDate,
         request.item.previewUrl,
         request.item.transform,
-      ),
+      )).url,
       onResult: url => {
         setEditorPreviewUrl(url);
         setPreviewRendering(false);
@@ -1022,25 +1125,34 @@ const App: React.FC = () => {
   const processButtonLabel =
     images.length === 0
       ? '先添加图片'
+      : includedCount === 0
+        ? '请先选择至少一张照片'
       : outputMode === 'strip'
         ? (currentStripResult ? '重新生成胶片长条' : '生成胶片长条')
-        : pendingCount > 0
-          ? `冲洗待更新照片 (${pendingCount})`
+        : includedPendingCount > 0
+          ? `冲洗待更新照片 (${includedPendingCount})`
           : '全部成片均为最新';
   const downloadButtonLabel =
     outputMode === 'strip'
       ? '下载长条大图'
-      : `打包下载 ZIP${processedCount > 0 ? ` (${processedCount})` : ''}`;
+      : `打包下载 ZIP${includedProcessedCount > 0 ? ` (${includedProcessedCount})` : ''}`;
   const primaryActionState = exporting
     ? 'exporting'
     : processing
       ? 'processing'
       : images.length === 0
         ? 'empty'
+        : includedCount === 0
+          ? 'idle'
         : outputMode === 'single'
-          ? pendingCount > 0 ? 'idle' : 'ready'
+          ? includedPendingCount > 0 ? 'idle' : 'ready'
           : currentStripResult ? 'ready' : 'idle';
-  const primaryAction = getPrimaryAction(primaryActionState);
+  const basePrimaryAction = getPrimaryAction(primaryActionState);
+  const primaryAction = {
+    ...basePrimaryAction,
+    disabled: basePrimaryAction.disabled
+      || (!processing && !exporting && images.length > 0 && includedCount === 0),
+  };
   const imageRemovalAllowed = isImageRemovalAllowed(
     processing,
     activeBatchMode ?? outputMode,
@@ -1063,845 +1175,328 @@ const App: React.FC = () => {
     }
   };
 
+  const resetToDefaults = () => {
+    if (processing || exporting) return;
+    setSettings({ ...DEFAULT_SETTINGS });
+    setOutputMode('single');
+    setSelectedRecipeId('');
+    setNotice({ tone: 'info', message: '已恢复默认设置，照片和本地配方仍然保留。' });
+  };
+
+  const dismissNotice = useCallback(() => setNotice(null), []);
+
+  const selectedRecipeName = recipes.find(recipe => recipe.id === selectedRecipeId)?.name;
+  const runInspectorPrimaryAction = () => {
+    if (processing) {
+      stopProcessing();
+    } else if (images.length === 0) {
+      fileInputRef.current?.click();
+    } else {
+      void processAll();
+    }
+  };
+  const inspectorProps: RecipeInspectorProps = {
+    settings,
+    onSettingsChange: setSettings,
+    outputMode,
+    recipes,
+    selectedRecipeId,
+    recipeName,
+    onRecipeNameChange: setRecipeName,
+    onSaveRecipe: saveCurrentRecipe,
+    onApplyRecipe: applyRecipe,
+    onDeleteRecipe: removeRecipe,
+    imageCount: includedCount,
+    pendingCount: includedPendingCount,
+    processedCount: includedProcessedCount,
+    primaryActionLabel: processing ? '停止后续' : processButtonLabel,
+    primaryActionDisabled: exporting || (!processing && images.length > 0 && (
+      includedCount === 0 || (outputMode === 'single' && includedPendingCount === 0)
+    )),
+    primaryActionTone: processing
+      ? 'stop'
+      : images.length > 0 && (includedCount === 0 || (includedPendingCount === 0 && outputMode === 'single'))
+        ? 'neutral'
+        : 'primary',
+    onPrimaryAction: runInspectorPrimaryAction,
+    onReprocessAll: () => void processAll(true),
+    onReset: resetToDefaults,
+    processing,
+    exporting,
+    selectedRecipeName,
+  };
+  const mobilePrimaryAction = {
+    ...primaryAction,
+    label: primaryAction.command === 'process'
+      ? processButtonLabel
+      : primaryAction.command === 'download'
+        ? downloadButtonLabel
+        : primaryAction.command === 'none' && exportMessage
+          ? exportMessage
+          : primaryAction.label,
+  };
+  const contactSheetItems = images.map((item, index) => ({
+    item,
+    index,
+    frameNumber: frameNumberForIndex(settings, index),
+    status: imageWorkflowStatuses.get(item.id)!,
+    artifact: currentImageArtifacts.get(item.id) ?? null,
+    active: activeImageId === item.id,
+  }));
+  const stripStage: FilmStripStageState = processing && activeBatchMode === 'strip'
+    ? { kind: 'processing', message: processingMessage }
+    : currentStripResult
+      ? { kind: 'current', artifact: currentStripResult }
+      : stripResult
+        ? { kind: 'stale', artifact: stripResult, message: '选片、顺序或配方已变化，请重新生成。' }
+        : { kind: 'empty', message: includedCount === 0 ? '请先选择至少一张照片' : `按当前顺序合成 ${includedCount} 张入选照片` };
+  const workspaceSummary = images.length === 0
+    ? 'NEW ROLL · LOCAL ONLY'
+    : `入选 ${includedCount} / ${images.length} · ${includedProcessedCount} 已出片 · ${includedPendingCount} 待冲洗`;
+  const stripStatusLabel = currentStripResult ? '已生成' : stripResult ? '需重生成' : `${includedCount} 张入选`;
+  const previewAfterSource = previewImageItem
+    ? editorPreviewUrl ?? previewImageArtifact?.url ?? previewImageItem.previewUrl
+    : previewImageSource;
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a] text-gray-200">
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {processing ? processingMessage : exporting ? exportMessage : notice?.message ?? ''}
-      </div>
-      {/* Sidebar Settings */}
-      <aside
-        ref={settingsPanelRef}
-        id="film-settings"
+    <>
+      <a
+        href="#workspace"
+        className="fixed left-3 top-3 z-[120] -translate-y-24 rounded-[4px] bg-[var(--ff-paper)] px-3 py-2 text-sm font-medium text-[var(--ff-ink)] focus:translate-y-0"
+      >
+        跳到工作区
+      </a>
+      <input
+        ref={fileInputRef}
+        type="file"
+        aria-label="选择照片"
+        multiple
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleFileUpload}
+        className="sr-only"
         tabIndex={-1}
-        className={`${settingsOpen ? 'flex' : 'hidden'} order-2 w-full flex-col gap-6 border-t border-white/10 bg-[#121212] p-5 pb-28 md:order-1 md:flex md:w-80 md:max-h-screen md:overflow-y-auto md:border-r md:border-t-0 md:p-6 md:pb-6 z-10`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 transition-transform hover:scale-105">
-            <FilmLogoIcon />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white leading-none">FilmFrame</h1>
-            <p className="text-[10px] text-amber-500 font-medium tracking-[0.2em] mt-1 uppercase opacity-90">Digital Darkroom</p>
-          </div>
-        </div>
+      />
 
-        {/* Community Buttons */}
-        <div className="space-y-2">
-          {/* GitHub Star Button */}
-          <a 
-            href="https://github.com/Zeno-cc/FilmFrame" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg group transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <GithubIcon />
-              <span className="text-xs font-medium text-gray-300 group-hover:text-white">Star on GitHub</span>
-            </div>
-            <div className="text-amber-500 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            </div>
-          </a>
-
-          {/* Donate / Tea Button */}
-          <button 
-            onClick={() => setShowDonate(true)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/10 hover:border-pink-500/30 rounded-lg group transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <div className="text-pink-400 group-hover:text-pink-300 transition-colors">
-                <CoffeeIcon />
-              </div>
-              <span className="text-xs font-medium text-pink-200/80 group-hover:text-pink-100 transition-colors">请作者喝一杯奶茶</span>
-            </div>
-            <div className="text-pink-500/60 group-hover:text-pink-500 group-hover:scale-110 transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            </div>
-          </button>
-        </div>
-
-        {/* Mode Toggle */}
-        <div className="bg-white/5 p-1 rounded-lg flex border border-white/10">
-          <button 
-            onClick={() => {
-              if (!processing && !exporting) setOutputMode('single');
-            }}
-            disabled={processing || exporting}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all disabled:opacity-40 ${outputMode === 'single' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <GridIcon /> 单张卡片
-          </button>
-          <button 
-            onClick={() => {
-              if (!processing && !exporting) setOutputMode('strip');
-            }}
-            disabled={processing || exporting}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all disabled:opacity-40 ${outputMode === 'strip' ? 'bg-amber-500 text-black shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <StripIcon /> 连底长条
-          </button>
-        </div>
-
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-            <SettingsIcon /> 胶片配置
-          </div>
-          
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-xs text-gray-400 mb-1 block">胶片型号</span>
-              <select 
-                className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                value={settings.brandText}
-                onChange={(e) => setSettings({...settings, brandText: e.target.value as FilmType})}
-              >
-                {Object.values(FilmType).map(type => (
-                  <option key={type} value={type} className="bg-[#121212]">{type}</option>
-                ))}
-              </select>
-            </label>
-
-            {!isReal135Mode && (
-              <label className="block">
-                <span className="text-xs text-gray-400 mb-1 block">自定义文字 (可选, 覆盖胶片型号)</span>
-                <input 
-                  type="text"
-                  placeholder="例如: SHOT BY ZENO"
-                  className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-500 placeholder-gray-600"
-                  value={settings.customText}
-                  onChange={(e) => setSettings({...settings, customText: e.target.value})}
-                />
-              </label>
-            )}
-
-            <div className={isReal135Mode ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
-              <label>
-                <span className="text-xs text-gray-400 mb-1 block">起始编号</span>
-                <input 
-                  type="number"
-                  className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
-                  value={settings.frameNumber}
-                  onChange={(e) => setSettings({...settings, frameNumber: parseInt(e.target.value) || 1})}
-                />
-              </label>
-              {!isReal135Mode && (
-                <label>
-                  <span className="text-xs text-gray-400 mb-1 block">默认日期</span>
-                  <input 
-                    type="text"
-                    className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm mono focus:outline-none focus:border-amber-500"
-                    value={settings.dateStr}
-                    onChange={(e) => setSettings({...settings, dateStr: e.target.value})}
-                    placeholder="YYYY/MM/DD"
-                  />
-                </label>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-            视觉与输出
-          </div>
-
-          <div className="space-y-4">
-             {supportsReal135Template && (
-             <div className="space-y-2">
-                <span className="text-xs text-gray-400">边框模式</span>
-                <div className="grid grid-cols-2 gap-1 bg-white/5 p-1 rounded-md border border-white/10">
-                   <button
-                     onClick={() => setSettings({...settings, frameRenderMode: 'real135'})}
-                     className={`text-xs py-1.5 rounded transition-all ${(settings.frameRenderMode ?? 'real135') === 'real135' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
-                   >
-                     真实135
-                   </button>
-                   <button
-                     onClick={() => setSettings({...settings, frameRenderMode: 'classic'})}
-                     className={`text-xs py-1.5 rounded transition-all ${settings.frameRenderMode === 'classic' ? 'bg-amber-500 text-black font-bold shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
-                   >
-                     经典边框
-                   </button>
-                </div>
-             </div>
-             )}
-
-             {isReal135Mode && outputMode === 'single' && (
-             <div className="space-y-2">
-                <span className="text-xs text-gray-400">扫描输出</span>
-                <div className="grid grid-cols-2 gap-1 bg-white/5 p-1 rounded-md border border-white/10">
-                   <button
-                     onClick={() => setSettings({...settings, scanOutputAspect: '4:3'})}
-                     className={`text-xs py-1.5 rounded transition-all ${(settings.scanOutputAspect ?? '4:3') === '4:3' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                   >
-                     4:3扫描
-                   </button>
-                   <button
-                     onClick={() => setSettings({...settings, scanOutputAspect: 'native'})}
-                     className={`text-xs py-1.5 rounded transition-all ${settings.scanOutputAspect === 'native' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                   >
-                     原始底片
-                   </button>
-                </div>
-             </div>
-             )}
-
-             {isReal135Mode && (
-             <div className="space-y-2">
-                <span className="text-xs text-gray-400">处理模式</span>
-                <div className="grid grid-cols-2 gap-1 bg-white/5 p-1 rounded-md border border-white/10">
-                   <button
-                     onClick={() => setSettings({...settings, processingMode: 'preview'})}
-                     className={`text-xs py-1.5 rounded transition-all ${(settings.processingMode ?? 'preview') === 'preview' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                   >
-                     快速预览
-                   </button>
-                   <button
-                     onClick={() => setSettings({...settings, processingMode: 'high'})}
-                     className={`text-xs py-1.5 rounded transition-all ${settings.processingMode === 'high' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                   >
-                     高清导出
-                   </button>
-                </div>
-             </div>
-             )}
-
-             {/* 新增：输出格式控制 */}
-             <div className="space-y-2">
-                <span className="text-xs text-gray-400">输出格式</span>
-                <div className="flex bg-white/5 p-1 rounded-md border border-white/10">
-                   <button
-                     onClick={() => setSettings({...settings, outputFormat: 'image/jpeg'})}
-                     className={`flex-1 text-xs py-1.5 rounded transition-all ${settings.outputFormat === 'image/jpeg' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500'}`}
-                   >
-                     JPG (推荐)
-                   </button>
-                   <button
-                     onClick={() => setSettings({...settings, outputFormat: 'image/png'})}
-                     className={`flex-1 text-xs py-1.5 rounded transition-all ${settings.outputFormat === 'image/png' ? 'bg-gray-700 text-white font-bold' : 'text-gray-500'}`}
-                   >
-                     PNG (无损)
-                   </button>
-                </div>
-             </div>
-             
-             {settings.outputFormat === 'image/jpeg' && (
-                <label className="block">
-                  <div className="flex justify-between text-xs text-gray-400 mb-2">
-                    <span>JPG 质量</span>
-                    <span>{Math.round(settings.outputQuality * 100)}%</span>
-                  </div>
-                  <input 
-                    type="range" min="0.5" max="1" step="0.05" 
-                    value={settings.outputQuality} 
-                    onChange={e => setSettings({...settings, outputQuality: parseFloat(e.target.value)})} 
-                    className="w-full accent-amber-500" 
-                  />
-                </label>
-             )}
-
-
-            {!isReal135Mode && (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-gray-400">齿孔形状</span>
-                  <div className="grid grid-cols-2 bg-white/5 p-1 rounded-md border border-white/10">
-                    <button
-                      onClick={() => setSettings({...settings, holeType: 'square'})}
-                      className={`text-xs py-1.5 rounded transition-all ${
-                        settings.holeType === 'square' 
-                        ? 'bg-amber-500 text-black font-bold shadow-sm' 
-                        : 'text-gray-400 hover:text-gray-200'
-                      }`}
-                    >
-                      方孔
-                    </button>
-                    <button
-                      onClick={() => setSettings({...settings, holeType: 'rounded'})}
-                      className={`text-xs py-1.5 rounded transition-all ${
-                        settings.holeType === 'rounded' 
-                        ? 'bg-amber-500 text-black font-bold shadow-sm' 
-                        : 'text-gray-400 hover:text-gray-200'
-                      }`}
-                    >
-                      圆角
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-500 text-center">边框色</span>
-                    <input type="color" value={settings.borderColor} onChange={e => setSettings({...settings, borderColor: e.target.value})} className="w-full h-8 bg-transparent cursor-pointer rounded overflow-hidden" />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-500 text-center">齿孔色</span>
-                    <input type="color" value={settings.holeColor} onChange={e => setSettings({...settings, holeColor: e.target.value})} className="w-full h-8 bg-transparent cursor-pointer rounded overflow-hidden" />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-500 text-center">文字色</span>
-                    <input type="color" value={settings.textColor} onChange={e => setSettings({...settings, textColor: e.target.value})} className="w-full h-8 bg-transparent cursor-pointer rounded overflow-hidden" />
-                  </label>
-                </div>
-              </>
-            )}
-
-            <div className="space-y-3">
-              {!isReal135Mode && (
-                <label className="block">
-                  <div className="flex justify-between text-xs text-gray-400 mb-2">
-                    <span>边框尺寸</span>
-                    <span>{settings.borderSize}%</span>
-                  </div>
-                  <input type="range" min="5" max="25" step="1" value={settings.borderSize} onChange={e => setSettings({...settings, borderSize: parseInt(e.target.value)})} className="w-full accent-amber-500" />
-                </label>
-              )}
-              <label className="block">
-                <div className="flex justify-between text-xs text-gray-400 mb-2">
-                  <span>颗粒强度</span>
-                  <span>{settings.grainIntensity}</span>
-                </div>
-                <input type="range" min="0" max="60" step="1" value={settings.grainIntensity} onChange={e => setSettings({...settings, grainIntensity: parseInt(e.target.value)})} className="w-full accent-amber-500" />
-              </label>
-            </div>
-
-            {!isReal135Mode && (
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={settings.showDate} 
-                  onChange={e => setSettings({...settings, showDate: e.target.checked})}
-                  className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500 bg-white/5"
-                />
-                <span className="text-sm text-gray-300">显示日期/EXIF 时间</span>
-              </label>
-            )}
-          </div>
-        </section>
-
-        <section className="space-y-3 border-t border-white/5 pt-5">
-          <div className="text-xs font-bold uppercase text-gray-500">我的配方</div>
-          {recipes.length > 0 && (
-            <div className="flex gap-2">
-              <select
-                aria-label="选择本地配方"
-                value={selectedRecipeId}
-                onChange={event => applyRecipe(event.target.value)}
-                className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
-              >
-                <option value="" className="bg-[#121212]">选择配方</option>
-                {recipes.map(recipe => <option key={recipe.id} value={recipe.id} className="bg-[#121212]">{recipe.name}</option>)}
-              </select>
-              <button
-                type="button"
-                aria-label="删除所选配方"
-                disabled={!selectedRecipeId}
-                onClick={() => selectedRecipeId && removeRecipe(selectedRecipeId)}
-                className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-red-300 disabled:opacity-25"
-              >
-                <TrashIcon />
-              </button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              value={recipeName}
-              maxLength={40}
-              onChange={event => setRecipeName(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') saveCurrentRecipe();
-              }}
-              placeholder="为当前设置命名"
-              aria-label="配方名称"
-              className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm placeholder:text-gray-600"
-            />
-            <button
-              type="button"
-              onClick={saveCurrentRecipe}
-              disabled={!recipeName.trim()}
-              className="min-h-11 rounded-md bg-white/10 px-3 text-xs font-medium text-white disabled:opacity-25"
-            >
-              保存
-            </button>
-          </div>
-          <p className="text-[10px] leading-relaxed text-gray-600">只保存设置，不保存照片或成片。</p>
-        </section>
-
-        <div className="mt-auto pt-6 border-t border-white/5">
-          <button 
-            onClick={() => processing ? stopProcessing() : void processAll()}
-            disabled={images.length === 0 || (!processing && pendingCount === 0 && outputMode === 'single')}
-            className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              processing 
-                ? 'bg-white/10 text-white hover:bg-white/15'
-                : 'bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/20 active:scale-95'
-            }`}
-          >
-            {processing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-                停止后续
-              </>
-            ) : processButtonLabel}
-          </button>
-          {outputMode === 'single' && processedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => void processAll(true)}
-              disabled={processing || exporting}
-              className="mt-2 w-full rounded-md px-3 py-2 text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300 disabled:opacity-30"
-            >
-              重新冲洗全部照片
-            </button>
-          )}
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main
-        className={`order-1 flex-1 flex flex-col p-4 pb-28 md:order-2 md:p-8 md:pb-8 md:overflow-y-auto bg-[#0a0a0a] transition-colors ${isDraggingUpload ? 'bg-amber-500/[0.04]' : ''}`}
-        onDragEnter={handleUploadDragEnter}
-        onDragOver={handleUploadDragOver}
-        onDragLeave={handleUploadDragLeave}
-        onDrop={handleUploadDrop}
-      >
-        <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
-          <div className="flex items-center justify-between md:hidden">
-            <div className="flex items-center gap-3">
-              <FilmLogoIcon />
-              <div>
-                <h1 className="text-lg font-bold text-white">FilmFrame</h1>
-                <p className="text-[10px] text-amber-500">本地冲洗，不上传照片</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={event => toggleMobileSettings(event.currentTarget)}
-              aria-expanded={settingsOpen}
-              aria-controls="film-settings"
-              className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
-            >
-              <span className="sr-only">{settingsOpen ? '收起胶片设置' : '展开胶片设置'}</span>
-              <SettingsIcon />
-            </button>
-          </div>
-          <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-white">工作室</h2>
-              <p className="text-sm text-gray-500">
-                {outputMode === 'strip' 
-                  ? '将多张照片拼接为连续的胶片印样 (Contact Sheet)。长按拖拽可调整叙事顺序。' 
-                  : '批量为每张照片添加独立的胶片边框。照片仅在当前设备处理。'}
-              </p>
-            </div>
-            <div className="flex gap-3 w-full sm:w-auto">
-              {(images.length > 0 && hasAnyResult) && (
-                <button 
-                  onClick={downloadAll}
-                  disabled={exporting || processing}
-                  className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 rounded-md text-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <DownloadIcon /> {exporting ? exportMessage || '正在打包...' : downloadButtonLabel}
-                </button>
-              )}
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-md text-sm transition-all flex items-center justify-center gap-2"
-              >
-                <PlusIcon /> 添加图片
-              </button>
-            </div>
-          </header>
-
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            multiple 
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileUpload} 
-            className="hidden" 
+      <AppShell
+        header={(
+          <AppHeader
+            imageCount={images.length}
+            processedCount={includedProcessedCount}
+            outputMode={outputMode}
+            hasDownloadableResult={hasAnyResult}
+            processing={processing}
+            exporting={exporting}
+            busyLabel={processing ? processingMessage : exporting ? exportMessage : undefined}
+            settingsOpen={settingsOpen}
+            onAddPhotos={() => fileInputRef.current?.click()}
+            onExport={() => void downloadAll()}
+            onOpenSettings={toggleMobileSettings}
+            onReset={resetToDefaults}
+            onOpenSupport={() => setShowDonate(true)}
+            onOpenPrivacy={() => setNotice({ tone: 'info', message: '照片只在当前设备处理，不会上传；刷新或关闭页面后不会保留。' })}
+            githubHref="https://github.com/Zeno-cc/FilmFrame"
           />
-          
-          {notice && (
-            <div
-              className={`flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
-                notice.tone === 'warning'
-                  ? 'border-amber-400/20 bg-amber-400/10 text-amber-100'
-                  : notice.tone === 'success'
-                    ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100'
-                    : 'border-sky-400/20 bg-sky-400/10 text-sky-100'
-              }`}
-            >
-              <span>{notice.message}</span>
-              <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示" className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-current/70 hover:text-current"><CloseIcon /></button>
-            </div>
-          )}
-
-          {images.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex-1 min-h-[360px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${
-                isDraggingUpload
-                  ? 'border-amber-500/80 bg-amber-500/[0.06]'
-                  : 'border-white/10 hover:border-amber-500/50 hover:bg-amber-500/[0.02]'
-              }`}
-            >
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-gray-500">
-                <PlusIcon />
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-medium text-gray-300">点击或拖拽上传图片</p>
-                <p className="text-sm text-gray-500">支持 JPG, PNG, WebP (建议保留 EXIF 信息)</p>
-                <p className="mt-2 text-xs text-emerald-300/80">照片仅在本机处理，不会上传</p>
-              </div>
-            </button>
-          ) : (
-            <>
-              {outputMode === 'single' ? (
-                // GRID VIEW
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {images.map((img, index) => {
-                    const status = imageWorkflowStatuses.get(img.id)!;
-                    return (
-                    <article
-                      key={img.id} 
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragEnter={(e) => handleDragEnter(e, index)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={handleDragOver}
-                      className="group relative bg-[#181818] rounded-md overflow-hidden border border-white/5 hover:border-white/20 transition-all md:cursor-move md:active:cursor-grabbing hover:shadow-xl hover:shadow-black/50"
-                    >
-	                      <div className="aspect-[4/3] w-full relative bg-black/40 overflow-hidden">
-		                        <img
-		                          src={currentImageArtifacts.get(img.id)?.url || img.previewUrl}
-	                          alt="Preview" 
-	                          className={`w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${processing ? 'opacity-40' : 'opacity-100'}`}
-	                        />
-		                        <div className={`absolute top-2 left-2 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium shadow-lg shadow-black/20 ${statusBadgeClass(status)}`}>
-		                          {status.kind === 'failed' && <AlertCircleIcon />}
-		                          <span>{status.label}</span>
-		                        </div>
-		                        <div className="absolute top-2 right-2 hidden text-white/50 bg-black/50 p-1 rounded-md md:block md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-		                          <GripIcon />
-		                        </div>
-		                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/90 to-transparent px-3 pb-3 pt-10 opacity-100 transition-opacity md:inset-0 md:bg-black/60 md:p-0 md:opacity-0 md:group-hover:opacity-100">
-		                          {img.processingError && (
-		                            <button
-		                              type="button"
-		                              onClick={() => retryImage(img.id)}
-		                              disabled={processing || exporting}
-		                              aria-label={`重试 ${img.file.name}`}
-		                              className="min-h-11 min-w-11 p-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-red-200 transition-colors"
-		                            >
-		                              <RetryIcon />
-		                            </button>
-		                          )}
-                          <button type="button" aria-label={`编辑并预览 ${img.file.name}`} onClick={() => setPreview({ type: 'single', imageId: img.id })} className="min-h-11 min-w-11 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
-                            <MaximizeIcon />
-                          </button>
-			                          {currentImageArtifacts.has(img.id) && (
-		                              <button type="button" aria-label={`下载 ${img.file.name}`} onClick={() => downloadImage(currentImageArtifacts.get(img.id)!, img.file.name)} className="min-h-11 min-w-11 p-3 bg-amber-500 hover:bg-amber-600 rounded-full text-black transition-colors">
-                                <DownloadIcon />
-                              </button>
-                          )}
-                          <button type="button" aria-label={`删除 ${img.file.name}`} disabled={!imageRemovalAllowed} onClick={() => removeImage(img.id)} className="min-h-11 min-w-11 p-3 bg-red-500/20 hover:bg-red-500/40 disabled:opacity-30 rounded-full text-red-300 transition-colors">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </div>
-		                      <div className="flex items-center justify-between gap-2 border-t border-white/5 p-3">
-		                        <div className="min-w-0">
-		                          <div className={`truncate text-xs font-medium ${img.processingError ? 'text-red-300' : 'text-gray-300'}`}>{img.file.name}</div>
-		                          <div className="mt-0.5 text-[10px] text-gray-500">{status.detail ?? (img.exifDate || '无 EXIF 日期')}</div>
-		                        </div>
-		                        <div className="flex shrink-0 gap-1">
-		                          <button type="button" onClick={() => moveImage(img.id, 'up')} disabled={index === 0} aria-label={`上移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-gray-300 disabled:opacity-25"><ArrowUpIcon /></button>
-		                          <button type="button" onClick={() => moveImage(img.id, 'down')} disabled={index === images.length - 1} aria-label={`下移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2 text-gray-300 disabled:opacity-25"><ArrowDownIcon /></button>
-		                        </div>
-		                      </div>
-                    </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                // STRIP VIEW
-                <div className="w-full flex flex-col gap-4">
-                  <div className="w-full bg-[#181818] rounded-xl border border-white/5 p-4 overflow-x-auto min-h-[300px] flex items-center justify-center relative">
-                    {processing ? (
-                       <div className="flex flex-col items-center gap-2">
-                          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-xs text-gray-500">{processingMessage || '正在拼合胶片长条...'}</span>
-                       </div>
-	                    ) : currentStripResult ? (
-	                      <div className="relative group">
-	                        <img src={currentStripResult.url} alt="Film Strip" className="max-h-[600px] shadow-2xl" />
-	                        <div className="absolute top-4 right-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-	                           <button type="button" aria-label="预览胶片长条" onClick={() => setPreview({ type: 'strip' })} className="min-h-11 min-w-11 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"><MaximizeIcon /></button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-500">
-                        <StripIcon />
-                        <p className="mt-2 text-sm">点击左侧“生成胶片长条”按钮开始制作</p>
-                        <p className="text-xs opacity-50 mt-1">将按顺序拼接 {images.length} 张图片</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Mini List to reorder or delete before strip gen */}
-                  <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-1">
-                    {images.map((img, idx) => (
-                      <div 
-                        key={img.id} 
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragEnter={(e) => handleDragEnter(e, idx)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                        className="relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-white/5 border border-white/10 group cursor-move hover:scale-105 transition-transform active:scale-95 shadow-md"
-                      >
-                        <img src={img.previewUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                        <button type="button" aria-label={`删除 ${img.file.name}`} disabled={!imageRemovalAllowed} onClick={() => removeImage(img.id)} className="absolute top-1 right-1 min-h-11 min-w-11 p-2 bg-red-500/90 text-white rounded-full opacity-100 disabled:opacity-30 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><TrashIcon /></button>
-                        <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 px-1 rounded text-white">{idx+1}</span>
-                        <div className="absolute bottom-1 right-1 flex gap-1">
-                          <button type="button" onClick={() => moveImage(img.id, 'up')} disabled={idx === 0} aria-label={`上移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md bg-black/70 p-2 text-white disabled:opacity-25"><ArrowUpIcon /></button>
-                          <button type="button" onClick={() => moveImage(img.id, 'down')} disabled={idx === images.length - 1} aria-label={`下移 ${img.file.name}`} className="min-h-11 min-w-11 rounded-md bg-black/70 p-2 text-white disabled:opacity-25"><ArrowDownIcon /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </main>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-white/10 bg-[#111]/95 p-3 backdrop-blur md:hidden">
-        <button
-          type="button"
-          onClick={event => toggleMobileSettings(event.currentTarget)}
-          aria-expanded={settingsOpen}
-          aria-controls="film-settings"
-          className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
-          aria-label={settingsOpen ? '收起胶片设置' : '展开胶片设置'}
-        >
-          <SettingsIcon />
-        </button>
-        <button
-          type="button"
-          onClick={runPrimaryAction}
-          disabled={primaryAction.disabled}
-          className={`min-h-11 flex-1 rounded-md px-4 py-2 text-sm font-bold ${primaryAction.command === 'stop' ? 'bg-white/10 text-white' : 'bg-amber-500 text-black'} disabled:opacity-50`}
-        >
-          {primaryAction.label}
-        </button>
-      </div>
-
-      {/* Fullscreen Preview Modal */}
-      {preview && previewImageSource && (
-        <div ref={dialogRootRef} role="dialog" aria-modal="true" aria-label="成片预览" className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
-          <button 
-            ref={dialogCloseRef}
-            onClick={() => setPreview(null)}
-            className="absolute top-6 right-6 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-            aria-label="关闭预览"
+        )}
+        workspace={(
+          <Workspace
+            toolbar={(
+              <WorkspaceToolbar
+                outputMode={outputMode}
+                imageCount={images.length}
+                includedCount={includedCount}
+                processedCount={includedProcessedCount}
+                stripStatusLabel={stripStatusLabel}
+                statusSummary={workspaceSummary}
+                controlsDisabled={processing || exporting}
+                canExport={hasAnyResult}
+                exportLabel={exporting ? exportMessage || '正在导出' : downloadButtonLabel}
+                onOutputModeChange={mode => {
+                  if (!processing && !exporting) setOutputMode(mode);
+                }}
+                onAddPhotos={() => fileInputRef.current?.click()}
+                onExport={() => void downloadAll()}
+                onSelectAll={() => setAllImageSelections(true)}
+                onClearSelection={() => setAllImageSelections(false)}
+              />
+            )}
+            isDragActive={isDraggingUpload}
+            onDragEnter={handleUploadDragEnter}
+            onDragOver={handleUploadDragOver}
+            onDragLeave={handleUploadDragLeave}
+            onDrop={handleUploadDrop}
           >
-            <CloseIcon />
-          </button>
-          {!isCropping && previewDownload && (
-            <a
-              href={previewDownload.href}
-              download={previewDownload.download}
-              className="absolute top-6 right-20 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-              aria-label="下载当前预览"
-            >
-              <DownloadIcon />
-            </a>
-          )}
-          {!isCropping && preview.type === 'single' && previewImageArtifact && (
-            <button
-              type="button"
-              onClick={() => void shareCurrentPreview()}
-              className="absolute top-6 right-32 inline-flex min-h-11 min-w-11 items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-              aria-label="分享当前成片"
-            >
-              <ShareIcon />
-            </button>
-          )}
-          <div className="absolute top-6 left-6 right-32 flex items-center gap-3 min-w-0 pointer-events-none">
-            <div className="min-w-0 rounded-full bg-black/45 border border-white/10 px-4 py-2 text-white shadow-xl">
-              <div className="max-w-[52vw] truncate text-sm font-medium">{previewTitle}</div>
-              {preview.type === 'single' && previewImageIndex >= 0 && (
-                <div className="mt-0.5 text-[11px] text-white/55 mono">
-                  {previewImageIndex + 1} / {images.length} · {isCropping ? '调整构图' : previewSourceMode === 'before' ? '原图' : previewRendering ? '正在生成预览' : '成片预览'}
-                </div>
-              )}
-            </div>
-          </div>
-          {isCropping && preview.type === 'single' && previewImageItem ? (
-            <CropEditor
-              sourceUrl={previewImageItem.previewUrl}
-              initialTransform={previewImageItem.transform}
-              landscapeFrameAspect={isReal135Mode
-                ? (settings.useFilmOverlayTemplate === false ? 3 / 2 : KODAK_GOLD_APERTURE_ASPECT)
-                : undefined}
-              onCancel={closeCropEditor}
-              onCommit={transform => {
-                if (processing || exporting) return;
-                updateImageTransform(previewImageItem.id, transform);
-                setPreviewSourceMode('after');
-                closeCropEditor();
-                setNotice({ tone: 'info', message: '构图已更新，可继续冲洗此张照片。' });
+            {images.length === 0 ? (
+              <EmptyDarkroom
+                uploadDisabled={processing || exporting}
+                onChoosePhotos={() => fileInputRef.current?.click()}
+              />
+            ) : outputMode === 'single' ? (
+              <div
+                id="workspace-panel-single"
+                role="tabpanel"
+                aria-labelledby="workspace-tab-single"
+              >
+                <ContactSheet
+                  items={contactSheetItems}
+                  removalAllowed={imageRemovalAllowed}
+                  actionsDisabled={exporting}
+                  reorderDisabled={processing || exporting}
+                  selectionDisabled={processing || exporting}
+                  draggable={!processing && !exporting}
+                  onOpen={id => setPreview({ type: 'single', imageId: id })}
+                  onRetry={id => void retryImage(id)}
+                  onToggleIncluded={toggleImageSelection}
+                  onDownload={downloadImage}
+                  onRemove={removeImage}
+                  onMove={moveImage}
+                  onDragStart={handleDragStart}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={event => handleDragOver(event)}
+                  onDragEnd={() => handleDragEnd()}
+                />
+              </div>
+            ) : (
+              <div
+                id="workspace-panel-strip"
+                role="tabpanel"
+                aria-labelledby="workspace-tab-strip"
+              >
+                <FilmStripWorkspace
+                  stage={stripStage}
+                  sequenceItems={images.map((item, index) => ({
+                    item,
+                    sequenceNumber: index + 1,
+                    selected: preview?.type === 'single' && preview.imageId === item.id,
+                  }))}
+                  includedCount={includedCount}
+                  removalAllowed={imageRemovalAllowed}
+                  actionsDisabled={processing || exporting}
+                  selectionDisabled={processing || exporting}
+                  draggable={!processing && !exporting}
+                  generateLabel={processButtonLabel}
+                  onGenerate={() => void processAll()}
+                  onPreview={currentStripResult ? () => setPreview({ type: 'strip' }) : undefined}
+                  onDownload={downloadImage}
+                  downloadFilename="film_strip"
+                  onSelectSequenceItem={id => setPreview({ type: 'single', imageId: id })}
+                  onToggleSequenceItem={toggleImageSelection}
+                  onRemove={removeImage}
+                  onMove={moveImage}
+                  onDragStart={handleDragStart}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={event => handleDragOver(event)}
+                  onDragEnd={() => handleDragEnd()}
+                />
+              </div>
+            )}
+          </Workspace>
+        )}
+        inspector={(
+          <RecipeInspector
+            {...inspectorProps}
+            className="hidden min-[1180px]:sticky min-[1180px]:top-16 min-[1180px]:flex min-[1180px]:h-[calc(100dvh-4rem)]"
+          />
+        )}
+        mobileActionBar={(
+          <MobileActionBar
+            primaryAction={mobilePrimaryAction}
+            onPrimaryAction={runPrimaryAction}
+            onOpenSettings={toggleMobileSettings}
+            settingsOpen={settingsOpen}
+            processing={processing}
+            exporting={exporting}
+            hidden={settingsOpen}
+          />
+        )}
+        overlays={(
+          <>
+            <MobileSettingsSheet
+              open={settingsOpen}
+              onClose={closeMobileSettings}
+              inspectorProps={inspectorProps}
+              moreMenuProps={{
+                onReset: resetToDefaults,
+                onOpenSupport: openSupportFromSettings,
+                onOpenPrivacy: () => setNotice({ tone: 'info', message: '照片只在当前设备处理，不会上传；刷新或关闭页面后不会保留。' }),
+                githubHref: 'https://github.com/Zeno-cc/FilmFrame',
+                resetDisabled: processing || exporting,
               }}
             />
-          ) : (
-          <>
-          <div data-preview-media className="relative flex min-h-0 w-full flex-1 items-center justify-center pt-16 md:pt-14">
-            {preview.type === 'single' && images.length > 1 && (
-              <>
-                <button
-                  onClick={() => navigatePreview('previous')}
-                  className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
-                  aria-label="上一张"
-                >
-                  <ChevronLeftIcon />
-                </button>
-                <button
-                  onClick={() => navigatePreview('next')}
-                  className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white shadow-2xl transition-colors"
-                  aria-label="下一张"
-                >
-                  <ChevronRightIcon />
-                </button>
-              </>
-            )}
-            <img
-              src={effectivePreviewSource ?? previewImageSource}
-              className={`max-h-full max-w-full object-contain transition-opacity ${previewRendering && previewSourceMode === 'after' ? 'opacity-60' : 'opacity-100'}`}
-              alt={previewTitle || 'Fullscreen preview'}
-            />
-          </div>
-          {preview.type === 'single' && previewImageItem && (
-            <div data-preview-controls className="relative z-10 mx-auto mt-3 flex w-full max-w-3xl shrink-0 flex-wrap items-center justify-center gap-3 rounded-md border border-white/10 bg-[#151515]/95 p-3 text-white shadow-2xl backdrop-blur">
-              <div className="flex rounded-md border border-white/10 bg-black/30 p-1">
-                <button type="button" onClick={() => setPreviewSourceMode('before')} className={`min-h-11 rounded px-3 text-xs ${previewSourceMode === 'before' ? 'bg-white text-black' : 'text-gray-300'}`}>原图</button>
-                <button type="button" onClick={() => setPreviewSourceMode('after')} className={`min-h-11 rounded px-3 text-xs ${previewSourceMode === 'after' ? 'bg-amber-500 text-black' : 'text-gray-300'}`}>成片</button>
-              </div>
-              <button
-                ref={cropTriggerRef}
-                type="button"
-                onClick={() => setIsCropping(true)}
-                disabled={processing || exporting}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-xs font-medium text-gray-100 hover:bg-white/10 disabled:opacity-40"
-              >
-                <CropIcon />
-                调整构图
-              </button>
-              <button
-                type="button"
-                onClick={() => updateImageTransform(previewImageItem.id, { quarterTurns: ((previewTransform.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3 })}
-                className="min-h-11 min-w-11 rounded-md border border-white/10 bg-white/5 p-2.5 text-gray-200"
-                aria-label="顺时针旋转 90 度"
-              >
-                <RotateIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => void retryImage(previewImageItem.id)}
-                disabled={processing || previewRendering}
-                className="min-h-11 rounded-md bg-amber-500 px-4 text-xs font-bold text-black disabled:opacity-40"
-              >
-                应用并冲洗此张
-              </button>
-            </div>
-          )}
-          </>
-          )}
-        </div>
-      )}
 
-      {/* Error Modal */}
-      {errorMsg && (
-        <div ref={dialogRootRef} role="dialog" aria-modal="true" aria-labelledby="error-dialog-title" className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#181818] border border-red-500/20 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
-            <button 
-                ref={dialogCloseRef}
-                onClick={() => setErrorMsg(null)}
-                aria-label="关闭错误提示"
-                className="absolute top-3 right-3 inline-flex min-h-11 min-w-11 items-center justify-center text-gray-500 hover:text-white transition-colors"
-            >
-                <CloseIcon />
-            </button>
-            <div className="flex flex-col items-center text-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                    <AlertCircleIcon />
-                </div>
-                <div>
-                    <h3 id="error-dialog-title" className="text-lg font-bold text-white mb-2">需要处理</h3>
-                    <p className="text-sm text-gray-400 whitespace-pre-line leading-relaxed">
-                        {errorMsg}
-                    </p>
-                </div>
-                <button 
-                    onClick={() => setErrorMsg(null)}
-                    className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors"
-                >
-                    我知道了
-                </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Donate Modal */}
-      {showDonate && (
-        <div 
-          ref={dialogRootRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="donate-dialog-title"
-          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setShowDonate(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl relative transform transition-all scale-100"
-            onClick={e => e.stopPropagation()}
-          >
-             <button 
-                ref={dialogCloseRef}
-                onClick={() => setShowDonate(false)}
-                aria-label="关闭赞助窗口"
-                className="absolute top-3 right-3 inline-flex min-h-11 min-w-11 items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
-              >
-                <CloseIcon />
-              </button>
-             
-             <div className="text-center mb-4">
-                <div className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center mx-auto text-pink-500 mb-2">
-                   <CoffeeIcon />
-                </div>
-                <h3 id="donate-dialog-title" className="text-lg font-bold text-gray-800">请作者喝一杯奶茶</h3>
-                <p className="text-xs text-gray-500 mt-1">感谢您对 FilmFrame 的支持！❤️</p>
-             </div>
-
-             <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden min-h-[250px]">
-                <img 
-                  src="/alipay.jpg" 
-                  alt="Donation QR Code" 
-                  className="w-full h-auto rounded-lg object-contain max-h-[400px]" 
+            <PreviewDialog
+              open={Boolean(preview && previewImageSource && !errorMsg && !showDonate)}
+              mode={preview?.type ?? 'single'}
+              title={previewTitle}
+              source={previewImageSource}
+              beforeSource={previewImageItem?.previewUrl}
+              afterSource={previewAfterSource}
+              sourceMode={previewSourceMode}
+              onSourceModeChange={setPreviewSourceMode}
+              index={previewImageIndex >= 0 ? previewImageIndex : undefined}
+              total={preview?.type === 'single' ? images.length : undefined}
+              onClose={() => {
+                if (isCropping) closeCropEditor();
+                else setPreview(null);
+              }}
+              onPrevious={() => navigatePreview('previous')}
+              onNext={() => navigatePreview('next')}
+              canNavigate={preview?.type === 'single' && images.length > 1}
+              downloadHref={previewDownload?.href}
+              downloadName={previewDownload?.download}
+              onShare={previewImageArtifact ? () => void shareCurrentPreview() : undefined}
+              canShare={Boolean(previewImageArtifact)}
+              onCrop={previewImageItem && !processing && !exporting ? () => setIsCropping(true) : undefined}
+              cropTriggerRef={cropTriggerRef}
+              onRotate={previewImageItem && !processing && !exporting
+                ? () => updateImageTransform(previewImageItem.id, {
+                    quarterTurns: ((previewTransform.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3,
+                  })
+                : undefined}
+              onApply={previewImageItem && !processing && !exporting
+                ? () => void retryImage(previewImageItem.id)
+                : undefined}
+              isCropping={isCropping}
+              previewRendering={previewRendering}
+              cropContent={previewImageItem ? (
+                <CropEditor
+                  sourceUrl={previewImageItem.previewUrl}
+                  initialTransform={previewImageItem.transform}
+                  landscapeFrameAspect={isReal135Mode
+                    ? (settings.useFilmOverlayTemplate === false ? 3 / 2 : KODAK_GOLD_APERTURE_ASPECT)
+                    : undefined}
+                  onCancel={closeCropEditor}
+                  onCommit={transform => {
+                    if (processing || exporting) return;
+                    updateImageTransform(previewImageItem.id, transform);
+                    setPreviewSourceMode('after');
+                    closeCropEditor();
+                    setNotice({ tone: 'info', message: '构图已更新，可继续冲洗此张照片。' });
+                  }}
                 />
-             </div>
-             
-             <p className="text-center text-[10px] text-gray-400 mt-4">
-                推荐使用支付宝扫码
-             </p>
-          </div>
-        </div>
-      )}
-    </div>
+              ) : undefined}
+            />
+
+            {notice && (
+              <DarkroomNoticeToast
+                key={notice.tone + ':' + notice.message}
+                tone={notice.tone}
+                message={notice.message}
+                onDismiss={dismissNotice}
+              />
+            )}
+            <ErrorDialog
+              open={Boolean(errorMsg)}
+              message={errorMsg ?? ''}
+              onClose={() => setErrorMsg(null)}
+            />
+            <SupportDialog
+              open={showDonate}
+              onClose={() => setShowDonate(false)}
+            />
+          </>
+        )}
+      />
+    </>
   );
 };
 

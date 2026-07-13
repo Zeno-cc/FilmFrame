@@ -1,6 +1,6 @@
 import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
-import { drawKodakGoldFrameNumbers, getFrameNumberForIndex } from './filmFrameNumber';
+import { drawKodakGoldFrameNumbers, getFrameNumberForImage } from './filmFrameNumber';
 import {
   createKodakGoldOverlayLayout,
   createKodakGoldStripLayout,
@@ -601,8 +601,9 @@ async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): 
       ctx.strokeRect(imageX, imageY, layout.frame.imageW, layout.frame.imageH);
       ctx.restore();
 
-      const frameNumber = getFrameNumberForIndex(
+      const frameNumber = getFrameNumberForImage(
         settings.frameNumber,
+        images[index],
         index,
         settings.maxRollFrames ?? 36,
       );

@@ -93,6 +93,19 @@ npm run build
 
 构建产物位于 `dist` 目录，可直接部署至 Vercel, Netlify 或任何静态服务器。
 
+### 4. 验证
+
+```bash
+npm run check
+npm run test:e2e
+```
+
+`npm run check` 会依次执行 Vitest、TypeScript 和生产构建；`npm run test:e2e` 使用 Playwright 检查桌面、平板和移动端的关键暗房流程。
+
+## 🖥️ 界面与工作流
+
+FilmFrame 使用本地数字暗房工作流：选片、排序、选择配方、冲洗、审片与导出。桌面端将接触印样工作区置于左侧、暗房配方置于右侧；平板以右侧抽屉呈现设置，手机使用底部 Sheet。照片只在当前浏览器中处理，不会上传到 FilmFrame 服务。
+
 ### Zeabur 部署
 
 Zeabur 上选择从 GitHub 仓库部署即可：

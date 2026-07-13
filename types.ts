@@ -67,6 +67,15 @@ export interface ImageItem {
   id: string;
   file: File;
   previewUrl: string;
+  /** Session-only batch curation state. New uploads always start included. */
+  included: boolean;
+  /** Natural dimensions recorded after the upload preview has decoded successfully. */
+  sourceWidth: number;
+  sourceHeight: number;
+  /** Current full-roll position attached only to a strip render request. */
+  rollIndex?: number;
+  /** Byte size captured when the current render artifact is created. */
+  processedByteSize?: number;
   processedUrl?: string;
   processedMime?: OutputFormat;
   processedSettingsKey?: string;

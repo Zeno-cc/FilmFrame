@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { RenderTransform } from '../types';
 import {
+  changeZoomPreservingPoint,
   changeZoomPreservingView,
   createCoverPlacement,
   getVisibleFrameAspect,
   normalizeRenderTransform,
   type NormalizedRenderTransform,
 } from '../services/renderTransform';
+import { ResetIcon, RotateCwIcon } from './icons/FilmFrameIcons';
+import { Button, IconButton } from './ui';
 
 type Size = { width: number; height: number };
 
@@ -18,11 +21,21 @@ interface CropEditorProps {
   onCommit: (transform: NormalizedRenderTransform) => void;
 }
 
-const RotateIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>;
-const ResetIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>;
-
 function clamp(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+function formatAspect(aspect: number): string {
+  if (!Number.isFinite(aspect) || aspect <= 0) return '—';
+  const known = [
+    [1, '1:1'],
+    [4 / 3, '4:3'],
+    [3 / 2, '3:2'],
+    [16 / 9, '16:9'],
+  ] as const;
+  const match = known.find(([ratio]) => Math.abs(aspect - ratio) < 0.01);
+  if (match) return match[1];
+  return aspect >= 1 ? `${aspect.toFixed(2)}:1` : `1:${(1 / aspect).toFixed(2)}`;
 }
 
 function imageTransform(placement: ReturnType<typeof createCoverPlacement>): string | undefined {
@@ -40,6 +53,9 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
   const [stageSize, setStageSize] = useState<Size>({ width: 0, height: 0 });
   const stageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef(draft);
+  const imageSizeRef = useRef<Size | null>(imageSize);
+  const viewportSizeRef = useRef<Size>({ width: 0, height: 0 });
   const dragRef = useRef<{
     pointerId: number;
     x: number;
@@ -68,12 +84,53 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
   const numericAspect = imageSize
     ? getVisibleFrameAspect(imageSize.width, imageSize.height, draft.quarterTurns, landscapeFrameAspect)
     : landscapeFrameAspect ?? 1.5;
+  const sourceAspect = imageSize
+    ? getVisibleFrameAspect(imageSize.width, imageSize.height, draft.quarterTurns)
+    : null;
   const aspectRatio = String(numericAspect);
   const viewportSize = useMemo(() => {
     if (stageSize.width === 0 || stageSize.height === 0) return { width: 0, height: 0 };
     const width = Math.min(stageSize.width - 8, (stageSize.height - 8) * numericAspect);
     return { width: Math.max(0, width), height: Math.max(0, width / numericAspect) };
   }, [numericAspect, stageSize]);
+  draftRef.current = draft;
+  imageSizeRef.current = imageSize;
+  viewportSizeRef.current = viewportSize;
+
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      const currentImageSize = imageSizeRef.current;
+      const currentViewportSize = viewportSizeRef.current;
+      if (!currentImageSize || currentViewportSize.width <= 0 || currentViewportSize.height <= 0) return;
+
+      event.preventDefault();
+      const deltaPixels = event.deltaY * (
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? currentViewportSize.height
+            : 1
+      );
+      const nextZoom = draftRef.current.zoom * Math.exp(-deltaPixels * 0.0015);
+      const bounds = element.getBoundingClientRect();
+      setDraft(changeZoomPreservingPoint(
+        currentImageSize.width,
+        currentImageSize.height,
+        currentViewportSize.width,
+        currentViewportSize.height,
+        draftRef.current,
+        nextZoom,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      ));
+    };
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, []);
   const placement = useMemo(() => {
     if (!imageSize || viewportSize.width === 0 || viewportSize.height === 0) return null;
     return createCoverPlacement(
@@ -84,6 +141,10 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
       draft,
     );
   }, [draft, imageSize, viewportSize]);
+  const canPan = Boolean(placement && (
+    placement.drawWidth - viewportSize.width > 0.5
+    || placement.drawHeight - viewportSize.height > 0.5
+  ));
 
   const nudge = (deltaX: number, deltaY: number) => {
     setDraft(current => normalizeRenderTransform({
@@ -94,7 +155,9 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!placement) return;
+    if (event.button !== 0) return;
+    event.currentTarget.focus({ preventScroll: true });
+    if (!placement || !canPan) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,
@@ -128,20 +191,36 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
   };
 
   return (
-    <div data-crop-editor className="flex min-h-0 w-full flex-1 flex-col items-center pt-16 md:pt-14">
-      <div className="mb-2 flex w-full max-w-4xl items-center justify-between px-1 text-white">
+    <section data-crop-editor className="mx-auto flex h-full min-h-0 w-full max-w-[1180px] flex-1 flex-col gap-3 py-1 md:py-2">
+      <header className="flex shrink-0 items-center justify-between px-1">
         <div>
-          <h2 className="text-sm font-semibold">调整构图</h2>
+          <p className="font-mono text-[10px] text-[var(--ff-amber)]" aria-hidden="true">FRAME · CROP</p>
+          <h2 className="mt-1 text-sm font-semibold text-[var(--ff-paper)]">调整构图</h2>
+          <div data-crop-aspect className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--ff-paper-dim)]">
+            <span>照片 {sourceAspect ? formatAspect(sourceAspect) : '加载中'}</span>
+            {typeof landscapeFrameAspect === 'number' && (
+              <>
+                <span aria-hidden="true">→</span>
+                <span>片窗 {formatAspect(numericAspect)}</span>
+              </>
+            )}
+          </div>
         </div>
-        <output className="mono text-xs text-white/60" aria-live="polite">{Math.round(draft.zoom * 100)}%</output>
-      </div>
+        <output className="font-mono text-xs text-[var(--ff-paper-muted)]" aria-live="polite">{Math.round(draft.zoom * 100)}%</output>
+      </header>
 
-      <div ref={stageRef} className="flex min-h-0 w-full flex-1 items-center justify-center px-1">
+      <div
+        ref={stageRef}
+        data-crop-stage
+        className="relative flex min-h-[180px] w-full flex-1 items-center justify-center overflow-hidden rounded-[6px] border border-[var(--ff-line-soft)] bg-[var(--ff-bg-deep)] px-1 py-1 md:min-h-[260px]"
+      >
         <div
           ref={viewportRef}
           role="region"
           tabIndex={0}
-          aria-label="裁切预览，拖动照片或使用方向键调整位置"
+          aria-label={canPan
+            ? '裁切预览，拖动照片、滚轮缩放或使用方向键调整位置'
+            : '裁切预览，当前构图已居中；放大后可拖动照片'}
           data-crop-viewport
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -156,7 +235,7 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
             else return;
             event.preventDefault();
           }}
-          className="crop-viewport relative shrink-0 cursor-grab touch-none overflow-hidden border border-white/70 bg-[#090909] shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:cursor-grabbing"
+          className={`crop-viewport relative shrink-0 touch-none overflow-hidden border border-[var(--ff-paper)] bg-[var(--ff-bg-deep)] shadow-[0_12px_32px_rgba(0,0,0,.34)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ff-focus)] ${canPan ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
           style={{ aspectRatio, width: viewportSize.width, height: viewportSize.height }}
         >
           <img
@@ -173,21 +252,25 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
               top: placement.offsetY,
               width: imageSize.width * placement.scale,
               height: imageSize.height * placement.scale,
+              // The global responsive-image rule must not clamp only the width.
+              // Crop scaling owns both dimensions so the source aspect stays intact.
+              maxWidth: 'none',
+              maxHeight: 'none',
               transform: imageTransform(placement),
               transformOrigin: '0 0',
             } : { opacity: 0 }}
           />
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
             {Array.from({ length: 9 }, (_, index) => (
-              <span key={index} className="border-[0.5px] border-white/35" />
+              <span key={index} className="border-[0.5px] border-[var(--ff-paper)]/25" />
             ))}
           </div>
         </div>
       </div>
 
-      <div data-preview-controls className="relative z-10 mx-auto mt-3 flex w-full max-w-4xl shrink-0 flex-wrap items-center gap-2 rounded-md border border-white/10 bg-[#151515]/95 p-3 text-white shadow-2xl backdrop-blur" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
-        <label className="flex min-h-11 min-w-[180px] flex-1 items-center gap-3 text-xs text-white/70">
-          <span className="shrink-0">缩放</span>
+      <footer data-crop-controls className="mx-auto flex w-full max-w-[900px] shrink-0 flex-col gap-2 rounded-[6px] border border-[var(--ff-line)] bg-[var(--ff-panel)] p-2.5 text-[var(--ff-paper)] shadow-[0_12px_32px_rgba(0,0,0,.28)] sm:flex-row sm:flex-wrap sm:items-center" style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}>
+        <label className="flex min-h-11 min-w-[180px] flex-1 items-center gap-3 text-xs text-[var(--ff-paper-muted)]">
+          <span className="shrink-0">等比放大</span>
           <input
             type="range"
             min="1"
@@ -208,27 +291,29 @@ export default function CropEditor({ sourceUrl, initialTransform, landscapeFrame
                   )
                 : normalizeRenderTransform({ ...current, zoom: nextZoom }));
             }}
-            className="h-11 w-full accent-amber-500"
+            className="h-11 w-full accent-[var(--ff-amber)]"
           />
         </label>
-        <button
-          type="button"
-          onClick={() => setDraft(current => normalizeRenderTransform({ ...current, quarterTurns: ((current.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3 }))}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200"
-          aria-label="顺时针旋转 90 度"
-          title="旋转"
-        ><RotateIcon /></button>
-        <button
-          type="button"
-          onClick={() => setDraft(current => normalizeRenderTransform({ ...DEFAULT_POSITION, quarterTurns: current.quarterTurns }))}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200"
-          aria-label="重置构图"
-          title="重置构图"
-        ><ResetIcon /></button>
-        <button type="button" onClick={onCancel} className="min-h-11 rounded-md px-4 text-xs text-white/70 hover:bg-white/5">取消</button>
-        <button type="button" onClick={() => onCommit(draft)} className="min-h-11 rounded-md bg-amber-500 px-5 text-xs font-bold text-black">完成</button>
-      </div>
-    </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <IconButton
+            icon={<RotateCwIcon />}
+            label="顺时针旋转 90 度"
+            title="旋转 90°"
+            onClick={() => setDraft(current => normalizeRenderTransform({ ...current, quarterTurns: ((current.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3 }))}
+          />
+          <IconButton
+            icon={<ResetIcon />}
+            label="重置位置"
+            onClick={() => setDraft(current => normalizeRenderTransform({ ...DEFAULT_POSITION, quarterTurns: current.quarterTurns }))}
+            title="重置位置"
+          />
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-2">
+          <Button variant="ghost" onClick={onCancel}>取消</Button>
+          <Button variant="primary" onClick={() => onCommit(draft)}>完成</Button>
+        </div>
+      </footer>
+    </section>
   );
 }
 

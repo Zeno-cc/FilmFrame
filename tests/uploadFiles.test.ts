@@ -47,8 +47,23 @@ describe('uploaded image preparation', () => {
     expect(result.images[0].id).toBe('id-scan 01.jpg');
     expect(result.images[0].previewUrl).toBe('blob:scan 01.jpg');
     expect(result.images[0].exifDate).toBe('2026/04/29');
+    expect(result.images[0]).toMatchObject({
+      included: true,
+      sourceWidth: 3000,
+      sourceHeight: 2000,
+    });
     expect(result.images[1].file.name).toBe('scan 02.webp');
+    expect(result.images[1]).toMatchObject({
+      included: true,
+      sourceWidth: 3000,
+      sourceHeight: 2000,
+    });
     expect(result.images[2].file.name).toBe('huge.png');
+    expect(result.images[2]).toMatchObject({
+      included: true,
+      sourceWidth: LARGE_IMAGE_EDGE + 1,
+      sourceHeight: 4000,
+    });
     expect(result.errors).toHaveLength(5);
     expect(result.errors.join('\n')).toContain('"notes.txt"');
     expect(result.errors.join('\n')).toContain('"vector.svg"');
@@ -85,6 +100,27 @@ describe('uploaded image preparation', () => {
     expect(revokeObjectUrl).toHaveBeenCalledOnce();
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:corrupt');
     expect(warn).toHaveBeenCalledWith('Image dimension check failed', expect.any(Error));
+    warn.mockRestore();
+  });
+
+  it('rejects and revokes images when a decoder returns invalid natural dimensions', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const revokeObjectUrl = vi.fn();
+    const result = await prepareUploadedImages(
+      [{ name: 'zero-width.jpg', size: 1000, type: 'image/jpeg' }] as TestFile[],
+      {
+        createId: () => 'id-zero-width',
+        createObjectUrl: () => 'blob:zero-width',
+        readImageSize: async () => ({ width: 0, height: 800 }),
+        readExifDate: async () => '',
+        revokeObjectUrl,
+      },
+    );
+
+    expect(result.images).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('zero-width.jpg');
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:zero-width');
     warn.mockRestore();
   });
 

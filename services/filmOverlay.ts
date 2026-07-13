@@ -1,4 +1,7 @@
+import { FilmType } from '../types';
+
 export const KODAK_GOLD_OVERLAY_URL = '/film-overlays/kodak-gold-200.png';
+export const KODAK_PORTRA_160_OVERLAY_URL = '/film-overlays/kodak-portra-160.png';
 export const KODAK_GOLD_BASE_URL = '/film-overlays/film-base.png';
 export const KODAK_GOLD_APERTURE_MASK_URL = '/film-overlays/aperture-mask-derived.png';
 export const KODAK_GOLD_APERTURE_SHADOW_URL = '/film-overlays/aperture-shadow-derived.png';
@@ -6,6 +9,19 @@ export const KODAK_GOLD_APERTURE_SHADOW_URL = '/film-overlays/aperture-shadow-de
 const TEMPLATE_W = 1307;
 const TEMPLATE_H = 1203;
 export const KODAK_GOLD_APERTURE_ASPECT = 1123 / 800;
+
+export const REAL135_TEMPLATE_URLS: Partial<Record<FilmType, string>> = {
+  [FilmType.KODAK_GOLD_200]: KODAK_GOLD_OVERLAY_URL,
+  [FilmType.KODAK_PORTRA_160]: KODAK_PORTRA_160_OVERLAY_URL,
+};
+
+export function getReal135OverlayUrl(brand: FilmType): string | undefined {
+  return REAL135_TEMPLATE_URLS[brand];
+}
+
+export function supportsReal135Template(brand: FilmType): boolean {
+  return Boolean(getReal135OverlayUrl(brand));
+}
 
 const APERTURE = {
   x: 92 / TEMPLATE_W,
@@ -27,6 +43,20 @@ export interface KodakGoldOverlayLayout {
 }
 
 export interface KodakGoldStripLayout {
+  frame: KodakGoldOverlayLayout;
+  frameStride: number;
+  frameGap: number;
+  rowGap: number;
+  padding: number;
+  maxPerRow: number;
+  cols: number;
+  rows: number;
+  rowFilmW: number;
+  totalW: number;
+  totalH: number;
+}
+
+export interface FilmTemplateStripLayout {
   frame: KodakGoldOverlayLayout;
   frameStride: number;
   frameGap: number;
@@ -93,6 +123,43 @@ export function createKodakGoldStripLayout(
     rowFilmW,
     totalW,
     totalH,
+  };
+}
+
+/**
+ * Layout for flattened single-frame templates. Each frame keeps its complete
+ * rebate and touches the next frame, so the strip reads as one continuous roll.
+ */
+export function createFilmTemplateStripLayout(
+  targetImageWidthPx: number,
+  frameCount: number,
+  maxPerRow = 4,
+): FilmTemplateStripLayout {
+  const frame = createKodakGoldOverlayLayout(targetImageWidthPx);
+  const safeCount = Math.max(1, frameCount);
+  const safeMaxPerRow = Math.max(1, maxPerRow);
+  const cols = Math.min(safeCount, safeMaxPerRow);
+  const rows = Math.ceil(safeCount / safeMaxPerRow);
+  // The generated template already contains the full rebate. Do not add a
+  // second inter-frame gutter or each frame will look like a separate card.
+  const frameGap = 0;
+  const frameStride = frame.filmW + frameGap;
+  const rowFilmW = cols * frame.filmW + Math.max(0, cols - 1) * frameGap;
+  const rowGap = Math.round(frame.filmH * 0.08);
+  const padding = Math.round(frame.filmW * 0.035);
+
+  return {
+    frame,
+    frameStride,
+    frameGap,
+    rowGap,
+    padding,
+    maxPerRow: safeMaxPerRow,
+    cols,
+    rows,
+    rowFilmW,
+    totalW: padding * 2 + rowFilmW,
+    totalH: padding * 2 + rows * frame.filmH + Math.max(0, rows - 1) * rowGap,
   };
 }
 

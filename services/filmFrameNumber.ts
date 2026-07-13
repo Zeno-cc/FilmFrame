@@ -19,6 +19,19 @@ export function getFrameNumberForIndex(
   return normalizeFrameNumber(startFrameNumber + index, maxRollFrames);
 }
 
+export function getFrameNumberForImage(
+  startFrameNumber: number,
+  image: { rollIndex?: number },
+  fallbackIndex: number,
+  maxRollFrames = 36,
+): number {
+  return getFrameNumberForIndex(
+    startFrameNumber,
+    image.rollIndex ?? fallbackIndex,
+    maxRollFrames,
+  );
+}
+
 export function getKodakGoldFrameNumberPositions(layout: KodakGoldOverlayLayout) {
   return {
     topCenterX: layout.filmW * 0.5,

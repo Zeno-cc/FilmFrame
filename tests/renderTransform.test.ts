@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RENDER_TRANSFORM,
+  changeZoomPreservingPoint,
   changeZoomPreservingView,
   createCoverPlacement,
   createRenderTransformKey,
@@ -101,6 +102,24 @@ describe('cover placement', () => {
 
     expect(next.zoom).toBe(2);
     expect(afterCenter).toBeCloseTo(beforeCenter);
+  });
+
+  it('preserves the source point under the wheel cursor while zooming', () => {
+    const current = { focusX: 0.4, focusY: 0.6, zoom: 1.25, quarterTurns: 0 } as const;
+    const before = createCoverPlacement(400, 300, 300, 200, current);
+    const next = changeZoomPreservingPoint(400, 300, 300, 200, current, 2, 70, 150);
+    const after = createCoverPlacement(400, 300, 300, 200, next);
+    const sourcePointBefore = {
+      x: (-before.offsetX + 70) / before.scale,
+      y: (-before.offsetY + 150) / before.scale,
+    };
+    const sourcePointAfter = {
+      x: (-after.offsetX + 70) / after.scale,
+      y: (-after.offsetY + 150) / after.scale,
+    };
+
+    expect(sourcePointAfter.x).toBeCloseTo(sourcePointBefore.x);
+    expect(sourcePointAfter.y).toBeCloseTo(sourcePointBefore.y);
   });
 
   it('shows 4:3 source overflow inside a 3:2 crop aperture', () => {

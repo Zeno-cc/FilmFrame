@@ -1,6 +1,6 @@
 # 产品与用户流程
 
-> 最后核验：2026-07-12。主要证据：`App.tsx`、`types.ts`、`services/workflowState.ts`、`services/renderTransform.ts`、上传/预览/配方/分享服务。
+> 最后核验：2026-07-13。主要证据：`App.tsx`、`types.ts`、`services/workflowState.ts`、`services/renderTransform.ts`、上传/预览/配方/分享服务。
 
 ## 产品边界
 
@@ -13,25 +13,24 @@ FilmFrame 是一个浏览器内数字暗房，不是图库或云服务。它处�
 应用只有一个 `App` 根组件和一个页面：
 
 ```text
-桌面：左侧 320px 设置栏 | 右侧工作室
-移动：工作室在上          | 设置默认收起并位于下方 | 底部固定主操作
+Desktop (>=1180px): Header + Workspace | sticky Recipe Inspector
+Tablet (768-1179px): Header + Workspace + right-side Settings Drawer
+Mobile (<768px): compact Header + Workspace + fixed action bar + bottom Settings Sheet
 
-左侧设置栏
-  品牌和 Logo
-  GitHub 外链 / 捐赠按钮
-  单张卡片 / 连底长条切换
-  胶片配置
-  视觉与输出
-  主处理按钮
+Header
+  品牌、当前胶卷摘要、添加照片、当前可用时的导出、更多操作
 
-右侧工作室
-  标题、说明、下载、添加图片
-  空上传区 / 图片网格 / 长条结果
+Workspace
+  接触印象 / 连底长条 Tab
+  标题、说明、添加/导出动作
+  空暗房、照片接触印样或长条审片台
+
+Recipe Inspector / Settings Sheet
+  胶片与片边、输出、配方
+  固定主冲洗动作
 
 覆盖层
-  全屏预览
-  错误与警告
-  捐赠二维码
+  全屏审片与构图、错误、支持二维码 fallback、操作提示
 ```
 
 无导航路由、面包屑、全局菜单或命令面板。
@@ -52,6 +51,8 @@ FilmFrame 是一个浏览器内数字暗房，不是图库或云服务。它处�
 | 模板 | 启用 |
 
 首次渲染前，`loadPreferences()` 会尝试从 `filmFrame.preferences.v1` 合并合法偏好。图片、预览状态、错误和结果不恢复。
+
+Header 的“更多操作”内“恢复默认设置”会恢复默认 FilmSettings 并切回单张模式，同时清除当前配方选中状态；照片、已保存的本地配方和会话文件不会被删除。冲洗或导出期间重置不可用。
 
 ## 核心用户旅程
 
@@ -80,11 +81,13 @@ FilmFrame 是一个浏览器内数字暗房，不是图库或云服务。它处�
 - 长条中的视觉顺序；
 - ZIP 文件前缀序号。
 
+新导入照片默认入选。卡片和长条序列可逐张取消/恢复入选，工具栏支持全部入选和清空；单张冲洗、长条与 ZIP 只使用入选子集，但未入选照片仍可预览、排序、裁切和单独下载已有成片。
+
 桌面保留原生拖拽；所有视口都提供上移/下移按钮，首尾边界禁用。卡片查看、重试、下载和删除在触屏下常驻可用。
 
 ### 3. 选择胶片与边框
 
-`types.ts` 定义 16 种 `FilmType`。只有 Kodak Gold 200 显示“真实135/经典边框”选择；切换到其他胶片时 effect 会强制 `frameRenderMode='classic'`，并按预设覆盖 `textColor` 与孔型。
+`types.ts` 定义 16 种 `FilmType`。模板注册表中的 Kodak Gold 200 与 Kodak Portra 160 显示“真实135/经典边框”选择；切换到未注册胶片时 effect 会强制 `frameRenderMode='classic'`，并按预设覆盖 `textColor` 与孔型。
 
 真实 135 模式隐藏：自定义文字、日期开关、孔型、颜色和边框尺寸。模板化真实单张主要响应帧号、颗粒、质量、格式、处理模式和扫描输出。
 
@@ -109,13 +112,13 @@ FilmFrame 是一个浏览器内数字暗房，不是图库或云服务。它处�
 
 ### 5. 生成长条
 
-长条把全部图片一次性送入渲染器。真实 135 每行最多 4 帧；主线程经典长条每行最多 6 帧。图片数组任何变化都会清除长条结果。
+长条把入选图片按当前整卷顺序送入渲染器，并保留其原卷帧号。真实 135 每行最多 4 帧；主线程经典长条每行最多 6 帧。选片、设置或顺序变化会让旧长条变 stale，但不会提前释放旧结果。
 
-长条保存 MIME 和“设置 + 有序图片 ID”签名。切换设置、增删或重排后旧结果会变 stale，不再显示或下载；晚到旧结果会直接回收。
+长条保存 MIME、Blob 字节数和“设置 + 有序图片 ID + 原卷位置”签名。切换设置、选片、增删或重排后旧结果会变 stale，不再作为 current 下载；晚到旧结果会直接回收。
 
 ### 6. 预览
 
-单张卡片打开编辑预览，提供原图/成片切换、`调整构图`、顺时针 90 度旋转和“应用并冲洗此张”。裁切器使用固定片窗与本地草稿：拖动照片调整连续位置，滑杆在 100%-300% 缩放，支持旋转、重置、取消和完成；只有完成才提交 transform。设置或 transform 变化后，300ms debounce 生成临时 preview 成片；临时 URL 与正式结果分离。只有 current 正式成片提供下载或系统分享。
+单张卡片打开编辑预览，提供原图/成片切换、`调整构图`、顺时针 90 度旋转和“应用并冲洗此张”。裁切器使用固定片窗与本地草稿：拖动照片调整连续位置，滑杆或鼠标滚轮在 100%-300% 缩放；滚轮缩放保持指针下的画面位置。支持旋转、重置、取消和完成，只有完成才提交 transform。设置或 transform 变化后，300ms debounce 生成临时 preview 成片；临时 URL 与正式结果分离。只有 current 正式成片提供下载或系统分享。
 
 ### 7. 配方与分享
 
@@ -144,6 +147,7 @@ ZIP 文件项：`01_清洗后的原名.jpg`。ZIP 本身：`filmframe_YYYYMMDD_H
 | 全局失败 | “需要处理”dialog，逐项说明并保留重试/移除路径 |
 | 大图 | 非阻塞 warning，文件仍已加入 |
 | 无结果 | 下载按钮隐藏；主处理按钮随图片数量变化 |
+| 操作反馈 | 右上角悬浮 Toast，渐入后保持展示，4 秒内渐出关闭，也可手动关闭 |
 
 支持停止后续但不承诺中断当前 Canvas；没有暂停、后台队列或虚假时间估算。ZIP 有独立 `x/n` 打包状态和重复触发 gate。
 
@@ -155,16 +159,16 @@ ZIP 文件项：`01_清洗后的原名.jpg`。ZIP 本身：`filmframe_YYYYMMDD_H
 
 HTML 为 `zh-CN`，中文硬编码为主，混合英文品牌和术语。没有 i18n 框架。
 
-界面使用深黑/灰工作台与琥珀强调色。大部分 Tailwind utility 直接写在 `App.tsx`；`styles.css` 仅负责 Tailwind 导入、全局字体、背景和 WebKit 滚动条。Logo、favicon 和图标均是手写内联 SVG；未使用图标库。
+界面使用深黑/灰工作台与琥珀强调色。视觉 token 位于 `styles/tokens.css`，全局基础样式和组件样式分别位于 `styles/base.css`、`styles/components.css`，并由 `styles.css` 引入。展示层拆分到 `components/app`、`components/workspace`、`components/settings`、`components/preview`、`components/feedback` 和 `components/mobile`；`App.tsx` 保留状态和工作流编排。图标集中在 `components/icons/FilmFrameIcons.tsx`，未引入图标库。
 
 ## 当前行为契约表
 
 | 能力 | classic single | classic strip | real135 single | real135 strip |
 | --- | --- | --- | --- | --- |
-| 支持胶片 | 全部预设 | 全部预设 | UI 仅 Gold 200 | UI 仅 Gold 200 |
+| 支持胶片 | 全部预设 | 全部预设 | UI 为 Gold 200、Portra 160 | UI 为 Gold 200、Portra 160 |
 | 自定义文字 | 是 | 是 | 模板路径否 | 否 |
 | EXIF 日期 | `showDate` 时 | `showDate` 时 | 否 | 否 |
 | 起始帧号 | 是，App 先循环 | 主线程直接递增 | 是，规范化 | 是，规范化 |
 | 原图尺寸输出 | 基本是 | 否，固定布局 | 否，1200/1800-3600 | 否，900/1400 |
 | 竖图处理 | 竖向边框 | 旋入帧 | 旋入后单张旋回 | 旋入横向帧 |
-| Worker | 否，暂固定主线程 | 否，暂固定主线程 | Gold 模板时 | Gold 模板时 |
+| Worker | 否，暂固定主线程 | 否，暂固定主线程 | 仅 Gold 模板；Portra 主线程 | 仅 Gold 模板；Portra 主线程 |
