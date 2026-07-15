@@ -87,7 +87,7 @@ Header 的“更多操作”内“恢复默认设置”会恢复默认 FilmSetti
 
 ### 3. 选择胶片与边框
 
-`types.ts` 定义 16 种 `FilmType`。模板注册表中的 Kodak Gold 200 与 Kodak Portra 160 显示“真实135/经典边框”选择；切换到未注册胶片时 effect 会强制 `frameRenderMode='classic'`，并按预设覆盖 `textColor` 与孔型。
+`types.ts` 定义 16 种 `FilmType`，并全部注册了真实 135 模板，因此每款胶片都显示“真实135/经典边框”选择。若未来加入未注册胶片，切换时 effect 会强制 `frameRenderMode='classic'`，并按预设覆盖 `textColor` 与孔型。
 
 真实 135 模式隐藏：自定义文字、日期开关、孔型、颜色和边框尺寸。模板化真实单张主要响应帧号、颗粒、质量、格式、处理模式和扫描输出。
 
@@ -165,10 +165,10 @@ HTML 为 `zh-CN`，中文硬编码为主，混合英文品牌和术语。没有 
 
 | 能力 | classic single | classic strip | real135 single | real135 strip |
 | --- | --- | --- | --- | --- |
-| 支持胶片 | 全部预设 | 全部预设 | UI 为 Gold 200、Portra 160 | UI 为 Gold 200、Portra 160 |
+| 支持胶片 | 全部预设 | 全部预设 | 全部 16 款 | 全部 16 款 |
 | 自定义文字 | 是 | 是 | 模板路径否 | 否 |
 | EXIF 日期 | `showDate` 时 | `showDate` 时 | 否 | 否 |
 | 起始帧号 | 是，App 先循环 | 主线程直接递增 | 是，规范化 | 是，规范化 |
 | 原图尺寸输出 | 基本是 | 否，固定布局 | 否，1200/1800-3600 | 否，900/1400 |
 | 竖图处理 | 竖向边框 | 旋入帧 | 旋入后单张旋回 | 旋入横向帧 |
-| Worker | 否，暂固定主线程 | 否，暂固定主线程 | 仅 Gold 模板；Portra 主线程 | 仅 Gold 模板；Portra 主线程 |
+| Worker | 否，暂固定主线程 | 否，暂固定主线程 | 仅 Gold 模板；其余主线程 | 仅 Gold 模板；其余主线程 |

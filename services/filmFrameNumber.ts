@@ -43,6 +43,39 @@ export function getKodakGoldFrameNumberPositions(layout: KodakGoldOverlayLayout)
   };
 }
 
+export function getFilmTemplateFrameNumberMark(
+  layout: KodakGoldOverlayLayout,
+  frameNumber: number,
+  maxRollFrames = 36,
+) {
+  return {
+    text: String(normalizeFrameNumber(frameNumber, maxRollFrames)),
+    x: layout.filmW * 0.5,
+    y: layout.imageY * 0.78,
+  };
+}
+
+export function drawFilmTemplateFrameNumber(
+  ctx: CanvasRenderingContext2D,
+  layout: KodakGoldOverlayLayout,
+  settings: FilmSettings,
+) {
+  const mark = getFilmTemplateFrameNumberMark(
+    layout,
+    settings.frameNumber,
+    settings.maxRollFrames ?? 36,
+  );
+
+  ctx.save();
+  ctx.fillStyle = settings.textColor || '#d99a16';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.82;
+  ctx.font = `700 ${Math.max(18, Math.round(layout.topRebateH * 0.14))}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(mark.text, mark.x, mark.y);
+  ctx.restore();
+}
+
 export function drawKodakGoldFrameNumbers(
   ctx: CanvasRenderingContext2D,
   layout: KodakGoldOverlayLayout,

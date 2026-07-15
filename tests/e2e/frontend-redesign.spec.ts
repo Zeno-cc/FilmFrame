@@ -124,8 +124,11 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
 
   await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
   await page.locator('input[type="file"]').setInputFiles(fixture);
+  const frameImage = page.getByRole('img', { name: path.basename(fixture) });
+  const originalFrameSource = await frameImage.getAttribute('src');
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => frameImage.getAttribute('src')).not.toBe(originalFrameSource);
 
   await page.getByRole('tab', { name: /连底长条/ }).click();
   const stripStage = page.getByLabel('长条审片台');
@@ -137,6 +140,17 @@ for (const [name, stock] of [
   ['Kodak Portra 400', 'KODAK PORTRA 400'],
   ['Kodak Ektar 100', 'KODAK EKTAR 100'],
   ['Kodak Portra 800', 'KODAK PORTRA 800'],
+  ['Kodak Ultramax 400', 'GC 400 KODAK'],
+  ['Kodak ColorPlus 200', 'KODAK COLORPLUS 200'],
+  ['Kodak Pro Image 100', 'KODAK PRO IMAGE 100'],
+  ['Kodak Ektachrome E100', 'KODAK EKTACHROME E100'],
+  ['Kodak Tri-X 400', 'KODAK TRI-X 400'],
+  ['Kodak T-Max 100', 'KODAK T-MAX 100'],
+  ['Kodak T-Max 400', 'KODAK T-MAX 400'],
+  ['Kodak T-Max P3200', 'KODAK T-MAX P3200'],
+  ['Fuji Superia 400', 'FUJI SUPERIA 400'],
+  ['CineStill 800T', 'CINESTILL 800T'],
+  ['Ilford HP5 Plus', 'ILFORD HP5 PLUS'],
 ] as const) {
   test(`${name} supports real 135 single and template strip rendering`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -145,8 +159,11 @@ for (const [name, stock] of [
 
     await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
     await page.locator('input[type="file"]').setInputFiles(fixture);
+    const frameImage = page.getByRole('img', { name: path.basename(fixture) });
+    const originalFrameSource = await frameImage.getAttribute('src');
     await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
     await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => frameImage.getAttribute('src')).not.toBe(originalFrameSource);
 
     await page.getByRole('tab', { name: /连底长条/ }).click();
     const stripStage = page.getByLabel('长条审片台');

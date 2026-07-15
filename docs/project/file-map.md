@@ -1,6 +1,6 @@
 # 文件与模块地图
 
-> 最后核验：2026-07-12。排除 `.git/`、`node_modules/`、`dist/` 和被忽略的手工浏览器产物。
+> 最后核验：2026-07-14。排除 `.git/`、`node_modules/`、`dist/` 和被忽略的手工浏览器产物。
 
 ## 根目录
 
@@ -46,7 +46,7 @@
 | `filmWorker.ts` | Worker `self.onmessage` | OffscreenCanvas 两模式两输出的渲染 |
 | `filmEngine.ts` | `processImage`, `processImageReal135`, `generateFilmStrip` | 主线程完整渲染、模板 fallback、经典模式 |
 | `filmGeometry.ts` | layout、cover、rotate helpers | 135 物理几何和图像装框 |
-| `filmOverlay.ts` | Gold URL/layout/segment/draw helpers | 模板 aperture 与连续长条布局 |
+| `filmOverlay.ts` | 真实 135 模板注册表与 layout/draw helpers | 模板 aperture 与连续长条布局 |
 | `filmResolution.ts` | 两个 target width helper | 真实模式 preview/high 尺寸 |
 | `filmColor.ts` | `applyGold200Look` | Gold 200 像素色彩变换 |
 | `filmTexture.ts` | grain/dust/scratch/base texture | 主线程真实程序化纹理 |
@@ -99,6 +99,12 @@
 | `film-overlays/kodak-portra-400.png` | Portra 400 flattened real-135 template |
 | `film-overlays/kodak-ektar-100.png` | Ektar 100 flattened real-135 template |
 | `film-overlays/kodak-portra-800.png` | Portra 800 flattened real-135 template |
+| `film-overlays/kodak-{ultramax-400,colorplus-200,pro-image-100}.png` | Kodak 彩色负片 flattened real-135 templates |
+| `film-overlays/kodak-ektachrome-e100.png` | Ektachrome E100 flattened real-135 template |
+| `film-overlays/kodak-{tri-x-400,tmax-100,tmax-400,tmax-p3200}.png` | Kodak 黑白 flattened real-135 templates |
+| `film-overlays/fuji-superia-400.png` | Fuji Superia 400 flattened real-135 template |
+| `film-overlays/cinestill-800t.png` | CineStill 800T flattened real-135 template |
+| `film-overlays/ilford-hp5-plus.png` | Ilford HP5 Plus flattened real-135 template |
 | 其他 mask/shadow PNG | 当前源码未引用，疑似中间素材 |
 | `film-overlays/README.md` | runtime template geometry and normalization contract |
 

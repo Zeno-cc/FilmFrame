@@ -28,6 +28,9 @@ git diff --check
 - Every flattened real-135 template must be an RGB `1307x1203` PNG with a fully black aperture at `x=92`, `y=211`, `width=1123`, `height=800`.
 - Measure each generated source image's largest continuous black aperture before normalizing it. Source apertures differ by model, so never reuse another stock's crop coordinates.
 - Normalize a source template by splitting it around the measured aperture into a 3x3 grid, resizing the edge and center regions independently to `92/1123/92` columns and `211/800/192` rows, then stitching the regions together. A global affine resize can introduce black padding at the film edges.
+- Compare the outermost rows and columns with several inset bands. If a generated source contains an isolated canvas halo, replace only that outer band from mirrored valid film pixels; never rescale the full template, and restore the aperture to exact black afterward.
+- When compositing a flattened template, clip all four overlay bands exactly to the aperture boundary. Never overlap opaque black aperture pixels onto the photo to hide seams; even a small inset becomes a visible black frame after scaling.
+- Flattened templates use one compact dynamic frame number in the shared top-center perforation gap. Do not reuse the Gold-only bottom number or `A` suffix because stock-specific labels occupy those areas. The layered Gold path keeps its dedicated markings.
 - Validate the result before registration: the aperture pixels are all black, all four outer edges retain non-black film material, and the asset renders in a browser for both single and strip workflows.
 
 ## Accessibility Review

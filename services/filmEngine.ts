@@ -1,7 +1,11 @@
 
 import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
-import { drawKodakGoldFrameNumbers, getFrameNumberForImage } from './filmFrameNumber';
+import {
+  drawFilmTemplateFrameNumber,
+  drawKodakGoldFrameNumbers,
+  getFrameNumberForImage,
+} from './filmFrameNumber';
 import {
   create135LandscapeLayout,
   create135SidePerforationLayout,
@@ -734,7 +738,11 @@ function drawKodakGoldTemplateFrame(
 
   drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
   drawKodakGoldOverlayLayer(ctx, overlay, layout);
-  drawKodakGoldFrameNumbers(ctx, layout, settings);
+  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+    drawKodakGoldFrameNumbers(ctx, layout, settings);
+  } else {
+    drawFilmTemplateFrameNumber(ctx, layout, settings);
+  }
 }
 
 function drawContinuousFilmRowBase(

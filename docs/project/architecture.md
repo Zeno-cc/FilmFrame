@@ -1,6 +1,6 @@
 # 系统架构与数据流
 
-> 最后核验：2026-07-13。本文描述 `e5c5a84` 加当前 P0/P1 工作区。
+> 最后核验：2026-07-14。本文描述当前工作区。
 
 ## 总体结构
 
@@ -102,7 +102,7 @@ createImageBitmap
 ### 策略条件
 
 - classic：暂不允许 Worker，统一走主线程，避免当前双实现的尺寸和标记差异暴露给用户。
-- real135：Gold 200、Portra 160、Portra 400、Ektar 100 与 Portra 800 由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，其余已注册型号走主线程扁平模板路径。
+- real135：16 种 `FilmType` 均由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，其余 15 款走主线程扁平模板路径。
 - 不满足时直接主线程。
 
 ### 请求协议

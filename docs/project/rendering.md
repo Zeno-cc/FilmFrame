@@ -1,6 +1,6 @@
 # 渲染引擎与图像算法
 
-> 最后核验：2026-07-13。核心文件：`filmEngine.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
+> 最后核验：2026-07-14。核心文件：`filmEngine.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
 
 ## 路由决策
 
@@ -9,14 +9,14 @@ UI 先决定 `OutputMode`，渲染门面再按能力与 `FrameRenderMode` 决定
 ```text
 single
   classic -> classic frame
-  real135 -> registered template (Gold layered, Portra flattened), fallback programmatic
+  real135 -> registered template (Gold layered, other stocks flattened), fallback programmatic
 
 strip
   classic -> classic strip
   real135 -> Gold continuous strip or complete flattened-template frames
 ```
 
-Worker 和主线程仍是独立实现，不是同一组平台无关绘制函数。为避免已知差异影响用户，classic 当前固定主线程；Worker 只服务 Gold 200 真实 135 分层模板路径。Portra 160、Portra 400、Ektar 100 与 Portra 800 的扁平模板均由主线程渲染。
+Worker 和主线程仍是独立实现，不是同一组平台无关绘制函数。为避免已知差异影响用户，classic 当前固定主线程；Worker 只服务 Gold 200 真实 135 分层模板路径。其余 15 款胶片的扁平模板均由主线程渲染。
 
 ## 135 物理模型
 
@@ -36,7 +36,7 @@ Worker 和主线程仍是独立实现，不是同一组平台无关绘制函数�
 
 ## 模板几何契约
 
-已注册的 Gold 200、Portra 160、Portra 400、Ektar 100 与 Portra 800 模板都必须维持 1307 x 1203。片窗坐标：
+已注册的 16 款真实 135 模板都必须维持 1307 x 1203。片窗坐标：
 
 ```text
 x = 92
@@ -59,6 +59,17 @@ h = 800
 | `kodak-portra-400.png` | 1307x1203 RGB | Portra 400 单图与长条扁平模板 |
 | `kodak-ektar-100.png` | 1307x1203 RGB | Ektar 100 单图与长条扁平模板 |
 | `kodak-portra-800.png` | 1307x1203 RGB | Portra 800 单图与长条扁平模板 |
+| `kodak-ultramax-400.png` | 1307x1203 RGB | Ultramax 400 单图与长条扁平模板 |
+| `kodak-colorplus-200.png` | 1307x1203 RGB | ColorPlus 200 单图与长条扁平模板 |
+| `kodak-pro-image-100.png` | 1307x1203 RGB | Pro Image 100 单图与长条扁平模板 |
+| `kodak-ektachrome-e100.png` | 1307x1203 RGB | Ektachrome E100 单图与长条扁平模板 |
+| `kodak-tri-x-400.png` | 1307x1203 RGB | Tri-X 400 单图与长条扁平模板 |
+| `kodak-tmax-100.png` | 1307x1203 RGB | T-Max 100 单图与长条扁平模板 |
+| `kodak-tmax-400.png` | 1307x1203 RGB | T-Max 400 单图与长条扁平模板 |
+| `kodak-tmax-p3200.png` | 1307x1203 RGB | T-Max P3200 单图与长条扁平模板 |
+| `fuji-superia-400.png` | 1307x1203 RGB | Fuji Superia 400 单图与长条扁平模板 |
+| `cinestill-800t.png` | 1307x1203 RGB | CineStill 800T 单图与长条扁平模板 |
+| `ilford-hp5-plus.png` | 1307x1203 RGB | Ilford HP5 Plus 单图与长条扁平模板 |
 
 `aperture-mask.png`、`aperture-shadow.png`、`*-clean`、`*-cutout` 看起来是素材处理过程文件，当前源码未引用。删除前仍需确认资产来源和人工工作流。
 
@@ -80,7 +91,7 @@ h = 800
 12. 若源图为竖图，把最终单张成片逆时针旋回。
 13. 导出 JPEG/PNG Blob URL。
 
-分层加载失败后，先尝试 Gold legacy overlay；再失败才调用程序化 `processImageReal135()`。Portra 160、Portra 400、Ektar 100 和 Portra 800 直接加载注册表中的扁平模板，按同一片窗几何绘制照片、颗粒和动态帧号，再覆盖模板；模板加载失败时同样回退程序化渲染。未注册的胶片不会由 UI 进入真实 135。
+分层加载失败后，先尝试 Gold legacy overlay；再失败才调用程序化 `processImageReal135()`。其余 15 款胶片直接加载注册表中的扁平模板，按同一片窗几何绘制照片、颗粒和动态帧号，再覆盖模板；四条模板边带严格止于片窗边界，不得把素材中的不透明黑色片窗向照片内重叠，否则缩放后会形成可见黑框。模板加载失败时同样回退程序化渲染。当前 16 种 `FilmType` 均已注册。
 
 ## Worker 真实单张路径
 
@@ -171,7 +182,7 @@ Gold 200 使用 `createKodakGoldStripLayout(target, count, 4)`：
 
 主线程先为每一行画连续片基，再逐帧加载图片、cover、Gold 色彩、颗粒和文字。Worker 同样程序化绘制连续片基，不读取分层 PNG。
 
-Portra 160、Portra 400、Ektar 100 和 Portra 800 使用 `createFilmTemplateStripLayout(target, count, 4)`，逐帧保留完整的扁平模板和片边，并让相邻模板边缘直接相接，不额外添加帧间空隙；照片、颗粒和动态帧号在各自模板内绘制。此路径只在主线程运行。
+其余 15 款胶片使用 `createFilmTemplateStripLayout(target, count, 4)`，逐帧保留完整的扁平模板和片边，并让相邻模板边缘直接相接，不额外添加帧间空隙；照片、颗粒和动态帧号在各自模板内绘制。此路径只在主线程运行。
 
 旧版 `getKodakGoldStripSegment()` 没有生产调用，且它的分段算法与真实布局契约不一致，已经连同失真断言删除。当前几何测试覆盖实际使用的 strip layout、旋转和帧号契约。
 

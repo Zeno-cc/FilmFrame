@@ -10,6 +10,7 @@ import {
 import {
   getFrameNumberForImage,
   getFrameNumberForIndex,
+  getFilmTemplateFrameNumberMark,
   getKodakGoldFrameNumberPositions,
   normalizeFrameNumber,
 } from '../services/filmFrameNumber';
@@ -67,6 +68,18 @@ describe('frame numbers', () => {
   it('does not expose the removed previous-frame suffix position', () => {
     const positions = getKodakGoldFrameNumberPositions(createKodakGoldOverlayLayout(3600));
     expect('previousSuffixX' in positions).toBe(false);
+  });
+
+  it('uses one compact frame mark in the shared top perforation gap for flattened templates', () => {
+    const layout = createKodakGoldOverlayLayout(1123);
+    const mark = getFilmTemplateFrameNumberMark(layout, 37, 36);
+
+    expect(mark).toEqual({
+      text: '1',
+      x: layout.filmW * 0.5,
+      y: layout.imageY * 0.78,
+    });
+    expect(mark.y).toBeLessThan(layout.imageY);
   });
 });
 

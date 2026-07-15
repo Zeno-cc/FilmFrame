@@ -15,7 +15,7 @@
   <p align="center"><strong>真实 135 胶片边框生成器 (Digital Darkroom)</strong></p>
   
   <p align="center">
-    一个浏览器端 Canvas 胶片模拟工具，为照片生成 Kodak 多款真实 135 底片边框。<br />
+    一个浏览器端 Canvas 胶片模拟工具，为照片生成 16 款真实 135 底片边框。<br />
     支持<strong>真实模板叠加</strong>、<strong>连续底片长条</strong>、<strong>批量处理</strong>与<strong>ZIP 打包下载</strong>。
   </p>
 
@@ -33,7 +33,7 @@
 
 ## ✨ 核心特性 (Features)
 
-**FilmFrame** 不仅是简单加黑边工具，它是基于 Canvas 像素级绘制的胶片模拟器，当前支持 Kodak Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 真实 135 底片边框。
+**FilmFrame** 不仅是简单加黑边工具，它是基于 Canvas 像素级绘制的胶片模拟器，当前 16 款胶片均支持真实 135 底片边框。
 
 ### 1. 🎞️ 真实 135 工作流
 - **真实 135 单张**：使用与所选胶片对应的模板，照片自动裁切/旋转进入底片窗口。
@@ -54,18 +54,18 @@
 
 ## 📸 胶片型号 (Film Stocks)
 
-真实 135 模式支持 Kodak Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 模板。经典边框模式仍保留多胶卷预设：
+真实 135 与经典边框模式均支持以下 16 款胶片：
 
 | 系列 | 型号 | 风格特点 |
 | :--- | :--- | :--- |
 | **Kodak Portra** | 160 / 400 / 800 | 暖色调，经典的 JetBrains Mono 等宽字体 |
-| **Kodak Consumer** | Gold 200 / ColorPlus | 金黄色复古感 |
+| **Kodak Consumer** | Gold 200 / ColorPlus 200 / Pro Image 100 | 金黄色与暖色消费负片质感 |
 | **Kodak Consumer** | Ultramax 400 | **加粗**无衬线字体，高对比度风格 |
 | **Kodak Ektar** | Ektar 100 | 鲜艳的红色品牌标识 |
 | **Reversal (正片)** | Ektachrome E100 | 白色边框，独特的反转片质感 |
 | **Fujifilm** | Superia 400 | 标志性的绿色字体，**全圆角**齿孔 |
 | **Cinema** | CineStill 800T | 电影卷风格，红色高光 |
-| **B&W (黑白)** | Tri-X / T-Max / Ilford | 纯粹的黑白灰度，锐利的字体 |
+| **B&W (黑白)** | Tri-X 400 / T-Max 100 / 400 / P3200 / Ilford HP5 Plus | 纯粹的黑白灰度，锐利的字体 |
 
 ## 🚀 开发指南 (Development)
 
@@ -118,7 +118,7 @@ Output Directory: dist
 Node Version: >=20
 ```
 
-项目没有后端、数据库或必需环境变量。`public/film-overlays/` 下的 Gold 200、Portra 160、Portra 400、Ektar 100 和 Portra 800 模板会在构建时自动复制到 `dist/film-overlays/`。
+项目没有后端、数据库或必需环境变量。`public/film-overlays/` 下的 16 款真实 135 模板会在构建时自动复制到 `dist/film-overlays/`。
 
 ## 🛠️ 技术栈 (Tech Stack)
 
