@@ -104,3 +104,36 @@ Verified the repository is clean; no active tasks required archiving.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Complete remaining real 135 templates
+
+**Date**: 2026-07-15
+**Task**: Complete remaining real 135 templates
+**Branch**: `main`
+
+### Summary
+
+Added real 135 template coverage for all remaining film stocks, fixed T-MAX 400 edge halo, standardized non-Gold frame numbering to avoid label and sprocket overlap, updated docs/specs, and passed npm run check plus Playwright e2e.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ff97a95` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
