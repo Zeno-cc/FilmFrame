@@ -68,6 +68,7 @@ import { PreviewDialog } from './components/preview/PreviewDialog';
 import { NoticeToast as DarkroomNoticeToast } from './components/feedback/NoticeToast';
 import { ErrorDialog } from './components/feedback/ErrorDialog';
 import { SupportDialog } from './components/feedback/SupportDialog';
+import { DeleteAllPhotosDialog } from './components/feedback/DeleteAllPhotosDialog';
 // Security Fix: Import EXIF from local dependency instead of external CDN
 import EXIF from 'exif-js';
 
@@ -244,6 +245,7 @@ const App: React.FC = () => {
   const [previewRendering, setPreviewRendering] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
+  const [deleteAllPhotosOpen, setDeleteAllPhotosOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const cropTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -442,6 +444,49 @@ const App: React.FC = () => {
       const nextPreviewImage = nextImages[Math.min(targetIndex, nextImages.length - 1)];
       setPreview(nextPreviewImage ? { type: 'single', imageId: nextPreviewImage.id } : null);
     }
+  };
+
+  const openDeleteAllPhotos = () => {
+    if (processing || exporting || imagesRef.current.length === 0) return;
+    setDeleteAllPhotosOpen(true);
+  };
+
+  const confirmDeleteAllPhotos = () => {
+    if (processing || exporting || imagesRef.current.length === 0) {
+      setDeleteAllPhotosOpen(false);
+      return;
+    }
+
+    renderGenerationRef.current += 1;
+    imagesRef.current.forEach(item => {
+      revokeObjectUrl(item.previewUrl);
+      revokeObjectUrl(item.processedUrl);
+    });
+    revokeObjectUrl(stripResultRef.current?.url);
+
+    imagesRef.current = [];
+    stripResultRef.current = null;
+    dragItem.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setImages([]);
+    setStripResult(null);
+    setPreview(null);
+    setIsCropping(false);
+    setEditorPreviewUrl(null);
+    setPreviewRendering(false);
+    setActiveBatchMode(null);
+    setProcessingMessage('');
+    setActiveImageId(null);
+    setQueuedImageIds([]);
+    setErrorMsg(null);
+    setNotice(null);
+    setIsDraggingUpload(false);
+    setDeleteAllPhotosOpen(false);
+
+    window.requestAnimationFrame(() => {
+      document.getElementById('workspace-add-photos')?.focus({ preventScroll: true });
+    });
   };
 
   const processAll = async (force = false) => {
@@ -1318,6 +1363,7 @@ const App: React.FC = () => {
                 onExport={() => void downloadAll()}
                 onSelectAll={() => setAllImageSelections(true)}
                 onClearSelection={() => setAllImageSelections(false)}
+                onDeleteAll={openDeleteAllPhotos}
               />
             )}
             isDragActive={isDraggingUpload}
@@ -1493,6 +1539,12 @@ const App: React.FC = () => {
             <SupportDialog
               open={showDonate}
               onClose={() => setShowDonate(false)}
+            />
+            <DeleteAllPhotosDialog
+              open={deleteAllPhotosOpen}
+              photoCount={images.length}
+              onCancel={() => setDeleteAllPhotosOpen(false)}
+              onConfirm={confirmDeleteAllPhotos}
             />
           </>
         )}

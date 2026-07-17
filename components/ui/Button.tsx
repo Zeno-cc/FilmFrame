@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { joinClassNames } from './utils';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -13,7 +13,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   trailingIcon?: ReactNode;
 }
 
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   className,
   variant = 'secondary',
   size = 'md',
@@ -25,10 +25,11 @@ export function Button({
   disabled,
   type = 'button',
   ...props
-}: ButtonProps) {
+}, ref) {
   return (
     <button
       {...props}
+      ref={ref}
       type={type}
       className={joinClassNames(
         'ff-button',
@@ -45,4 +46,4 @@ export function Button({
       {!loading && trailingIcon ? <span className="ff-button__icon" aria-hidden="true">{trailingIcon}</span> : null}
     </button>
   );
-}
+});

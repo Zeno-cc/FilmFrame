@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import type { OutputMode } from '../../types';
-import { DownloadIcon, PlusIcon } from '../icons/FilmFrameIcons';
+import { DownloadIcon, PlusIcon, TrashIcon } from '../icons/FilmFrameIcons';
 import { Button } from '../ui/Button';
 
 const MODE_COPY: Record<OutputMode, { eyebrow: string; title: string; description: string }> = {
@@ -32,6 +32,7 @@ export interface WorkspaceToolbarProps {
   onExport?: () => void;
   onSelectAll?: () => void;
   onClearSelection?: () => void;
+  onDeleteAll?: () => void;
   className?: string;
 }
 
@@ -51,6 +52,7 @@ export function WorkspaceToolbar({
   onExport,
   onSelectAll,
   onClearSelection,
+  onDeleteAll,
   className = '',
 }: WorkspaceToolbarProps) {
   const copy = MODE_COPY[outputMode];
@@ -100,6 +102,7 @@ export function WorkspaceToolbar({
             </Button>
           ) : null}
           <Button
+            id="workspace-add-photos"
             variant="primary"
             leadingIcon={<PlusIcon />}
             onClick={onAddPhotos}
@@ -153,12 +156,26 @@ export function WorkspaceToolbar({
               <p className="mt-1 text-xs text-[var(--ff-warning)]" role="status" aria-live="polite">请先选择至少一张照片</p>
             ) : null}
           </div>
-          {onSelectAll && onClearSelection ? (
-            <div className="flex flex-wrap gap-2" role="group" aria-label="选片范围">
-              <Button variant="ghost" onClick={onSelectAll} disabled={controlsDisabled || includedCount === imageCount}>全部入选</Button>
-              <Button variant="ghost" onClick={onClearSelection} disabled={controlsDisabled || includedCount === 0}>清空入选</Button>
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {onSelectAll && onClearSelection ? (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="选片范围">
+                <Button variant="ghost" onClick={onSelectAll} disabled={controlsDisabled || includedCount === imageCount}>全部入选</Button>
+                <Button variant="ghost" onClick={onClearSelection} disabled={controlsDisabled || includedCount === 0}>清空入选</Button>
+              </div>
+            ) : null}
+            {onDeleteAll ? (
+              <div className="border-l border-[var(--ff-line)] pl-2">
+                <Button
+                  variant="danger"
+                  leadingIcon={<TrashIcon size={16} />}
+                  onClick={onDeleteAll}
+                  disabled={controlsDisabled}
+                >
+                  删除全部照片
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </header>

@@ -371,6 +371,53 @@ test('batch curation keeps card, strip, summary, and zero-selection recovery in 
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${thirdName}` })).toBeChecked();
 });
 
+test('delete all photos requires confirmation and resets only the current roll', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => {
+    const originalRevoke = URL.revokeObjectURL.bind(URL);
+    (window as Window & { __revokedObjectUrls?: string[] }).__revokedObjectUrls = [];
+    URL.revokeObjectURL = url => {
+      (window as Window & { __revokedObjectUrls?: string[] }).__revokedObjectUrls?.push(String(url));
+      originalRevoke(url);
+    };
+  });
+
+  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
+  await uploadCurationFixtures(page, 2);
+  await page.getByRole('tab', { name: /连底长条 · 2 张入选/ }).click();
+
+  const trigger = page.getByRole('button', { name: '删除全部照片' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: '删除全部照片？' });
+  await expect(dialog).toContainText('将从当前工作区移除 2 张照片及其生成结果。');
+  await expect(dialog.getByRole('button', { name: '取消' })).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(page.getByText('入选 2 / 2', { exact: true })).toBeVisible();
+
+  await trigger.click();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await dialog.getByRole('button', { name: '删除 2 张照片' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('heading', { name: '把这一卷带进暗房' })).toBeVisible();
+  await expect(trigger).toBeHidden();
+  await expect(page.locator('#workspace-add-photos')).toBeFocused();
+  await expect(inspector.getByLabel('胶片型号')).toHaveValue('KODAK PORTRA 160');
+  await expect(page.getByRole('tab', { name: /连底长条/ })).toHaveAttribute('aria-selected', 'true');
+  expect(await page.evaluate(() => (
+    (window as Window & { __revokedObjectUrls?: string[] }).__revokedObjectUrls ?? []
+  ))).toHaveLength(2);
+
+  await uploadCurationFixtures(page, 2);
+  await expect(page.getByText('入选 2 / 2', { exact: true })).toBeVisible();
+});
+
 test('batch processing skips excluded cards without renumbering or discarding current artifacts', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await uploadCurationFixtures(page);
@@ -404,6 +451,7 @@ test('processing locks batch order and rejects dropped files until the snapshot 
   const [firstName] = curationNames;
   await page.getByRole('button', { name: '冲洗待更新照片 (3)' }).click();
   await expect(page.getByRole('button', { name: `下移 ${firstName}` })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '删除全部照片' })).toBeDisabled();
 
   const dataTransfer = await page.evaluateHandle(async () => {
     const blob = await fetch('/film-overlays/aperture-mask-derived.png').then(response => response.blob());

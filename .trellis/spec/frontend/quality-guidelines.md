@@ -96,6 +96,64 @@ drawFrameNumber(ctx);
 ctx.restore();
 ```
 
+### Scenario: Destructive Roll Cleanup
+
+#### 1. Scope / Trigger
+
+Apply this contract when one command removes multiple `ImageItem` records or resets the current roll.
+
+#### 2. Signatures
+
+```ts
+interface BulkDeleteCommand {
+  photoCount: number;
+  disabled: boolean;
+  onConfirm: () => void;
+}
+```
+
+#### 3. Contracts
+
+- `App.tsx` owns deletion because it owns image state, render artifacts, async generations, and Object URLs.
+- Require an accessible confirmation that names the exact photo count and initially focuses the non-destructive action.
+- Disable deletion during processing/exporting; do not implicitly stop either operation.
+- Revoke preview, processed, and strip URLs before clearing their owning refs. Let `createPreviewRenderController` revoke its own accepted and late editor-preview URLs on disposal.
+- Invalidate async generations, clear image-owned transient state and file-input value, preserve settings/recipes/output mode, then focus a persistent add-photo control.
+
+#### 4. Validation & Error Matrix
+
+- No photos -> do not expose or execute the command.
+- Processing/exporting -> trigger is disabled and the command guard exits without mutation.
+- Cancel/Escape -> keep the roll and restore focus to the trigger.
+- Confirm while idle -> remove the roll and return to the empty workspace.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: every URL has one owner and is revoked once before its reference disappears.
+- Base: cancel leaves image order, selection, artifacts, and preferences unchanged.
+- Bad: clearing the array first loses URL references; manually revoking `editorPreviewUrl` duplicates controller cleanup.
+
+#### 6. Tests Required
+
+- Playwright asserts exact count copy, cancel-first focus, Escape/cancel restoration, busy-state disabling, empty-workspace recovery, add-photo focus, and preference preservation.
+- Instrument `URL.revokeObjectURL` in a focused browser flow when resource ownership changes.
+- Re-run desktop and 390px overflow checks for the bulk-action row and dialog.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: references are lost before resources are released.
+setImages([]);
+
+// Correct: release at the owner boundary, then clear refs and state.
+imagesRef.current.forEach(item => {
+  revokeObjectUrl(item.previewUrl);
+  revokeObjectUrl(item.processedUrl);
+});
+imagesRef.current = [];
+setImages([]);
+```
+
 ## Accessibility Review
 
 - Use role/name selectors in E2E tests; this verifies both interaction and accessible naming.
