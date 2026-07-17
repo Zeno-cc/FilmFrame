@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-07-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~172 | Active |
+| `journal-1.md` | ~206 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-07-17 | Delete all photos and HP5 sprocket repair | `8b32ddd`, `d80f479` | `main` |
 | 5 | 2026-07-17 | Custom real 135 output colors | `aff853e` | `main` |
 | 4 | 2026-07-15 | Complete remaining real 135 templates | `ff97a95` | `main` |
 | 3 | 2026-07-14 | Finish work session | `da7220c` | `main` |

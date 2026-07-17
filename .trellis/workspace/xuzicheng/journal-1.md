@@ -170,3 +170,37 @@ Added customizable scan background and frame-number colors across UI, persistenc
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Delete all photos and HP5 sprocket repair
+
+**Date**: 2026-07-17
+**Task**: Delete all photos and HP5 sprocket repair
+**Branch**: `main`
+
+### Summary
+
+Added a guarded delete-all workflow with confirmation, focus restoration, Object URL cleanup, and responsive E2E coverage; corrected all Ilford HP5 Plus sprocket holes to black with direct asset pixel regression coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8b32ddd` | (see git log) |
+| `d80f479` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
