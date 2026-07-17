@@ -1,9 +1,10 @@
 
-import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
 import {
   drawFilmTemplateFrameNumber,
   drawKodakGoldFrameNumbers,
+  getFrameNumberColor,
   getFrameNumberForImage,
 } from './filmFrameNumber';
 import {
@@ -475,7 +476,10 @@ function drawReal135Hole(
   ctx.restore();
 }
 
-function composeOnScannerCanvas(filmCanvas: HTMLCanvasElement): HTMLCanvasElement {
+function composeOnScannerCanvas(
+  filmCanvas: HTMLCanvasElement,
+  backgroundColor = DEFAULT_SCAN_BACKGROUND_COLOR,
+): HTMLCanvasElement {
   const paddingRatio = 0.055;
   const outputW = filmCanvas.width;
   const outputH = Math.round((outputW * 3) / 4);
@@ -495,7 +499,7 @@ function composeOnScannerCanvas(filmCanvas: HTMLCanvasElement): HTMLCanvasElemen
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  ctx.fillStyle = '#e8e3d8';
+  ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   const gradient = ctx.createRadialGradient(
@@ -555,7 +559,7 @@ export const processImageReal135 = async (
 
   const finalCanvas =
     (settings.scanOutputAspect ?? '4:3') === '4:3'
-      ? composeOnScannerCanvas(filmCanvas)
+      ? composeOnScannerCanvas(filmCanvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
       : filmCanvas;
 
   const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, layout.imageW, layout.imageH, transform);
@@ -588,7 +592,7 @@ const processImageWithTemplateOverlay = async (
 
       const finalCanvas =
         (settings.scanOutputAspect ?? 'native') === '4:3'
-          ? composeOnScannerCanvas(canvas)
+          ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
           : canvas;
 
       const outputCanvas = restoreOutputOrientationForSource(
@@ -615,7 +619,7 @@ const processImageWithTemplateOverlay = async (
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
-        ? composeOnScannerCanvas(canvas)
+        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
         : canvas;
 
     const outputCanvas = restoreOutputOrientationForSource(
@@ -830,13 +834,14 @@ function drawContinuousStripMarkings(
   layout: ReturnType<typeof createKodakGoldStripLayout>,
   rowY: number,
   index: number,
-  frameNumber: number
+  settings: FilmSettings,
 ) {
   const frame = layout.frame;
   const col = index % layout.maxPerRow;
   const slotX = layout.padding + col * layout.frameStride;
   const imageX = slotX + frame.imageX;
   const textColor = '#d99a16';
+  const frameNumberColor = getFrameNumberColor(settings, textColor);
 
   ctx.save();
   ctx.translate(0, rowY);
@@ -872,11 +877,13 @@ function drawContinuousStripMarkings(
 
   ctx.textAlign = 'center';
   ctx.font = `900 ${numberFont}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, topNumberY);
-  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, bottomNumberY);
+  ctx.fillStyle = frameNumberColor;
+  ctx.fillText(String(settings.frameNumber), imageX + frame.imageW * 0.5, topNumberY);
+  ctx.fillText(String(settings.frameNumber), imageX + frame.imageW * 0.5, bottomNumberY);
 
   ctx.textAlign = 'left';
   ctx.font = `800 ${smallFont}px Arial, Helvetica, sans-serif`;
+  ctx.fillStyle = textColor;
   ctx.fillText('DX', slotX + frame.imageX * 0.18, bottomTextY);
   ctx.fillText('SAFETY FILM', imageX + frame.imageW * 0.43, bottomTextY);
   drawContinuousDxBlocks(ctx, imageX + frame.imageW * 0.1, bottomBarcodeY, frame.imageW * 0.22, smallFont);
@@ -1009,7 +1016,7 @@ const generateReal135FilmStrip = async (
     ctx.strokeRect(imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
     ctx.restore();
 
-    drawContinuousStripMarkings(ctx, layout, y, index, frameSettings.frameNumber);
+    drawContinuousStripMarkings(ctx, layout, y, index, frameSettings);
   }
 
   return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality, 'Failed to export film strip blob');
@@ -1129,6 +1136,7 @@ export const processImage = async (
   ctx.textBaseline = 'middle';
   
   const finalDateStr = dateOverride || settings.dateStr;
+  const frameNumberColor = getFrameNumberColor(settings, settings.textColor);
   
   const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
 
@@ -1150,6 +1158,7 @@ export const processImage = async (
       }
       
       ctx.save();
+      ctx.fillStyle = frameNumberColor;
       ctx.translate(canvas.width - borderSize * outerCenterRatio, canvas.height * 0.05);
       ctx.rotate(Math.PI / 2);
       if (isGC400) {
@@ -1174,10 +1183,16 @@ export const processImage = async (
       ctx.fillText(brandText, canvas.width * 0.05, borderSize * outerCenterRatio);
       if (isGC400) {
           const frameStr = `${settings.frameNumber}A`;
+          ctx.save();
+          ctx.fillStyle = frameNumberColor;
           ctx.fillText(frameStr, canvas.width - ctx.measureText(frameStr).width - canvas.width * 0.05, borderSize * outerCenterRatio);
+          ctx.restore();
       } else {
           const frameStr = `${settings.frameNumber}`;
+          ctx.save();
+          ctx.fillStyle = frameNumberColor;
           ctx.fillText(frameStr, canvas.width - ctx.measureText(frameStr).width - canvas.width * 0.05, borderSize * outerCenterRatio);
+          ctx.restore();
       }
       if (!isGC400) {
            ctx.font = `normal ${Math.floor(fontSize * 0.7)}px ${preset.fontFamily}`;
@@ -1303,6 +1318,7 @@ export const generateFilmStrip = async (
 
     const isGC400 = settings.brandText.includes('GC 400');
     const baseFontSize = borderSize * 0.22; 
+    const frameNumberColor = getFrameNumberColor(settings, settings.textColor);
     
     ctx.font = `${preset.fontWeight} ${Math.floor(baseFontSize)}px ${preset.fontFamily}`;
     ctx.fillStyle = settings.textColor;
@@ -1330,9 +1346,12 @@ export const generateFilmStrip = async (
       ctx.fillText(brandText, frameX + paddingX, textYTop);
 
       // 2. 帧编号
-      ctx.textAlign = 'right';
       const frameLabel = isGC400 ? `${frameNum}A` : `${frameNum}A`;
+      ctx.save();
+      ctx.fillStyle = frameNumberColor;
+      ctx.textAlign = 'right';
       ctx.fillText(frameLabel, frameX + FRAME_WIDTH - paddingX, textYTop);
+      ctx.restore();
 
       // 3. 日期
       if (settings.showDate) {

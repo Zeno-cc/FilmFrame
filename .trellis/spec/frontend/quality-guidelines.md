@@ -33,6 +33,69 @@ git diff --check
 - Flattened templates use one compact dynamic frame number in the shared top-center perforation gap. Do not reuse the Gold-only bottom number or `A` suffix because stock-specific labels occupy those areas. The layered Gold path keeps its dedicated markings.
 - Validate the result before registration: the aperture pixels are all black, all four outer edges retain non-black film material, and the asset renders in a browser for both single and strip workflows.
 
+### Scenario: Optional Frame-Number Color Override
+
+#### 1. Scope / Trigger
+
+Apply this contract whenever dynamic frame-number color behavior changes across settings UI, persistence, render identity, main-thread Canvas rendering, or Worker rendering.
+
+#### 2. Signatures
+
+```ts
+interface FilmSettings {
+  frameNumberColor?: string;
+}
+
+function getFrameNumberColor(
+  settings: Pick<FilmSettings, 'frameNumberColor'>,
+  fallback: string,
+): string;
+```
+
+#### 3. Contracts
+
+- `frameNumberColor` is an optional six-digit HEX override stored as lowercase `#rrggbb`.
+- An absent value preserves each renderer's previous effective frame-number color.
+- An explicit value affects only application-generated frame numbers and suffixes; it must not recolor stock labels, dates, DX blocks, safety-film labels, or pixels baked into PNG templates.
+- The setting must round-trip through preferences and recipes, participate in `createRenderSettingsKey`, and travel unchanged in Worker request settings.
+- Film-stock changes must preserve an explicit override.
+
+#### 4. Validation & Error Matrix
+
+- Valid `#RRGGBB` -> normalize to lowercase and persist.
+- Missing value -> omit the override and use the renderer-provided fallback.
+- Invalid stored string, short HEX, or non-string -> ignore it without replacing the fallback.
+- Changed explicit value -> mark existing single and strip artifacts stale.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: `#44CC88` becomes `#44cc88` and colors dynamic numbers in main-thread and Worker output.
+- Base: no override keeps the existing stock/text amber without changing current users' output.
+- Bad: applying the override as the shared Canvas `fillStyle` recolors `KODAK`, `SAFETY FILM`, or DX blocks.
+
+#### 6. Tests Required
+
+- Settings tests assert valid normalization, invalid-value rejection, and preference/recipe round trips.
+- Render-result tests assert that changing only `frameNumberColor` changes single and ordered-strip keys.
+- Frame-number tests assert explicit override and fallback resolution.
+- Worker tests assert the field is preserved in the request payload.
+- Playwright asserts desktop/mobile availability, cross-stock persistence, and successful single/strip rendering after selection.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: leaks the override into unrelated markings.
+ctx.fillStyle = settings.frameNumberColor ?? settings.textColor;
+drawBrandAndFrameNumber(ctx);
+
+// Correct: scope the override to dynamic frame-number glyphs.
+drawBrand(ctx);
+ctx.save();
+ctx.fillStyle = getFrameNumberColor(settings, settings.textColor);
+drawFrameNumber(ctx);
+ctx.restore();
+```
+
 ## Accessibility Review
 
 - Use role/name selectors in E2E tests; this verifies both interaction and accessible naming.

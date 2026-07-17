@@ -33,6 +33,7 @@ const settings: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
   customText: '',
   frameNumber: 1,
+  frameNumberColor: '#44cc88',
   showDate: false,
   dateStr: '2026/07/11',
   borderColor: '#111111',
@@ -157,7 +158,11 @@ describe('createWorkerRenderer', () => {
       transform,
     }], settings);
 
-    expect(worker.messages[0]).toMatchObject({ type: 'processImage', transform });
+    expect(worker.messages[0]).toMatchObject({
+      type: 'processImage',
+      settings: { frameNumberColor: '#44cc88' },
+      transform,
+    });
     expect(worker.messages[1]).toMatchObject({
       type: 'generateFilmStrip',
       images: [{ id: 'one', transform }],

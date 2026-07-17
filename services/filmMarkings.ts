@@ -1,4 +1,5 @@
 import { FilmSettings, FILM_PRESETS } from '../types';
+import { getFrameNumberColor } from './filmFrameNumber';
 import { Film135Layout, Film135SideLayout } from './filmGeometry';
 
 export function draw135Markings(
@@ -28,7 +29,10 @@ export function draw135Markings(
   ctx.fillText(brandText, padX, topTextY);
 
   ctx.textAlign = 'right';
+  ctx.save();
+  ctx.fillStyle = getFrameNumberColor(settings, settings.textColor || preset.brandColor);
   ctx.fillText(frameLabel, rightX, topTextY);
+  ctx.restore();
 
   ctx.textAlign = 'left';
   ctx.font = `normal ${Math.round(fontSize * 0.72)}px ${preset.fontFamily}`;
@@ -78,6 +82,7 @@ export function draw135SideMarkings(
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = 'center';
   ctx.font = `${preset.fontWeight} ${Math.round(fontSize * 0.72)}px ${preset.fontFamily}`;
+  ctx.fillStyle = getFrameNumberColor(settings, color);
   ctx.fillText(`${settings.frameNumber}A`, 0, 0);
   ctx.restore();
 

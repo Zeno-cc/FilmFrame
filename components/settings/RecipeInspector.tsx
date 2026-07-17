@@ -1,9 +1,11 @@
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { FILM_PRESETS, FilmType, type FilmSettings, type OutputMode } from '../../types';
+import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FILM_PRESETS, FilmType, type FilmSettings, type OutputMode } from '../../types';
+import { getFrameNumberColor } from '../../services/filmFrameNumber';
 import type { FilmRecipe } from '../../services/recipeStorage';
 import { supportsReal135Template } from '../../services/filmOverlay';
 import { ResetIcon } from '../app/FilmFrameAppIcons';
-import { SettingsIcon, TrashIcon } from '../icons/FilmFrameIcons';
+import { EyedropperIcon, SettingsIcon, TrashIcon } from '../icons/FilmFrameIcons';
+import { IconButton } from '../ui';
 import { RecipeSummaryCard } from './RecipeSummaryCard';
 
 export type RecipeInspectorSection = 'all' | 'film' | 'output' | 'recipes';
@@ -42,6 +44,9 @@ export interface RecipeInspectorProps {
 const inputClass = 'min-h-11 w-full rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel-soft)] px-3 text-sm text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-45';
 const labelClass = 'mb-1.5 block text-xs font-medium text-[var(--ff-paper-muted)]';
 const segmentClass = 'min-h-11 rounded-[3px] px-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-45';
+
+type EyeDropperResult = { sRGBHex: string };
+type EyeDropperConstructor = new () => { open: () => Promise<EyeDropperResult> };
 
 function segmentState(selected: boolean): string {
   return selected
@@ -87,15 +92,37 @@ export function RecipeInspector({
   id = 'recipe-inspector',
   className = '',
 }: RecipeInspectorProps) {
+  const [isPickingScanBackground, setIsPickingScanBackground] = useState(false);
   const disabled = processing || exporting;
   const supportsReal135 = supportsReal135Template(settings.brandText);
   const isReal135 = supportsReal135 && (settings.frameRenderMode ?? 'real135') === 'real135';
+  const effectiveFrameNumberColor = getFrameNumberColor(
+    settings,
+    settings.textColor || FILM_PRESETS[settings.brandText]?.brandColor || '#d99a16',
+  );
   const showFilm = section === 'all' || section === 'film';
   const showOutput = section === 'all' || section === 'output';
   const showRecipes = section === 'all' || section === 'recipes';
 
   const update = (patch: Partial<FilmSettings>) => {
     onSettingsChange({ ...settings, ...patch });
+  };
+
+  const pickScanBackgroundColor = async () => {
+    const EyeDropper = (window as Window & { EyeDropper?: EyeDropperConstructor }).EyeDropper;
+    if (!EyeDropper || isPickingScanBackground) return;
+
+    setIsPickingScanBackground(true);
+    try {
+      const { sRGBHex } = await new EyeDropper().open();
+      update({ scanBackgroundColor: sRGBHex.toLowerCase() });
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        console.warn('Unable to pick a scan background color.', error);
+      }
+    } finally {
+      setIsPickingScanBackground(false);
+    }
   };
 
   const updateNumber = (
@@ -224,18 +251,34 @@ export function RecipeInspector({
                 </label>
               )}
 
-              <label className="block">
-                <span className={labelClass}>起始帧号</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={settings.maxRollFrames ?? 36}
-                  value={settings.frameNumber}
-                  onChange={event => updateNumber(event, 'frameNumber')}
-                  disabled={disabled}
-                  className={inputClass}
-                />
-              </label>
+              <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
+                <label className="block min-w-0">
+                  <span className={labelClass}>起始帧号</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={settings.maxRollFrames ?? 36}
+                    value={settings.frameNumber}
+                    onChange={event => updateNumber(event, 'frameNumber')}
+                    disabled={disabled}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block min-w-0 text-center">
+                  <span className={labelClass}>帧号颜色</span>
+                  <input
+                    type="color"
+                    aria-label="帧号颜色"
+                    value={effectiveFrameNumberColor}
+                    onChange={event => update({ frameNumberColor: event.target.value })}
+                    disabled={disabled}
+                    className="h-11 w-full cursor-pointer rounded-[4px] border border-[var(--ff-line)] bg-transparent p-1 disabled:opacity-45"
+                  />
+                  <span className="mt-1 block truncate font-mono text-[10px] text-[var(--ff-paper-dim)]">
+                    {effectiveFrameNumberColor}
+                  </span>
+                </label>
+              </div>
 
               {!isReal135 && (
                 <>
@@ -346,11 +389,38 @@ export function RecipeInspector({
                         onClick={() => update({ scanOutputAspect })}
                         className={`${segmentClass} ${segmentState((settings.scanOutputAspect ?? '4:3') === scanOutputAspect)}`}
                       >
-                        {scanOutputAspect === '4:3' ? '4:3 扫描' : '原始底片'}
+                        {scanOutputAspect === '4:3' ? '保留扫描背景' : '仅保留底片'}
                       </button>
                     ))}
                   </div>
                 </fieldset>
+              )}
+
+              {isReal135 && outputMode === 'single' && (settings.scanOutputAspect ?? '4:3') === '4:3' && (
+                <div className="block">
+                  <span className={labelClass}>扫描背景色</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      aria-label="扫描背景色"
+                      value={settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR}
+                      onChange={event => update({ scanBackgroundColor: event.target.value })}
+                      disabled={disabled}
+                      className="h-11 w-14 shrink-0 cursor-pointer rounded-[4px] border border-[var(--ff-line)] bg-transparent p-1 disabled:opacity-45"
+                    />
+                    {'EyeDropper' in window && (
+                      <IconButton
+                        icon={<EyedropperIcon size={18} />}
+                        label="从屏幕取色"
+                        onClick={() => void pickScanBackgroundColor()}
+                        disabled={disabled || isPickingScanBackground}
+                      />
+                    )}
+                    <span className="font-mono text-xs text-[var(--ff-paper-muted)]">
+                      {settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR}
+                    </span>
+                  </div>
+                </div>
               )}
 
               {isReal135 && (

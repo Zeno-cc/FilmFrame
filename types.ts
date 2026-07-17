@@ -32,6 +32,8 @@ export type OutputMode = 'single' | 'strip';
 export type FocusAnchor = number;
 export type QuarterTurn = 0 | 1 | 2 | 3;
 
+export const DEFAULT_SCAN_BACKGROUND_COLOR = '#e8e3d8';
+
 export interface RenderTransform {
   focusX: FocusAnchor;
   focusY: FocusAnchor;
@@ -43,6 +45,7 @@ export interface FilmSettings {
   brandText: FilmType;
   customText: string; // 新增：自定义文字
   frameNumber: number;
+  frameNumberColor?: string;
   showDate: boolean;
   dateStr: string;
   borderColor: string;
@@ -56,6 +59,7 @@ export interface FilmSettings {
   processingMode?: ProcessingMode;
   frameRenderMode?: FrameRenderMode;
   scanOutputAspect?: ScanOutputAspect;
+  scanBackgroundColor?: string;
   autoCropToFilmRatio?: boolean;
   enableRealisticRebate?: boolean;
   maxRollFrames?: 24 | 36;

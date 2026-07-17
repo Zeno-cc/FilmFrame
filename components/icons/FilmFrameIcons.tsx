@@ -99,6 +99,10 @@ export function EyeIcon(props: FilmFrameIconProps) {
   return <FilmFrameIcon {...props}><path d="M2.8 12s3.3-5 9.2-5 9.2 5 9.2 5-3.3 5-9.2 5-9.2-5-9.2-5Z" /><circle cx="12" cy="12" r="2.3" /></FilmFrameIcon>;
 }
 
+export function EyedropperIcon(props: FilmFrameIconProps) {
+  return <FilmFrameIcon {...props}><path d="m14.2 4.2 5.6 5.6" /><path d="m5.1 18.9 8.2-8.2 2.8 2.8-8.2 8.2H5.1v-2.8Z" /><path d="m11.4 5.1 7.5 7.5" /><path d="m3.3 20.7 2.5-2.5" /></FilmFrameIcon>;
+}
+
 export function FilmIcon(props: FilmFrameIconProps) {
   return <FilmFrameIcon {...props}><rect x="3.5" y="5" width="17" height="14" rx="1.5" /><path d="M7 5v14M17 5v14M3.5 9h17M3.5 15h17" /></FilmFrameIcon>;
 }

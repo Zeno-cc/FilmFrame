@@ -10,6 +10,7 @@ import {
 import {
   getFrameNumberForImage,
   getFrameNumberForIndex,
+  getFrameNumberColor,
   getFilmTemplateFrameNumberMark,
   getKodakGoldFrameNumberPositions,
   normalizeFrameNumber,
@@ -45,6 +46,11 @@ describe('135 film geometry', () => {
 });
 
 describe('frame numbers', () => {
+  it('uses an explicit global color and otherwise preserves the renderer fallback', () => {
+    expect(getFrameNumberColor({ frameNumberColor: '#44cc88' }, '#d99a16')).toBe('#44cc88');
+    expect(getFrameNumberColor({}, '#d99a16')).toBe('#d99a16');
+  });
+
   it('normalizes numbers to the roll range', () => {
     expect(normalizeFrameNumber(1)).toBe(1);
     expect(normalizeFrameNumber(36)).toBe(36);

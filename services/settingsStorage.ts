@@ -9,6 +9,7 @@ const HOLE_TYPES = new Set(['square', 'rounded']);
 const PROCESSING_MODES = new Set(['preview', 'high']);
 const FRAME_RENDER_MODES = new Set(['classic', 'real135']);
 const SCAN_OUTPUT_ASPECTS = new Set(['native', '4:3']);
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,6 +48,17 @@ function setBoolean<T extends keyof FilmSettings>(
   }
 }
 
+function setHexColor<T extends keyof FilmSettings>(
+  patch: Partial<FilmSettings>,
+  source: Record<string, unknown>,
+  key: T,
+) {
+  const value = source[key];
+  if (typeof value === 'string' && HEX_COLOR.test(value)) {
+    patch[key] = value.toLowerCase() as FilmSettings[T];
+  }
+}
+
 export function normalizeSettingsPatch(value: unknown): Partial<FilmSettings> {
   if (!isRecord(value)) {
     return {};
@@ -67,6 +79,8 @@ export function normalizeSettingsPatch(value: unknown): Partial<FilmSettings> {
   setBoolean(patch, value, 'autoCropToFilmRatio');
   setBoolean(patch, value, 'enableRealisticRebate');
   setBoolean(patch, value, 'useFilmOverlayTemplate');
+  setHexColor(patch, value, 'frameNumberColor');
+  setHexColor(patch, value, 'scanBackgroundColor');
 
   const frameNumber = clampInteger(value.frameNumber, 1, Number.MAX_SAFE_INTEGER);
   if (frameNumber !== undefined) {

@@ -13,6 +13,7 @@ const settings: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
   customText: '',
   frameNumber: 1,
+  frameNumberColor: '#44cc88',
   showDate: false,
   dateStr: '2026/07/12',
   borderColor: '#111111',
@@ -89,6 +90,7 @@ describe('recipe storage', () => {
     expect(recipes.map(recipe => recipe.name)).toEqual(['Warm', 'Cool']);
     expect(recipes[0]).toMatchObject({ id: 'warm', updatedAt: 3 });
     expect(recipes[0].settings.grainIntensity).toBe(30);
+    expect(recipes[0].settings.frameNumberColor).toBe('#44cc88');
     expect(JSON.stringify(recipes[0])).not.toContain('runtime-only');
   });
 
@@ -129,4 +131,3 @@ describe('recipe storage', () => {
     })).not.toThrow();
   });
 });
-

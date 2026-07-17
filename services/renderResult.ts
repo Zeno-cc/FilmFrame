@@ -1,3 +1,4 @@
+import { DEFAULT_SCAN_BACKGROUND_COLOR } from '../types';
 import type { FilmSettings, OutputFormat, RenderTransform } from '../types';
 import { createRenderTransformKey } from './renderTransform';
 
@@ -13,6 +14,7 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
     settings.brandText,
     settings.customText,
     settings.frameNumber,
+    settings.frameNumberColor ?? null,
     settings.showDate,
     settings.dateStr,
     settings.borderColor,
@@ -26,6 +28,7 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
     settings.processingMode,
     settings.frameRenderMode,
     settings.scanOutputAspect,
+    settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
     settings.enableRealisticRebate,
     settings.maxRollFrames,
     settings.useFilmOverlayTemplate,

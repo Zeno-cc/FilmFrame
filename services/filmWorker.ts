@@ -1,6 +1,6 @@
-import { FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
-import { drawKodakGoldFrameNumbers, getFrameNumberForImage } from './filmFrameNumber';
+import { drawKodakGoldFrameNumbers, getFrameNumberColor, getFrameNumberForImage } from './filmFrameNumber';
 import {
   createKodakGoldOverlayLayout,
   createKodakGoldStripLayout,
@@ -156,7 +156,10 @@ function createLuminanceAlphaMask(mask: WorkerImage, width: number, height: numb
   return canvas;
 }
 
-function composeOnScannerCanvas(filmCanvas: WorkerCanvas): WorkerCanvas {
+function composeOnScannerCanvas(
+  filmCanvas: WorkerCanvas,
+  backgroundColor = DEFAULT_SCAN_BACKGROUND_COLOR,
+): WorkerCanvas {
   const paddingRatio = 0.055;
   const outputW = filmCanvas.width;
   const outputH = Math.round((outputW * 3) / 4);
@@ -173,7 +176,7 @@ function composeOnScannerCanvas(filmCanvas: WorkerCanvas): WorkerCanvas {
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas init failed');
 
-  ctx.fillStyle = '#e8e3d8';
+  ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   const gradient = ctx.createRadialGradient(
@@ -298,6 +301,7 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
     ctx.textBaseline = 'middle';
     const brandText = settings.customText.trim() !== '' ? settings.customText : settings.brandText;
     const dateStr = dateOverride || settings.dateStr;
+    const frameNumberColor = getFrameNumberColor(settings, settings.textColor);
 
     if (isPortrait) {
       ctx.save();
@@ -306,6 +310,7 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
       ctx.fillText(brandText, 0, 0);
       ctx.restore();
       ctx.save();
+      ctx.fillStyle = frameNumberColor;
       ctx.translate(canvas.width - borderSize * 0.1, canvas.height * 0.05);
       ctx.rotate(Math.PI / 2);
       ctx.fillText(`${settings.frameNumber}A`, 0, 0);
@@ -313,7 +318,10 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
     } else {
       ctx.fillText(brandText, canvas.width * 0.05, borderSize * 0.1);
       const frameText = `${settings.frameNumber}A`;
+      ctx.save();
+      ctx.fillStyle = frameNumberColor;
       ctx.fillText(frameText, canvas.width - ctx.measureText(frameText).width - canvas.width * 0.05, borderSize * 0.1);
+      ctx.restore();
       if (settings.showDate) {
         ctx.font = `normal ${Math.floor(fontSize * 0.75)}px ${preset.fontFamily}`;
         ctx.fillText(dateStr, canvas.width - ctx.measureText(dateStr).width - canvas.width * 0.05, canvas.height - borderSize * 0.1);
@@ -369,7 +377,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
-        ? composeOnScannerCanvas(canvas)
+        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
         : canvas;
     const outputCanvas = restoreOutputOrientationForSource(
       finalCanvas,
@@ -507,12 +515,19 @@ function drawContinuousFilmRowBase(ctx: WorkerContext, layout: ReturnType<typeof
   ctx.restore();
 }
 
-function drawContinuousStripMarkings(ctx: WorkerContext, layout: ReturnType<typeof createKodakGoldStripLayout>, rowY: number, index: number, frameNumber: number) {
+function drawContinuousStripMarkings(
+  ctx: WorkerContext,
+  layout: ReturnType<typeof createKodakGoldStripLayout>,
+  rowY: number,
+  index: number,
+  settings: FilmSettings,
+) {
   const frame = layout.frame;
   const col = index % layout.maxPerRow;
   const slotX = layout.padding + col * layout.frameStride;
   const imageX = slotX + frame.imageX;
   const textColor = '#d99a16';
+  const frameNumberColor = getFrameNumberColor(settings, textColor);
 
   ctx.save();
   ctx.translate(0, rowY);
@@ -548,11 +563,13 @@ function drawContinuousStripMarkings(ctx: WorkerContext, layout: ReturnType<type
 
   ctx.textAlign = 'center';
   ctx.font = `900 ${numberFont}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, topNumberY);
-  ctx.fillText(String(frameNumber), imageX + frame.imageW * 0.5, bottomNumberY);
+  ctx.fillStyle = frameNumberColor;
+  ctx.fillText(String(settings.frameNumber), imageX + frame.imageW * 0.5, topNumberY);
+  ctx.fillText(String(settings.frameNumber), imageX + frame.imageW * 0.5, bottomNumberY);
 
   ctx.textAlign = 'left';
   ctx.font = `800 ${smallFont}px Arial, Helvetica, sans-serif`;
+  ctx.fillStyle = textColor;
   ctx.fillText('DX', slotX + frame.imageX * 0.18, bottomTextY);
   ctx.fillText('SAFETY FILM', imageX + frame.imageW * 0.43, bottomTextY);
   drawContinuousDxBlocks(ctx, imageX + frame.imageW * 0.1, bottomBarcodeY, frame.imageW * 0.22, smallFont);
@@ -607,7 +624,7 @@ async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): 
         index,
         settings.maxRollFrames ?? 36,
       );
-      drawContinuousStripMarkings(ctx, layout, y, index, frameNumber);
+      drawContinuousStripMarkings(ctx, layout, y, index, { ...settings, frameNumber });
     } finally {
       img.close();
     }

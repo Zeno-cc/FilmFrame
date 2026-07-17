@@ -1,6 +1,13 @@
 import type { FilmSettings } from '../types';
 import type { KodakGoldOverlayLayout } from './filmOverlay';
 
+export function getFrameNumberColor(
+  settings: Pick<FilmSettings, 'frameNumberColor'>,
+  fallback: string,
+): string {
+  return settings.frameNumberColor || fallback;
+}
+
 export function normalizeFrameNumber(frameNumber: number, maxRollFrames = 36): number {
   if (!Number.isFinite(frameNumber)) return 1;
 
@@ -67,7 +74,7 @@ export function drawFilmTemplateFrameNumber(
   );
 
   ctx.save();
-  ctx.fillStyle = settings.textColor || '#d99a16';
+  ctx.fillStyle = getFrameNumberColor(settings, settings.textColor || '#d99a16');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.globalAlpha = 0.82;
@@ -83,7 +90,7 @@ export function drawKodakGoldFrameNumbers(
 ) {
   const maxRollFrames = settings.maxRollFrames ?? 36;
   const frameNumber = normalizeFrameNumber(settings.frameNumber, maxRollFrames);
-  const textColor = settings.textColor || '#d99a16';
+  const textColor = getFrameNumberColor(settings, settings.textColor || '#d99a16');
 
   ctx.save();
   ctx.fillStyle = textColor;

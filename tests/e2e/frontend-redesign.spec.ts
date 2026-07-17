@@ -45,6 +45,8 @@ test('mobile settings sheet traps the settings flow and closes with Escape', asy
   await expect(sheet).toBeVisible();
   await sheet.getByRole('tab', { name: '输出' }).click();
   await expect(sheet.getByRole('group', { name: '输出格式' })).toBeVisible();
+  await sheet.getByRole('tab', { name: '胶片' }).click();
+  await expect(sheet.getByLabel('帧号颜色')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
@@ -122,7 +124,42 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
   const inspector = page.getByRole('complementary', { name: '暗房配方' });
   await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
 
+  const frameNumberColor = inspector.getByLabel('帧号颜色');
+  await frameNumberColor.evaluate((input, value) => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '#44cc88');
+  await expect(frameNumberColor).toHaveValue('#44cc88');
+  await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 400');
+  await expect(frameNumberColor).toHaveValue('#44cc88');
+  await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
+  await expect(frameNumberColor).toHaveValue('#44cc88');
+
   await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
+  await inspector.getByRole('button', { name: '仅保留底片' }).click();
+  await expect(inspector.getByRole('button', { name: '仅保留底片' })).toHaveAttribute('aria-pressed', 'true');
+  await inspector.getByRole('button', { name: '保留扫描背景' }).click();
+  const scanBackgroundColor = inspector.getByLabel('扫描背景色');
+  await expect(scanBackgroundColor).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'EyeDropper', {
+      configurable: true,
+      value: class {
+        open() {
+          return Promise.resolve({ sRGBHex: '#9fc5d5' });
+        }
+      },
+    });
+  });
+  await inspector.getByRole('button', { name: '从屏幕取色' }).click();
+  await expect(scanBackgroundColor).toHaveValue('#9fc5d5');
+  await scanBackgroundColor.evaluate((input, value) => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '#9fc5d5');
+  await expect(scanBackgroundColor).toHaveValue('#9fc5d5');
   await page.locator('input[type="file"]').setInputFiles(fixture);
   const frameImage = page.getByRole('img', { name: path.basename(fixture) });
   const originalFrameSource = await frameImage.getAttribute('src');

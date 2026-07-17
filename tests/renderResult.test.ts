@@ -39,7 +39,9 @@ describe('render result identity', () => {
     ['format', { outputFormat: 'image/png' as const }],
     ['quality', { outputQuality: 0.8 }],
     ['grain', { grainIntensity: 30 }],
+    ['scan background', { scanBackgroundColor: '#b8c4d8' }],
     ['frame number', { frameNumber: 12 }],
+    ['frame number color', { frameNumberColor: '#44cc88' }],
     ['render mode', { frameRenderMode: 'classic' as const }],
   ])('marks an artifact stale after a %s change', (_name, patch) => {
     const artifact = {

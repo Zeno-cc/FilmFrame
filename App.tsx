@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
 import { disposeFilmWorkerClient, processImage, generateFilmStrip } from './services/filmWorkerClient';
 import { createZipBlob } from './services/zip';
 import { loadPreferences, mergeSettings, savePreferences } from './services/settingsStorage';
@@ -88,6 +88,7 @@ const DEFAULT_SETTINGS: FilmSettings = {
   processingMode: 'preview',
   frameRenderMode: 'real135',
   scanOutputAspect: 'native',
+  scanBackgroundColor: DEFAULT_SCAN_BACKGROUND_COLOR,
   autoCropToFilmRatio: true,
   enableRealisticRebate: true,
   maxRollFrames: 36,
