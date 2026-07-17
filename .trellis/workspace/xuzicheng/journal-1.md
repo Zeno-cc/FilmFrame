@@ -137,3 +137,36 @@ Added real 135 template coverage for all remaining film stocks, fixed T-MAX 400 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Custom real 135 output colors
+
+**Date**: 2026-07-17
+**Task**: Custom real 135 output colors
+**Branch**: `main`
+
+### Summary
+
+Added customizable scan background and frame-number colors across UI, persistence, render identity, main-thread and Worker output; repaired the Portra 160 overlay edge; completed unit, build, and E2E validation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `aff853e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
