@@ -204,3 +204,36 @@ Added a guarded delete-all workflow with confirmation, focus restoration, Object
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Global real 135 sprocket color
+
+**Date**: 2026-07-20
+**Task**: Global real 135 sprocket color
+**Branch**: `main`
+
+### Summary
+
+Added a persistent global real-135 sprocket color override with source-template fallback, 16 stock-specific masks, main-thread and Worker rendering parity, responsive controls, render invalidation, and full unit/E2E coverage.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ad88ede` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
