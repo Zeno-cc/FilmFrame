@@ -47,6 +47,7 @@ test('mobile settings sheet traps the settings flow and closes with Escape', asy
   await expect(sheet.getByRole('group', { name: '输出格式' })).toBeVisible();
   await sheet.getByRole('tab', { name: '胶片' }).click();
   await expect(sheet.getByLabel('帧号颜色')).toBeVisible();
+  await expect(sheet.getByLabel('齿孔颜色')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
@@ -99,6 +100,13 @@ test('tablet settings drawer restores focus to its Header trigger', async ({ pag
 
 test('upload, develop, preview and film strip remain usable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
+  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  const sprocketColor = inspector.getByRole('textbox', { name: '齿孔颜色', exact: true });
+  await sprocketColor.evaluate((input, value) => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '#3366cc');
   await page.locator('input[type="file"]').setInputFiles(fixture);
 
   await expect(page.getByRole('list', { name: /接触印象，共 1 张照片/ })).toBeVisible();
@@ -106,6 +114,24 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
 
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
+  const processedImage = page.getByRole('img', { name: path.basename(fixture) });
+  const sprocketPixel = await processedImage.evaluate((image: HTMLImageElement) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas context unavailable');
+    context.drawImage(image, 0, 0);
+    return Array.from(context.getImageData(
+      Math.round(image.naturalWidth * 99 / 1307),
+      Math.round(image.naturalHeight * 130 / 1203),
+      1,
+      1,
+    ).data);
+  });
+  expect(Math.abs(sprocketPixel[0] - 51)).toBeLessThan(18);
+  expect(Math.abs(sprocketPixel[1] - 102)).toBeLessThan(18);
+  expect(Math.abs(sprocketPixel[2] - 204)).toBeLessThan(18);
 
   await page.getByRole('button', { name: /查看 aperture-mask-derived\.png/ }).click();
   const preview = page.getByRole('dialog', { name: /aperture-mask-derived\.png/ });
@@ -116,7 +142,27 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
 
   await page.getByRole('tab', { name: /连底长条/ }).click();
   await expect(page.getByRole('heading', { name: '长条审片台' })).toBeVisible();
-  await expect(page.getByLabel('长条审片台').getByRole('button', { name: '生成胶片长条' })).toBeVisible();
+  const stripStage = page.getByLabel('长条审片台');
+  await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
+  const stripImage = stripStage.getByRole('img', { name: '已生成的胶片长条' });
+  await expect(stripImage).toBeVisible({ timeout: 30_000 });
+  const stripSprocketPixel = await stripImage.evaluate((image: HTMLImageElement) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas context unavailable');
+    context.drawImage(image, 0, 0);
+    return Array.from(context.getImageData(
+      Math.round(image.naturalWidth * 0.0824),
+      Math.round(image.naturalHeight * 0.138),
+      1,
+      1,
+    ).data);
+  });
+  expect(Math.abs(stripSprocketPixel[0] - 51)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketPixel[1] - 102)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketPixel[2] - 204)).toBeLessThan(18);
 });
 
 test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }) => {
@@ -131,10 +177,28 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, '#44cc88');
   await expect(frameNumberColor).toHaveValue('#44cc88');
+
+  const sprocketColor = inspector.getByRole('textbox', { name: '齿孔颜色', exact: true });
+  await expect(inspector.getByText('跟随原片', { exact: true })).toBeVisible();
+  await sprocketColor.evaluate((input, value) => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '#cc3344');
+  await expect(sprocketColor).toHaveValue('#cc3344');
+  await expect(inspector.getByText('#cc3344', { exact: true })).toBeVisible();
   await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 400');
   await expect(frameNumberColor).toHaveValue('#44cc88');
+  await expect(sprocketColor).toHaveValue('#cc3344');
   await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
   await expect(frameNumberColor).toHaveValue('#44cc88');
+  await inspector.getByRole('button', { name: '恢复原片齿孔颜色' }).click();
+  await expect(inspector.getByText('跟随原片', { exact: true })).toBeVisible();
+  await sprocketColor.evaluate((input, value) => {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '#cc3344');
 
   await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
   await inspector.getByRole('button', { name: '仅保留底片' }).click();
@@ -160,17 +224,55 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, '#9fc5d5');
   await expect(scanBackgroundColor).toHaveValue('#9fc5d5');
+  await inspector.getByRole('button', { name: '仅保留底片' }).click();
   await page.locator('input[type="file"]').setInputFiles(fixture);
   const frameImage = page.getByRole('img', { name: path.basename(fixture) });
   const originalFrameSource = await frameImage.getAttribute('src');
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => frameImage.getAttribute('src')).not.toBe(originalFrameSource);
+  const frameSprocketPixel = await frameImage.evaluate((image: HTMLImageElement) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas context unavailable');
+    context.drawImage(image, 0, 0);
+    return Array.from(context.getImageData(
+      Math.round(image.naturalWidth * 121 / 1307),
+      Math.round(image.naturalHeight * 136 / 1203),
+      1,
+      1,
+    ).data);
+  });
+  expect(Math.abs(frameSprocketPixel[0] - 204)).toBeLessThan(18);
+  expect(Math.abs(frameSprocketPixel[1] - 51)).toBeLessThan(18);
+  expect(Math.abs(frameSprocketPixel[2] - 68)).toBeLessThan(18);
 
   await page.getByRole('tab', { name: /连底长条/ }).click();
   const stripStage = page.getByLabel('长条审片台');
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
-  await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
+  const stripImage = stripStage.getByRole('img', { name: '已生成的胶片长条' });
+  await expect(stripImage).toBeVisible({ timeout: 30_000 });
+  const stripSprocketPixel = await stripImage.evaluate((image: HTMLImageElement) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas context unavailable');
+    context.drawImage(image, 0, 0);
+    const xRatio = (0.035 + 121 / 1307) / 1.07;
+    const yRatio = (0.035 + 136 / 1307) / (1203 / 1307 + 0.07);
+    return Array.from(context.getImageData(
+      Math.round(image.naturalWidth * xRatio),
+      Math.round(image.naturalHeight * yRatio),
+      1,
+      1,
+    ).data);
+  });
+  expect(Math.abs(stripSprocketPixel[0] - 204)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketPixel[1] - 51)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketPixel[2] - 68)).toBeLessThan(18);
 });
 
 for (const [name, stock] of [

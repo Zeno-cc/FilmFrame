@@ -96,6 +96,72 @@ drawFrameNumber(ctx);
 ctx.restore();
 ```
 
+### Scenario: Optional Real-135 Sprocket Color Override
+
+#### 1. Scope / Trigger
+
+Apply this contract when real-135 sprocket color behavior changes across settings UI, persistence, render identity, template assets, main-thread Canvas rendering, or Worker rendering.
+
+#### 2. Signatures
+
+```ts
+interface FilmSettings {
+  real135SprocketColor?: string;
+}
+
+function getReal135SprocketMaskUrl(brand: FilmType): string | undefined;
+
+function getReal135SprocketColor(
+  settings: Pick<FilmSettings, 'real135SprocketColor'>,
+): string | null;
+```
+
+#### 3. Contracts
+
+- `real135SprocketColor` is an optional six-digit HEX override stored as lowercase `#rrggbb`.
+- An absent value means `跟随原片`: flattened templates preserve their baked sprocket colors, while programmatic Gold holes retain their existing black fallback.
+- An explicit value applies globally across real-135 stock and output-mode changes, preferences, recipes, and Worker request settings.
+- Every key in the real-135 template registry must have a stock-specific RGBA mask at `1307x1203`; only sprocket interiors may have nonzero alpha.
+- Composite the tinted mask after the film template/base and before dynamic frame markings. Scope composite state with `save()`/`restore()` or an isolated temporary canvas.
+- The setting participates in `createRenderSettingsKey`, so selection and reset mark single and strip artifacts stale.
+- A missing or unreadable mask preserves the source template and must not fail rendering.
+
+#### 4. Validation & Error Matrix
+
+- Valid `#RRGGBB` -> normalize to lowercase and persist.
+- Missing value -> omit the override and preserve the renderer's existing sprocket appearance.
+- Invalid stored string, short HEX, or non-string -> ignore it without replacing the fallback.
+- Registered flattened template without a valid mask -> fail asset validation before release.
+- Runtime mask-load failure -> continue rendering with the source-template holes unchanged.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: `#CC3344` becomes `#cc3344` and recolors only the existing stock-specific hole interiors in single and strip output.
+- Base: no override leaves every flattened template visually unchanged.
+- Bad: reusing one universal hole geometry covers labels, rebate text, or perforation edges on stocks with different hole counts.
+
+#### 6. Tests Required
+
+- Settings tests assert valid normalization, invalid-value rejection, and preference/recipe round trips.
+- Render-result and Worker-client tests assert invalidation and request propagation.
+- Registry tests assert every real-135 template has a matching mask URL.
+- Browser asset tests assert `1307x1203` RGBA dimensions, nonzero hole coverage, and zero aperture coverage for every mask.
+- Playwright render tests sample representative flattened-template and Gold single/strip pixels and assert desktop/mobile control behavior without horizontal overflow.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: one geometry cannot match every generated stock template.
+drawUniversalSprocketRectangles(ctx, settings.real135SprocketColor);
+
+// Correct: tint the mask registered for the active stock and isolate failures.
+const maskUrl = getReal135SprocketMaskUrl(settings.brandText);
+const color = getReal135SprocketColor(settings);
+if (maskUrl && color) {
+  await compositeStockSprocketMask(ctx, maskUrl, color);
+}
+```
+
 ### Scenario: Destructive Roll Cleanup
 
 #### 1. Scope / Trigger

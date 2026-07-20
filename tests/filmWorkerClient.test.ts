@@ -34,6 +34,7 @@ const settings: FilmSettings = {
   customText: '',
   frameNumber: 1,
   frameNumberColor: '#44cc88',
+  real135SprocketColor: '#112233',
   showDate: false,
   dateStr: '2026/07/11',
   borderColor: '#111111',
@@ -160,7 +161,7 @@ describe('createWorkerRenderer', () => {
 
     expect(worker.messages[0]).toMatchObject({
       type: 'processImage',
-      settings: { frameNumberColor: '#44cc88' },
+      settings: { frameNumberColor: '#44cc88', real135SprocketColor: '#112233' },
       transform,
     });
     expect(worker.messages[1]).toMatchObject({

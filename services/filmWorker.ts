@@ -1,5 +1,12 @@
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
+import {
+  getReal135SprocketColor,
+  getReal135SprocketMaskUrl,
+  paintTintedSprocketMask,
+  REAL135_SPROCKET_MASK_HEIGHT,
+  REAL135_SPROCKET_MASK_WIDTH,
+} from './filmSprocket';
 import { drawKodakGoldFrameNumbers, getFrameNumberColor, getFrameNumberForImage } from './filmFrameNumber';
 import {
   createKodakGoldOverlayLayout,
@@ -54,6 +61,7 @@ function assertCanvasBudget(width: number, height: number) {
 }
 
 let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
+let kodakGoldSprocketMaskPromise: Promise<ImageBitmap> | null = null;
 
 function roundedRect(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -133,6 +141,35 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   }
 
   return kodakGoldLayeredAssetsPromise;
+}
+
+function loadKodakGoldSprocketMask(): Promise<ImageBitmap> {
+  if (!kodakGoldSprocketMaskPromise) {
+    const maskUrl = getReal135SprocketMaskUrl(FilmType.KODAK_GOLD_200);
+    if (!maskUrl) return Promise.reject(new Error('Kodak Gold sprocket mask is not registered'));
+    kodakGoldSprocketMaskPromise = loadBitmapFromUrl(maskUrl).catch(error => {
+      kodakGoldSprocketMaskPromise = null;
+      throw error;
+    });
+  }
+  return kodakGoldSprocketMaskPromise;
+}
+
+async function createTintedSprocketOverlay(settings: FilmSettings): Promise<OffscreenCanvas | null> {
+  const color = getReal135SprocketColor(settings);
+  if (!color) return null;
+
+  try {
+    const mask = await loadKodakGoldSprocketMask();
+    const canvas = new OffscreenCanvas(REAL135_SPROCKET_MASK_WIDTH, REAL135_SPROCKET_MASK_HEIGHT);
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) return null;
+    paintTintedSprocketMask(context, mask, color, canvas.width, canvas.height);
+    return canvas;
+  } catch (error) {
+    console.warn('Sprocket mask unavailable; preserving the source template.', error);
+    return null;
+  }
 }
 
 function createLuminanceAlphaMask(mask: WorkerImage, width: number, height: number): WorkerCanvas {
@@ -340,6 +377,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
   }
 
   const assets = await loadKodakGoldLayeredAssets();
+  const sprocketOverlay = await createTintedSprocketOverlay(settings);
   const img = await createImageBitmap(file);
 
   try {
@@ -371,6 +409,9 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
 
     ctx.drawImage(emulsion, 0, 0);
     ctx.drawImage(assets.base, 0, 0, layout.filmW, layout.filmH);
+    if (sprocketOverlay) {
+      ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
+    }
     // Keep aperture shadow disabled to match the current main-thread renderer.
     // ctx.drawImage(assets.apertureShadow, 0, 0, layout.filmW, layout.filmH);
     drawKodakGoldFrameNumbers(ctx as unknown as CanvasRenderingContext2D, layout, settings);
@@ -439,12 +480,12 @@ async function renderClassicStrip(images: ImageItem[], settings: FilmSettings): 
   return canvasToBlob(canvas, settings);
 }
 
-function drawReal135Hole(ctx: WorkerContext, x: number, y: number, w: number, h: number) {
+function drawReal135Hole(ctx: WorkerContext, x: number, y: number, w: number, h: number, color = '#020100') {
   const radius = Math.round(Math.min(w, h) * 0.22);
 
   ctx.save();
   roundedRect(ctx, x, y, w, h, radius);
-  ctx.fillStyle = '#020100';
+  ctx.fillStyle = color;
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = Math.max(4, Math.round(h * 0.12));
   ctx.fill();
@@ -470,7 +511,13 @@ function drawContinuousDxBlocks(ctx: WorkerContext, x: number, y: number, width:
   }
 }
 
-function drawContinuousFilmRowBase(ctx: WorkerContext, layout: ReturnType<typeof createKodakGoldStripLayout>, rowY: number, rowCount: number) {
+function drawContinuousFilmRowBase(
+  ctx: WorkerContext,
+  layout: ReturnType<typeof createKodakGoldStripLayout>,
+  rowY: number,
+  rowCount: number,
+  settings: FilmSettings,
+) {
   const frame = layout.frame;
   const rowW = frame.imageX + rowCount * frame.imageW + Math.max(0, rowCount - 1) * layout.frameGap + (frame.filmW - frame.imageX - frame.imageW);
   const radius = Math.max(10, Math.round(frame.filmH * 0.018));
@@ -506,10 +553,11 @@ function drawContinuousFilmRowBase(ctx: WorkerContext, layout: ReturnType<typeof
   const pitch = layout.frameStride / 8;
   const topY = Math.round(frame.topRebateH * 0.42);
   const bottomY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.18);
+  const sprocketColor = getReal135SprocketColor(settings) ?? '#020100';
 
   for (let x = frame.imageX * 0.42; x < rowW - holeW; x += pitch) {
-    drawReal135Hole(ctx, Math.round(x), topY, holeW, holeH);
-    drawReal135Hole(ctx, Math.round(x), bottomY, holeW, holeH);
+    drawReal135Hole(ctx, Math.round(x), topY, holeW, holeH, sprocketColor);
+    drawReal135Hole(ctx, Math.round(x), bottomY, holeW, holeH, sprocketColor);
   }
 
   ctx.restore();
@@ -597,7 +645,7 @@ async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): 
   for (let row = 0; row < layout.rows; row++) {
     const rowCount = Math.min(layout.maxPerRow, images.length - row * layout.maxPerRow);
     const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-    drawContinuousFilmRowBase(ctx, layout, y, rowCount);
+    drawContinuousFilmRowBase(ctx, layout, y, rowCount, settings);
   }
 
   for (let index = 0; index < images.length; index++) {

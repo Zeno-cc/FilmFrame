@@ -46,6 +46,7 @@ export interface FilmSettings {
   customText: string; // 新增：自定义文字
   frameNumber: number;
   frameNumberColor?: string;
+  real135SprocketColor?: string;
   showDate: boolean;
   dateStr: string;
   borderColor: string;

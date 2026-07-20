@@ -280,6 +280,33 @@ export function RecipeInspector({
                 </label>
               </div>
 
+              {isReal135 && (
+                <div>
+                  <span className={labelClass}>齿孔颜色</span>
+                  <div className="flex min-h-11 items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="齿孔颜色"
+                      value={settings.real135SprocketColor ?? '#000000'}
+                      onChange={event => update({ real135SprocketColor: event.target.value })}
+                      disabled={disabled}
+                      className="h-11 w-14 shrink-0 cursor-pointer rounded-[4px] border border-[var(--ff-line)] bg-transparent p-1 disabled:opacity-45"
+                    />
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--ff-paper-muted)]">
+                      {settings.real135SprocketColor ?? '跟随原片'}
+                    </span>
+                    {settings.real135SprocketColor && (
+                      <IconButton
+                        icon={<ResetIcon size={17} />}
+                        label="恢复原片齿孔颜色"
+                        onClick={() => update({ real135SprocketColor: undefined })}
+                        disabled={disabled}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
               {!isReal135 && (
                 <>
                   <label className="block">

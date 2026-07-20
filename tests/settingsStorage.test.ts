@@ -40,6 +40,7 @@ describe('settings normalization', () => {
       customText: 'SHOT BY ZENO',
       frameNumber: -10,
       frameNumberColor: '#12ABEF',
+      real135SprocketColor: '#22CC88',
       showDate: false,
       dateStr: '2024/02/03',
       borderColor: '#abcdef',
@@ -64,6 +65,7 @@ describe('settings normalization', () => {
     expect(patch.brandText).toBe(FilmType.ILFORD_HP5);
     expect(patch.frameNumber).toBe(1);
     expect(patch.frameNumberColor).toBe('#12abef');
+    expect(patch.real135SprocketColor).toBe('#22cc88');
     expect(patch.borderSize).toBe(25);
     expect(patch.grainIntensity).toBe(0);
     expect(patch.outputQuality).toBe(1);
@@ -81,6 +83,7 @@ describe('settings normalization', () => {
       outputQuality: 0.1,
       maxRollFrames: 99,
       frameNumberColor: 'amber',
+      real135SprocketColor: 'black',
       scanBackgroundColor: 'blue',
       filmOverlayUrl: '/should-not-override.png',
     });
@@ -90,6 +93,7 @@ describe('settings normalization', () => {
     expect(merged.outputQuality).toBe(0.5);
     expect(merged.maxRollFrames).toBe(defaults.maxRollFrames);
     expect(merged.frameNumberColor).toBe(defaults.frameNumberColor);
+    expect(merged.real135SprocketColor).toBe(defaults.real135SprocketColor);
     expect(merged.scanBackgroundColor).toBe(defaults.scanBackgroundColor);
     expect(merged.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
   });
@@ -122,6 +126,7 @@ describe('settings storage', () => {
       filmOverlayUrl: '/runtime-overlay.png',
       frameNumber: 42,
       frameNumberColor: '#44cc88',
+      real135SprocketColor: '#112233',
       scanBackgroundColor: '#aabbcc',
     }, 'strip');
   });
@@ -131,6 +136,7 @@ describe('settings storage', () => {
     expect(rawSaved).toContain('"outputMode":"strip"');
     expect(rawSaved).toContain('"frameNumber":42');
     expect(rawSaved).toContain('"frameNumberColor":"#44cc88"');
+    expect(rawSaved).toContain('"real135SprocketColor":"#112233"');
     expect(rawSaved).toContain('"scanBackgroundColor":"#aabbcc"');
     expect(rawSaved).not.toContain('runtime-overlay');
   });
@@ -140,6 +146,7 @@ describe('settings storage', () => {
     expect(loaded.outputMode).toBe('strip');
     expect(loaded.settings.frameNumber).toBe(42);
     expect(loaded.settings.frameNumberColor).toBe('#44cc88');
+    expect(loaded.settings.real135SprocketColor).toBe('#112233');
     expect(loaded.settings.scanBackgroundColor).toBe('#aabbcc');
     expect(loaded.settings.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
   });

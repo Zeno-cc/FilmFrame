@@ -2,6 +2,13 @@
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
 import { applyGold200Look } from './filmColor';
 import {
+  getReal135SprocketColor,
+  getReal135SprocketMaskUrl,
+  paintTintedSprocketMask,
+  REAL135_SPROCKET_MASK_HEIGHT,
+  REAL135_SPROCKET_MASK_WIDTH,
+} from './filmSprocket';
+import {
   drawFilmTemplateFrameNumber,
   drawKodakGoldFrameNumbers,
   getFrameNumberColor,
@@ -82,6 +89,26 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
     img.src = src;
   });
 };
+
+async function createTintedSprocketOverlay(settings: FilmSettings): Promise<HTMLCanvasElement | null> {
+  const color = getReal135SprocketColor(settings);
+  const maskUrl = getReal135SprocketMaskUrl(settings.brandText);
+  if (!color || !maskUrl) return null;
+
+  try {
+    const mask = await loadImage(maskUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = REAL135_SPROCKET_MASK_WIDTH;
+    canvas.height = REAL135_SPROCKET_MASK_HEIGHT;
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) return null;
+    paintTintedSprocketMask(context, mask, color, canvas.width, canvas.height);
+    return canvas;
+  } catch (error) {
+    console.warn('Sprocket mask unavailable; preserving the source template.', error);
+    return null;
+  }
+}
 
 type KodakGoldLayeredAssets = {
   base: HTMLImageElement;
@@ -442,12 +469,14 @@ function draw135Perforations(
 
 function drawReal135SidePerforations(
   ctx: CanvasRenderingContext2D,
-  layout: Film135SideLayout
+  layout: Film135SideLayout,
+  settings: FilmSettings,
 ) {
+  const color = getReal135SprocketColor(settings) ?? '#020100';
   for (let i = 0; i < layout.perfCount; i++) {
     const y = Math.round(layout.perfStartY + i * layout.perfPitch);
-    drawReal135Hole(ctx, layout.perfLeftX, y, layout.perfW, layout.perfH);
-    drawReal135Hole(ctx, layout.perfRightX, y, layout.perfW, layout.perfH);
+    drawReal135Hole(ctx, layout.perfLeftX, y, layout.perfW, layout.perfH, color);
+    drawReal135Hole(ctx, layout.perfRightX, y, layout.perfW, layout.perfH, color);
   }
 }
 
@@ -456,13 +485,14 @@ function drawReal135Hole(
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  color = '#020100',
 ) {
   const radius = Math.round(Math.min(w, h) * 0.22);
 
   ctx.save();
   drawRoundedRect(ctx, x, y, w, h, radius);
-  ctx.fillStyle = '#020100';
+  ctx.fillStyle = color;
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = Math.max(4, Math.round(h * 0.12));
   ctx.fill();
@@ -552,7 +582,7 @@ export const processImageReal135 = async (
   }
 
   drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
-  drawReal135SidePerforations(ctx, layout);
+  drawReal135SidePerforations(ctx, layout, settings);
   draw135SideMarkings(ctx, layout, settings);
   drawRealFilmStockTexture(ctx, layout, settings);
   drawDust(ctx, layout.filmW, layout.filmH, 30);
@@ -574,6 +604,7 @@ const processImageWithTemplateOverlay = async (
   if (settings.useFilmOverlayTemplate === false) return null;
   const registeredOverlayUrl = getReal135OverlayUrl(settings.brandText);
   if (!registeredOverlayUrl) return null;
+  const sprocketOverlay = await createTintedSprocketOverlay(settings);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     try {
@@ -588,6 +619,7 @@ const processImageWithTemplateOverlay = async (
         settings,
         targetImageWidthPx,
         transform,
+        sprocketOverlay,
       );
 
       const finalCanvas =
@@ -615,7 +647,14 @@ const processImageWithTemplateOverlay = async (
     const overlay = await loadImage(overlayUrl);
     const img = await loadImage(imageSource);
     const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-    const canvas = renderKodakGoldTemplateFrameCanvas(img, overlay, settings, targetImageWidthPx, transform);
+    const canvas = renderKodakGoldTemplateFrameCanvas(
+      img,
+      overlay,
+      settings,
+      targetImageWidthPx,
+      transform,
+      sprocketOverlay,
+    );
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
@@ -642,6 +681,7 @@ function renderKodakGoldTemplateFrameCanvas(
   settings: FilmSettings,
   targetImageWidthPx: number,
   transform?: RenderTransform,
+  sprocketOverlay?: CanvasImageSource | null,
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   const canvas = document.createElement('canvas');
@@ -651,7 +691,7 @@ function renderKodakGoldTemplateFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings, transform);
+  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings, transform, sprocketOverlay);
   return canvas;
 }
 
@@ -663,6 +703,7 @@ function renderKodakGoldLayeredFrameCanvas(
   settings: FilmSettings,
   targetImageWidthPx: number,
   transform?: RenderTransform,
+  sprocketOverlay?: CanvasImageSource | null,
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   const canvas = document.createElement('canvas');
@@ -672,7 +713,17 @@ function renderKodakGoldLayeredFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldLayeredFrame(ctx, img, base, apertureMask, apertureShadow, layout, settings, transform);
+  drawKodakGoldLayeredFrame(
+    ctx,
+    img,
+    base,
+    apertureMask,
+    apertureShadow,
+    layout,
+    settings,
+    transform,
+    sprocketOverlay,
+  );
   return canvas;
 }
 
@@ -685,6 +736,7 @@ function drawKodakGoldLayeredFrame(
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings,
   transform?: RenderTransform,
+  sprocketOverlay?: CanvasImageSource | null,
 ) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -715,6 +767,9 @@ function drawKodakGoldLayeredFrame(
 
   ctx.drawImage(emulsion, 0, 0);
   ctx.drawImage(base, 0, 0, layout.filmW, layout.filmH);
+  if (sprocketOverlay) {
+    ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
+  }
   // Temporarily disabled to avoid darkening the photo edges.
   // ctx.drawImage(apertureShadow, 0, 0, layout.filmW, layout.filmH);
   drawKodakGoldFrameNumbers(ctx, layout, settings);
@@ -727,6 +782,7 @@ function drawKodakGoldTemplateFrame(
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings,
   transform?: RenderTransform,
+  sprocketOverlay?: CanvasImageSource | null,
 ) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -742,6 +798,9 @@ function drawKodakGoldTemplateFrame(
 
   drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
   drawKodakGoldOverlayLayer(ctx, overlay, layout);
+  if (sprocketOverlay) {
+    ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
+  }
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     drawKodakGoldFrameNumbers(ctx, layout, settings);
   } else {
@@ -753,7 +812,8 @@ function drawContinuousFilmRowBase(
   ctx: CanvasRenderingContext2D,
   layout: ReturnType<typeof createKodakGoldStripLayout>,
   rowY: number,
-  rowCount: number
+  rowCount: number,
+  settings: FilmSettings,
 ) {
   const frame = layout.frame;
   const rowW = frame.imageX + rowCount * frame.imageW + Math.max(0, rowCount - 1) * layout.frameGap + (frame.filmW - frame.imageX - frame.imageW);
@@ -801,7 +861,13 @@ function drawContinuousFilmRowBase(
     }
   }
 
-  drawContinuousSprocketHoles(ctx, frame, rowW, layout.frameStride);
+  drawContinuousSprocketHoles(
+    ctx,
+    frame,
+    rowW,
+    layout.frameStride,
+    getReal135SprocketColor(settings) ?? '#020100',
+  );
   ctx.restore();
 }
 
@@ -809,7 +875,8 @@ function drawContinuousSprocketHoles(
   ctx: CanvasRenderingContext2D,
   frame: KodakGoldOverlayLayout,
   rowW: number,
-  frameStride: number
+  frameStride: number,
+  color: string,
 ) {
   const holeW = Math.round(frame.imageW * 0.055);
   const holeH = Math.round(frame.topRebateH * 0.42);
@@ -818,8 +885,8 @@ function drawContinuousSprocketHoles(
   const bottomY = Math.round(frame.bottomRebateY + frame.bottomRebateH * 0.18);
 
   for (let x = frame.imageX * 0.42; x < rowW - holeW; x += pitch) {
-    drawReal135Hole(ctx, Math.round(x), topY, holeW, holeH);
-    drawReal135Hole(ctx, Math.round(x), bottomY, holeW, holeH);
+    drawReal135Hole(ctx, Math.round(x), topY, holeW, holeH, color);
+    drawReal135Hole(ctx, Math.round(x), bottomY, holeW, holeH, color);
   }
 
   ctx.save();
@@ -926,6 +993,7 @@ const generateReal135FilmStrip = async (
       console.warn('Film strip overlay template not available, falling back to classic strip.', error);
       return null;
     }
+    const sprocketOverlay = await createTintedSprocketOverlay(settings);
 
     const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
     const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
@@ -957,7 +1025,15 @@ const generateReal135FilmStrip = async (
 
       ctx.save();
       ctx.translate(x, y);
-      drawKodakGoldTemplateFrame(ctx, img, overlay, layout.frame, frameSettings, images[index].transform);
+      drawKodakGoldTemplateFrame(
+        ctx,
+        img,
+        overlay,
+        layout.frame,
+        frameSettings,
+        images[index].transform,
+        sprocketOverlay,
+      );
       ctx.restore();
     }
 
@@ -985,7 +1061,7 @@ const generateReal135FilmStrip = async (
   for (let row = 0; row < layout.rows; row++) {
     const rowCount = Math.min(layout.maxPerRow, images.length - row * layout.maxPerRow);
     const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-    drawContinuousFilmRowBase(ctx, layout, y, rowCount);
+    drawContinuousFilmRowBase(ctx, layout, y, rowCount, settings);
   }
 
   for (let index = 0; index < images.length; index++) {

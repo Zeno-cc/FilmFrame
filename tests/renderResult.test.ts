@@ -42,6 +42,7 @@ describe('render result identity', () => {
     ['scan background', { scanBackgroundColor: '#b8c4d8' }],
     ['frame number', { frameNumber: 12 }],
     ['frame number color', { frameNumberColor: '#44cc88' }],
+    ['real 135 sprocket color', { real135SprocketColor: '#112233' }],
     ['render mode', { frameRenderMode: 'classic' as const }],
   ])('marks an artifact stale after a %s change', (_name, patch) => {
     const artifact = {

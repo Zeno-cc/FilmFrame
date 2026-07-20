@@ -15,6 +15,7 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
     settings.customText,
     settings.frameNumber,
     settings.frameNumberColor ?? null,
+    settings.real135SprocketColor ?? null,
     settings.showDate,
     settings.dateStr,
     settings.borderColor,

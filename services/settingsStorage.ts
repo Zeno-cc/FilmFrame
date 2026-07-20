@@ -80,6 +80,7 @@ export function normalizeSettingsPatch(value: unknown): Partial<FilmSettings> {
   setBoolean(patch, value, 'enableRealisticRebate');
   setBoolean(patch, value, 'useFilmOverlayTemplate');
   setHexColor(patch, value, 'frameNumberColor');
+  setHexColor(patch, value, 'real135SprocketColor');
   setHexColor(patch, value, 'scanBackgroundColor');
 
   const frameNumber = clampInteger(value.frameNumber, 1, Number.MAX_SAFE_INTEGER);

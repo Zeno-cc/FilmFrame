@@ -14,6 +14,7 @@ const settings: FilmSettings = {
   customText: '',
   frameNumber: 1,
   frameNumberColor: '#44cc88',
+  real135SprocketColor: '#112233',
   showDate: false,
   dateStr: '2026/07/12',
   borderColor: '#111111',
@@ -91,6 +92,7 @@ describe('recipe storage', () => {
     expect(recipes[0]).toMatchObject({ id: 'warm', updatedAt: 3 });
     expect(recipes[0].settings.grainIntensity).toBe(30);
     expect(recipes[0].settings.frameNumberColor).toBe('#44cc88');
+    expect(recipes[0].settings.real135SprocketColor).toBe('#112233');
     expect(JSON.stringify(recipes[0])).not.toContain('runtime-only');
   });
 
