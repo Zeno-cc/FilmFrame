@@ -237,3 +237,36 @@ Added a persistent global real-135 sprocket color override with source-template 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 空暗房胶片与摄影名言体验
+
+**Date**: 2026-07-21
+**Task**: 空暗房胶片与摄影名言体验
+**Branch**: `main`
+
+### Summary
+
+完成连续 135 胶片背景、3:2 画幅与齿孔连接，加入审核快照驱动的摄影名言并调整为 24 小时自动更新，完成桌面和移动端视觉及回归验证。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `681e1d6` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
