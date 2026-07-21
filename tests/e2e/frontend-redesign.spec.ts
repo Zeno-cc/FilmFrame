@@ -32,8 +32,157 @@ test('desktop empty darkroom exposes the new shell and inspector', async ({ page
 
   await expect(page.getByRole('heading', { name: '接触印象' })).toBeVisible();
   await expect(page.getByLabel('新胶卷，本地处理')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '把这一卷带进暗房' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '让这一卷，慢慢显影' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: '暗房配方' })).toBeVisible();
+  const quote = page.getByTestId('photography-quote');
+  await expect(quote.locator('blockquote')).not.toBeEmpty();
+  await expect(quote.locator('cite')).not.toBeEmpty();
+  await expect(quote).toHaveAttribute('aria-live', 'off');
+  await expect(page.getByRole('button', { name: '换一句摄影名言' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /暂停名言轮播|继续名言轮播/ })).toHaveCount(0);
+  await expect(page.getByText(/照片仅在当前设备处理|名言语料由 Wikiquote/)).toHaveCount(0);
+  await expect.poll(async () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name))).not.toContainEqual(
+    expect.stringContaining('wikiquote.org'),
+  );
+
+  const track = page.getByTestId('empty-darkroom-film-track');
+  await expect(track).toBeVisible();
+  await expect(track).toHaveCSS('animation-name', 'ff-empty-film-transport');
+  await expect(track).toHaveCSS('animation-duration', '36s');
+  await expect(track).toHaveCSS('animation-timing-function', 'linear');
+  await expect(track).toHaveCSS('animation-iteration-count', 'infinite');
+  const exposureBackground = await page.locator('.ff-empty-darkroom__exposures').evaluate(element => {
+    const frame = element.firstElementChild;
+    if (!frame) throw new Error('Decorative 135 exposure frame is missing');
+    return {
+      color: getComputedStyle(frame).backgroundColor,
+      image: getComputedStyle(frame).backgroundImage,
+    };
+  });
+  expect(exposureBackground.color).toBe('rgba(72, 63, 49, 0.12)');
+  expect(exposureBackground.image).not.toContain('repeating-linear-gradient');
+
+  const frameGeometry = await page.getByTestId('empty-darkroom-exposure-frame').first().evaluate(element => {
+    const frame = element.getBoundingClientRect();
+    const trackElement = element.parentElement?.parentElement;
+    if (!trackElement) throw new Error('Decorative 135 film track is missing');
+    const track = trackElement.getBoundingClientRect();
+    return {
+      width: frame.width,
+      height: frame.height,
+      ratio: frame.width / frame.height,
+      topClearance: frame.top - track.top,
+      bottomClearance: track.bottom - frame.bottom,
+    };
+  });
+  const railGeometry = await page.getByTestId('empty-darkroom-film-rail').evaluateAll(elements => elements.map(element => {
+    const rail = element.getBoundingClientRect();
+    const holes = getComputedStyle(element, '::before');
+    return {
+      top: rail.top,
+      bottom: rail.bottom,
+      height: rail.height,
+      holeHeight: holes.height,
+      holeBackground: holes.backgroundImage,
+    };
+  }));
+  const negativeHeight = await track.evaluate(element => element.getBoundingClientRect().height);
+  expect(negativeHeight).toBe(332);
+  expect(frameGeometry.width).toBe(342);
+  expect(frameGeometry.height).toBe(228);
+  expect(frameGeometry.ratio).toBeCloseTo(1.5, 5);
+  expect(frameGeometry.topClearance).toBeCloseTo(52, 5);
+  expect(frameGeometry.bottomClearance).toBeCloseTo(52, 5);
+  expect(railGeometry).toHaveLength(2);
+  expect(railGeometry[0].height).toBe(52);
+  expect(railGeometry[1].height).toBe(52);
+  expect(railGeometry[0].bottom).toBeCloseTo(frameGeometry.topClearance + railGeometry[0].top, 5);
+  expect(railGeometry[1].top).toBeCloseTo(frameGeometry.bottomClearance + frameGeometry.height + railGeometry[0].top, 5);
+  expect(railGeometry[0].holeHeight).toBe('20px');
+  expect(railGeometry[0].holeBackground).toContain('repeating-linear-gradient');
+
+  const context = await page.getByTestId('empty-darkroom-context').boundingBox();
+  const negative = await track.boundingBox();
+  if (!context || !negative) throw new Error('Empty darkroom composition is missing');
+  expect(context.y).toBeGreaterThanOrEqual(negative.y + negative.height);
+
+  const transforms = await track.evaluate(element => {
+    const animation = element.getAnimations()[0];
+    if (!animation) throw new Error('Film transport animation is missing');
+    animation.pause();
+    animation.currentTime = 0;
+    const start = getComputedStyle(element).transform;
+    animation.currentTime = 1000;
+    const end = getComputedStyle(element).transform;
+    return { start, end };
+  });
+  expect(transforms.end).not.toBe(transforms.start);
+  await track.evaluate(element => element.getAnimations()[0]?.play());
+  await expect(track).toHaveCSS('animation-play-state', 'running');
+
+  const emptyDarkroom = page.locator('.ff-empty-darkroom');
+  await emptyDarkroom.hover();
+  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  await page.mouse.move(0, 0);
+  await emptyDarkroom.getByRole('button', { name: '选择照片' }).focus();
+  await expect(track).toHaveCSS('animation-play-state', 'paused');
+});
+
+test('empty darkroom film respects reduced motion, drag state, and mobile bounds', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.clock.install();
+  await page.reload();
+
+  const workspace = page.locator('.ff-workspace');
+  const track = page.getByTestId('empty-darkroom-film-track');
+  const film = page.locator('.ff-empty-darkroom__film');
+  await expect(track).toHaveCSS('animation-name', 'none');
+  await expect(track).toHaveCSS('will-change', 'auto');
+  await expect(page.locator('.ff-empty-darkroom').getByRole('button', { name: '选择照片' })).toBeVisible();
+  const mobileFrame = await page.getByTestId('empty-darkroom-exposure-frame').first().boundingBox();
+  if (!mobileFrame) throw new Error('Decorative 135 exposure frame is not visible');
+  expect(mobileFrame.width / mobileFrame.height).toBeCloseTo(1.5, 5);
+  const mobileNegative = await track.boundingBox();
+  const mobileContext = await page.getByTestId('empty-darkroom-context').boundingBox();
+  if (!mobileNegative || !mobileContext) throw new Error('Mobile empty darkroom composition is missing');
+  expect(mobileNegative.height).toBe(332);
+  expect(mobileContext.y).toBeGreaterThanOrEqual(mobileNegative.y + mobileNegative.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    await page.evaluate(() => window.innerWidth),
+  );
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const dataTransfer = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['film'], 'film.png', { type: 'image/png' }));
+    return transfer;
+  });
+  await workspace.dispatchEvent('dragenter', { dataTransfer });
+  await expect(workspace).toHaveAttribute('data-drag-active', 'true');
+  await expect(page.getByText('松开以加入这一卷', { exact: true })).toBeVisible();
+  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  await expect(film).toHaveCSS('opacity', '0.18');
+
+  await workspace.dispatchEvent('dragleave', { dataTransfer });
+  await expect(workspace).toHaveAttribute('data-drag-active', 'false');
+  await expect(page.getByText('松开以加入这一卷', { exact: true })).toBeHidden();
+  await expect(track).toHaveCSS('animation-play-state', 'running');
+});
+
+test('photography quote updates locally at the next 24-hour boundary', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-07-21T12:00:00Z') });
+  await page.reload();
+
+  const quote = page.getByTestId('photography-quote');
+  const initialQuoteId = await quote.getAttribute('data-quote-id');
+  await page.clock.fastForward(11 * 60 * 60 * 1_000 + 59 * 60 * 1_000);
+  await expect(quote).toHaveAttribute('data-quote-id', initialQuoteId ?? '');
+
+  await page.clock.fastForward(60 * 1_000);
+  await expect(quote).not.toHaveAttribute('data-quote-id', initialQuoteId ?? '');
+  await expect(page.getByRole('button', { name: '换一句摄影名言' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /暂停名言轮播|继续名言轮播/ })).toHaveCount(0);
 });
 
 test('mobile settings sheet traps the settings flow and closes with Escape', async ({ page }) => {
@@ -109,6 +258,7 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   }, '#3366cc');
   await page.locator('input[type="file"]').setInputFiles(fixture);
 
+  await expect(page.getByTestId('empty-darkroom-film-track')).toHaveCount(0);
   await expect(page.getByRole('list', { name: /接触印象，共 1 张照片/ })).toBeVisible();
   await expect(page.getByText('待冲洗', { exact: true })).toBeVisible();
 
@@ -507,7 +657,7 @@ test('delete all photos requires confirmation and resets only the current roll',
   await trigger.click();
   await dialog.getByRole('button', { name: '删除 2 张照片' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('heading', { name: '把这一卷带进暗房' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '让这一卷，慢慢显影' })).toBeVisible();
   await expect(trigger).toBeHidden();
   await expect(page.locator('#workspace-add-photos')).toBeFocused();
   await expect(inspector.getByLabel('胶片型号')).toHaveValue('KODAK PORTRA 160');

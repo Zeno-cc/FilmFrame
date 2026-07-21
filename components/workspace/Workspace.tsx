@@ -25,7 +25,8 @@ export function Workspace({
 }: WorkspaceProps) {
   return (
     <section
-      className={`relative min-h-[calc(100dvh-4rem)] bg-[var(--ff-bg)] ${className}`}
+      className={`ff-workspace relative min-h-[calc(100dvh-4rem)] bg-[var(--ff-bg)] ${className}`}
+      data-drag-active={isDragActive}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}

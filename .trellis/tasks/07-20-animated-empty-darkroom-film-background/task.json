@@ -1,0 +1,35 @@
+{
+  "id": "animated-empty-darkroom-film-background",
+  "name": "animated-empty-darkroom-film-background",
+  "title": "Animated empty darkroom film background",
+  "description": "Add a seamless CSS-only full-negative transport animation to the empty darkroom while preserving upload clarity, reduced motion, and responsive behavior.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "frontend-empty-state",
+  "package": "frontend",
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-07-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-20-correct-empty-film-135-aspect",
+    "07-20-reconnect-empty-darkroom-film-strip",
+    "07-20-rotating-photography-quotes"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "components/workspace/EmptyDarkroom.tsx",
+    "components/workspace/Workspace.tsx",
+    "styles/components.css",
+    "tests/e2e/frontend-redesign.spec.ts"
+  ],
+  "notes": "",
+  "meta": {}
+}

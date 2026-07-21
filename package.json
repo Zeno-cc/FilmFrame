@@ -16,7 +16,9 @@
     "test:settings": "vitest run tests/settingsStorage.test.ts",
     "test:upload": "vitest run tests/uploadFiles.test.ts",
     "test:download": "vitest run tests/previewDownload.test.ts",
+    "test:quotes": "vitest run tests/photographyQuotes.test.ts tests/wikiquoteSync.test.mjs",
     "test:e2e": "playwright test",
+    "sync:quotes": "node scripts/sync-photography-quotes.mjs",
     "check": "npm run test && npm run typecheck && npm run build",
     "preview": "vite preview"
   },

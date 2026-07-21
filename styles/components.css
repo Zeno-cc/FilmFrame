@@ -661,9 +661,166 @@
   color: var(--ff-paper);
 }
 
+.ff-empty-darkroom__film {
+  height: 332px;
+  inset: 24px 0 auto;
+  opacity: .82;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity var(--ff-motion-base) var(--ff-ease);
+  z-index: 0;
+}
+
+.ff-empty-darkroom__film-track {
+  animation: ff-empty-film-transport 36s linear infinite;
+  background:
+    linear-gradient(to bottom, rgba(240, 232, 214, .035), transparent 15%, rgba(0, 0, 0, .22) 86%, rgba(0, 0, 0, .32)),
+    rgba(23, 20, 15, .94);
+  bottom: 0;
+  box-shadow: inset 0 0 0 1px rgba(90, 77, 58, .48);
+  display: grid;
+  grid-template-rows: 52px 228px 52px;
+  left: -360px;
+  position: absolute;
+  top: 0;
+  width: calc(100% + 720px);
+  will-change: transform;
+}
+
+.ff-empty-darkroom__film-rail {
+  background: linear-gradient(to bottom, rgba(240, 232, 214, .04), transparent 38%, rgba(0, 0, 0, .18));
+  border-block: 1px solid rgba(90, 77, 58, .2);
+  box-shadow: inset 0 1px rgba(240, 232, 214, .025), inset 0 -1px rgba(0, 0, 0, .16);
+  height: 52px;
+  position: relative;
+}
+
+.ff-empty-darkroom__film-rail::before {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 13px,
+    rgba(5, 4, 3, .9) 13px 31px,
+    transparent 31px 45px
+  );
+  border-radius: 2px;
+  content: "";
+  height: 20px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: calc(50% - 10px);
+}
+
+.ff-empty-darkroom__exposures {
+  display: grid;
+  gap: 18px;
+  grid-auto-columns: 342px;
+  grid-auto-flow: column;
+  height: 228px;
+  left: 0;
+  position: relative;
+}
+
+.ff-empty-darkroom__exposure-frame {
+  background-color: rgba(72, 63, 49, .12);
+  background-image: linear-gradient(
+    to bottom,
+    rgba(240, 232, 214, .025),
+    transparent 20%,
+    rgba(216, 154, 43, .025) 58%,
+    transparent 84%,
+    rgba(0, 0, 0, .12)
+  );
+  border: 1px solid rgba(90, 77, 58, .28);
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, .28);
+  height: 228px;
+  position: relative;
+  width: 342px;
+}
+
+.ff-empty-darkroom__content {
+  display: grid;
+  grid-template-rows: 316px auto;
+  z-index: 1;
+}
+
+.ff-empty-darkroom__focus {
+  align-self: start;
+  justify-self: center;
+  margin-top: 64px;
+}
+
+.ff-empty-darkroom__context {
+  grid-row: 2;
+  margin-top: var(--ff-space-2);
+}
+
+.ff-empty-darkroom__quote-stage {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 112px;
+}
+
+.ff-empty-darkroom__quote-text {
+  color: var(--ff-paper-muted);
+  font-family: var(--ff-font-display);
+  font-size: 16px;
+  line-height: 26px;
+  margin: 0;
+  max-width: 620px;
+  text-wrap: balance;
+}
+
+.ff-empty-darkroom__quote-meta {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin-top: var(--ff-space-2);
+  min-height: 24px;
+}
+
+.ff-empty-darkroom__quote-cite {
+  color: var(--ff-paper-dim);
+  font-family: var(--ff-font-mono);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 18px;
+}
+
+.ff-empty-darkroom__quote-source {
+  color: inherit;
+  text-decoration-color: var(--ff-line-strong);
+  text-underline-offset: 3px;
+}
+
+.ff-empty-darkroom__quote-source:hover {
+  color: var(--ff-paper-muted);
+}
+
+.ff-empty-darkroom:hover .ff-empty-darkroom__film-track,
+.ff-empty-darkroom:focus-within .ff-empty-darkroom__film-track,
+.ff-empty-darkroom[data-drag-active="true"] .ff-empty-darkroom__film-track,
+.ff-workspace[data-drag-active="true"] .ff-empty-darkroom__film-track {
+  animation-play-state: paused;
+}
+
+.ff-empty-darkroom[data-drag-active="true"] .ff-empty-darkroom__film,
+.ff-workspace[data-drag-active="true"] .ff-empty-darkroom__film {
+  opacity: .18;
+}
+
 @keyframes ff-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes ff-empty-film-transport {
+  to {
+    transform: translate3d(-360px, 0, 0);
   }
 }
 
@@ -711,6 +868,37 @@
   .ff-modal-surface:not([data-surface="sheet"]) {
     max-height: calc(100vh - 20px);
   }
+
+  .ff-empty-darkroom__film {
+    inset: 16px 0 auto;
+    opacity: .74;
+  }
+
+  .ff-empty-darkroom__focus {
+    margin-top: 56px;
+  }
+
+  .ff-empty-darkroom__content {
+    grid-template-rows: 308px auto;
+  }
+
+  .ff-empty-darkroom__quote-stage {
+    min-height: 112px;
+  }
+
+  .ff-empty-darkroom__quote-text {
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  .ff-empty-darkroom__quote-meta {
+    min-height: 24px;
+  }
+
+  .ff-empty-darkroom__quote-cite {
+    max-width: 100%;
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -735,5 +923,11 @@
 
   .ff-button__spinner {
     animation: none;
+  }
+
+  .ff-empty-darkroom__film-track {
+    animation: none;
+    transform: translate3d(-180px, 0, 0);
+    will-change: auto;
   }
 }

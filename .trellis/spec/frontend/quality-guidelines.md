@@ -162,6 +162,144 @@ if (maskUrl && color) {
 }
 ```
 
+### Scenario: Seamless Decorative CSS Motion
+
+#### 1. Scope / Trigger
+
+Apply this contract to ambient looping motion that decorates a workflow surface without communicating state or progress.
+
+#### 2. Signatures
+
+```tsx
+<div className="ff-motion-viewport" aria-hidden="true">
+  <div className="ff-motion-track" data-testid="motion-track" />
+</div>
+```
+
+```css
+@keyframes ff-loop {
+  to { transform: translate3d(var(--ff-loop-distance), 0, 0); }
+}
+```
+
+#### 3. Contracts
+
+- The viewport is clipped and pointer-inert; decorative descendants are excluded from the accessibility tree.
+- Move one compositor track with `transform` only. Do not update React state, timers, animation frames, layout properties, background position, filters, or shadows per frame.
+- The translation distance must equal the common horizontal period of every repeated child/background layer. Extend the track by at least one complete tile beyond each viewport edge.
+- Semantic content and controls remain on a stationary layer above the animation.
+- Hover, focus-within, and task-specific interaction states pause with `animation-play-state`; do not change duration or transform because either can jump phase.
+- `prefers-reduced-motion: reduce` sets `animation: none`, preserves a deliberate static composition, and removes persistent `will-change` promotion.
+- The animation must unmount with its owning surface and add no global listener or cleanup path.
+- When the decoration represents horizontal 135 film, model the `36x24 mm` exposure as an exact `3:2` window independently from the wider eight-perforation transport pitch and from the full strip height.
+- Model a visual 135 strip as one contiguous acetate body: both perforation rails must directly abut the exposure row, and inter-frame rebates must reveal that same base rather than the surrounding page background.
+
+#### 4. Validation & Error Matrix
+
+- Loop distance differs from a background period -> visible snap; align every period or use their least common multiple.
+- Track does not overhang both edges -> exposed gap during translation; add full-tile overscan.
+- Interaction changes duration/direction -> phase jump; pause/resume the existing animation instead.
+- Reduced motion only shortens duration -> repeated flashing or one-frame jump; disable the animation entirely.
+- Moving layer accepts pointer events or accessibility semantics -> interaction/noise regression; make it pointer-inert and `aria-hidden`.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: a `360px` track containing `45px` and `360px` patterns translates exactly `-360px` with linear timing.
+- Base: reduced motion shows the same complete artwork at a fixed offset with no active loop.
+- Bad: animating `background-position` for multiple unrelated periods causes repainting and a seam at reset.
+
+#### 6. Tests Required
+
+- Playwright asserts animation name, duration, linear timing, infinite iteration, and transform progression at controlled animation times.
+- Interaction tests restore the sampled animation to `running` before asserting hover/focus/drag pause, preventing false-positive pause tests.
+- Reduced-motion tests assert `animation-name: none` and a non-promoted track.
+- Responsive tests assert the document has no horizontal overflow and the moving surface unmounts when its owner disappears.
+- Visual QA uses paused or reduced-motion screenshots at desktop, tablet, and `390px` mobile widths; inspect a live mid-cycle phase separately.
+
+#### 7. Wrong vs Correct
+
+```css
+/* Wrong: repaints continuously and resets on a non-shared period. */
+.film { animation: scroll 10s linear infinite; }
+@keyframes scroll { to { background-position-x: -317px; } }
+
+/* Correct: one phase-aligned compositor track. */
+.film-track { animation: ff-film-loop 36s linear infinite; }
+@keyframes ff-film-loop { to { transform: translate3d(-360px, 0, 0); } }
+```
+
+### 场景：审核快照驱动的外部语料
+
+#### 1. 适用范围
+
+当界面展示来自 Wikiquote 等第三方站点的名言、说明或其他编辑内容时，使用本契约。第三方接口只属于维护流程，不属于浏览器运行链路。
+
+#### 2. 接口与数据签名
+
+```bash
+npm run sync:quotes
+```
+
+```ts
+interface ReviewedPhotographyQuote {
+  id: string;
+  originalText: string;
+  displayTextZhHans: string;
+  author: string;
+  sourceTitle: string;
+  wikiquoteUrl: string;
+  wikiquoteRevisionId: number;
+  rightsNote: string;
+  verifiedAt: string;
+}
+```
+
+#### 3. 行为契约
+
+- 同步命令只请求项目维护的摄影师页面白名单，并把机器提取结果写入被 Git 忽略的 `generated/` 候选文件。
+- 候选内容必须经过人工核验、翻译和许可检查，才能进入 `data/photography-quotes.json`；应用只能导入这个审核快照。
+- 浏览器不得自动请求 Wikiquote，也不得向第三方发送用户照片、设置或会话信息。用户主动点击精确修订来源链接不属于自动请求。
+- 审核快照在模块加载时执行结构校验；非法 ID、来源、修订号或日期必须阻止构建，不能静默跳过。
+- 自动更新按固定 24 小时时段计算当前内容，并使用可清理的单次 `setTimeout` 等待下一个时段边界。
+- 自动变化区域使用 `aria-live="off"`；名言区不显示手动切换、暂停按钮或第三方采集技术说明。
+
+#### 4. 校验与错误矩阵
+
+- Wikiquote 超时、页面不存在、结构无效或候选为零 -> 同步命令失败，不写候选文件，也不修改审核快照。
+- 候选未审核 -> 只能停留在 `generated/`，不得被运行时代码导入。
+- 审核快照字段缺失、ID 重复或来源不是带修订号的 Wikiquote HTTPS 地址 -> 构建时抛出明确错误。
+- 快照少于两条 -> 展示首条并且不创建轮播计时器。
+- 组件卸载 -> 清除现有计时器；页面重新打开时根据当前时间直接计算正确时段，无需持久化状态。
+
+#### 5. 正常、基础与错误案例
+
+- 正常：维护者同步候选、人工核验六条记录，应用离线读取审核快照并在每个 24 小时时段展示对应名言。
+- 基础：第三方接口暂时不可用，已发布快照和用户页面不受影响。
+- 错误：组件定期在浏览器中请求随机名言接口，造成隐私、CORS、限流和页面稳定性风险。
+
+#### 6. 必需测试
+
+- 单元测试覆盖快照结构、唯一 ID、精确修订链接、时段索引和边界延迟。
+- 同步测试注入可控 `fetch`，覆盖成功、HTTP 失败、页面缺失、零候选以及失败不写文件。
+- Playwright 使用受控时钟验证同一时段稳定、跨时段自动切换，以及控制按钮和技术说明不存在。
+- 浏览器测试确认资源请求中没有 Wikiquote 自动请求，且桌面、平板与 `390px` 移动端无布局跳动或横向溢出。
+
+#### 7. 错误与正确实现
+
+```ts
+// 错误：把不稳定的第三方接口放进用户运行链路。
+useEffect(() => {
+  fetch('https://en.wikiquote.org/w/api.php?...').then(updateQuote);
+}, [quoteIndex]);
+
+// 正确：运行时只消费审核快照，并清理单次计时器。
+useEffect(() => {
+  if (reviewedQuotes.length < 2) return undefined;
+  const timer = window.setTimeout(updateQuoteForCurrentPeriod, delayUntilNextPeriod(Date.now()));
+  return () => window.clearTimeout(timer);
+}, [quoteIndex]);
+```
+
 ### Scenario: Destructive Roll Cleanup
 
 #### 1. Scope / Trigger
