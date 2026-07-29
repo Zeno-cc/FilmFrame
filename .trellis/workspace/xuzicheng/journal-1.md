@@ -305,3 +305,25 @@ Added a persistent global real-135 sprocket color override with source-template 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: 预览模式保持与快捷旋转
+
+**Date**: 2026-07-29
+**Task**: 预览模式保持与快捷旋转
+**Branch**: `main`
+
+### Summary
+
+修复单图预览在跨图片导航时重置原图/成片模式的问题，并新增明确的顺时针旋转 90° 按钮与受保护的 R 键快捷操作；完整 165 项单测、类型检查、生产构建和 38 条 Chromium E2E 通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `efabd7a` | (see git log) |
+| `8bdb260` | (see git log) |
+
+### Status
+
+[OK] **Completed**

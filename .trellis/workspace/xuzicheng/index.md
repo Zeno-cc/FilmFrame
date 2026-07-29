@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~307 | Active |
+| `journal-1.md` | ~329 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-29 | 预览模式保持与快捷旋转 | `efabd7a`, `8bdb260` | `main` |
 | 9 | 2026-07-29 | 完成 P0 导出闭环与全型号 Worker | `34b1306`, `651de14`, `4ef3201` | `main` |
 | 8 | 2026-07-21 | 空暗房胶片与摄影名言体验 | `681e1d6` | `main` |
 | 7 | 2026-07-20 | Global real 135 sprocket color | `ad88ede` | `main` |
