@@ -363,6 +363,89 @@ test('single preview keeps the selected source mode across navigation and reopen
   await expect(preview.getByRole('button', { name: '成片', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('single preview supports an explicit rotate button and guarded R shortcut', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await uploadCurationFixtures(page, 1);
+
+  const fileName = curationNames[0];
+  await page.getByRole('button', { name: `查看 ${fileName}` }).click();
+
+  const preview = page.getByRole('dialog', { name: new RegExp(fileName) });
+  const previewImage = preview.getByRole('img', { name: fileName });
+  const rotateButton = preview.getByRole('button', { name: '顺时针旋转 90°' });
+  await expect(rotateButton).toContainText('旋转 90°');
+  await expect(rotateButton).toHaveAttribute('aria-keyshortcuts', 'R');
+  await expect(rotateButton).toHaveCSS('min-height', '44px');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(rotateButton).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    await page.evaluate(() => window.innerWidth),
+  );
+
+  const initialSource = await previewImage.getAttribute('src');
+  await rotateButton.click();
+  await expect.poll(() => previewImage.getAttribute('src'), { timeout: 30_000 }).not.toBe(initialSource);
+
+  const buttonSource = await previewImage.getAttribute('src');
+  await page.keyboard.press('r');
+  await expect.poll(() => previewImage.getAttribute('src'), { timeout: 30_000 }).not.toBe(buttonSource);
+
+  const lowercaseSource = await previewImage.getAttribute('src');
+  await page.keyboard.press('Shift+R');
+  await expect.poll(() => previewImage.getAttribute('src'), { timeout: 30_000 }).not.toBe(lowercaseSource);
+
+  const uppercaseSource = await previewImage.getAttribute('src');
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', repeat: true, bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+  await expect(previewImage).toHaveAttribute('src', uppercaseSource ?? '');
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', ctrlKey: true, bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', metaKey: true, bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', altKey: true, bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+  await expect(previewImage).toHaveAttribute('src', uppercaseSource ?? '');
+
+  const editable = preview.locator('input[data-shortcut-guard]');
+  await preview.evaluate(dialog => {
+    const input = document.createElement('input');
+    input.dataset.shortcutGuard = 'true';
+    dialog.append(input);
+    input.focus();
+  });
+  await editable.press('r');
+  await editable.evaluate(input => input.remove());
+  await page.waitForTimeout(500);
+  await expect(previewImage).toHaveAttribute('src', uppercaseSource ?? '');
+
+  await preview.getByRole('button', { name: '调整构图' }).click();
+  const zoom = preview.getByRole('slider', { name: '等比放大' });
+  await zoom.focus();
+  await zoom.press('r');
+  await preview.getByRole('button', { name: '取消' }).click();
+  await page.waitForTimeout(500);
+  await expect(previewImage).toHaveAttribute('src', uppercaseSource ?? '');
+
+  await preview.getByRole('button', { name: '关闭预览' }).click();
+  await page.getByRole('tab', { name: /连底长条/ }).click();
+  const stripStage = page.getByLabel('长条审片台');
+  await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
+  await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
+  await stripStage.getByRole('button', { name: '预览' }).click();
+
+  const stripPreview = page.getByRole('dialog', { name: 'Film Strip' });
+  const stripImage = stripPreview.getByRole('img', { name: 'Film Strip' });
+  const stripSource = await stripImage.getAttribute('src');
+  await expect(stripPreview.getByRole('button', { name: '顺时针旋转 90°' })).toHaveCount(0);
+  await page.keyboard.press('r');
+  await page.waitForTimeout(500);
+  await expect(stripImage).toHaveAttribute('src', stripSource ?? '');
+});
+
 test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const inspector = page.getByRole('complementary', { name: '暗房配方' });

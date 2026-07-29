@@ -47,6 +47,14 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 - Preserve `focus-visible` styles, `aria-live` status feedback, and `prefers-reduced-motion` behavior.
 - Touch actions must remain at least 44px high where the current mobile UI guarantees it.
 
+### Dialog Keyboard Shortcuts
+
+- Keep a visible, named button for every shortcut command; the shortcut accelerates the command and never replaces its discoverable control.
+- Declare single-key shortcuts with `aria-keyshortcuts` on the owning control and invoke the same callback used by pointer activation.
+- Document-level dialog handlers must ignore repeated keydown events, `Ctrl`/`Meta`/`Alt` combinations, editable targets, and nested interaction modes where the command is not valid.
+- Store changing callbacks and mode guards in the dialog's existing interaction ref so one open-state listener always reads current props without being rebound.
+- Browser tests must cover the button and shortcut success paths plus repeat, modifier, editable-target, and nested-mode rejection.
+
 ## Common Mistakes
 
 - Inferring artifact validity from the presence of a URL instead of `workflowState`/settings keys.
@@ -54,3 +62,4 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 - Reimplementing recipe or render capability checks in multiple components instead of using helpers such as `supportsReal135Template`.
 - Mutating an `ImageItem` or `FilmSettings` object received through props.
 - Adding explanatory UI copy about how controls work; labels should describe the action or state.
+- Handling a letter key without guarding browser shortcuts, held-key repeats, or focused form controls.

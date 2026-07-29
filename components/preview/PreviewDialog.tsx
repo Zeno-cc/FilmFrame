@@ -86,6 +86,7 @@ export function PreviewDialog({
     onClose,
     onPrevious,
     onNext,
+    onRotate,
     restoreFocusRef,
   });
   interactionRef.current = {
@@ -95,6 +96,7 @@ export function PreviewDialog({
     onClose,
     onPrevious,
     onNext,
+    onRotate,
     restoreFocusRef,
   };
 
@@ -110,6 +112,27 @@ export function PreviewDialog({
         event.preventDefault();
         interactionRef.current.onClose();
         return;
+      }
+      if (
+        interactionRef.current.mode === 'single'
+        && !interactionRef.current.isCropping
+      ) {
+        const target = event.target;
+        const editableTarget = target instanceof HTMLElement
+          && (target.matches('input, textarea, select') || target.isContentEditable);
+        if (
+          (event.key === 'r' || event.key === 'R')
+          && !event.repeat
+          && !event.metaKey
+          && !event.ctrlKey
+          && !event.altKey
+          && !editableTarget
+          && interactionRef.current.onRotate
+        ) {
+          event.preventDefault();
+          interactionRef.current.onRotate();
+          return;
+        }
       }
       if (
         interactionRef.current.mode === 'single'
@@ -276,11 +299,13 @@ export function PreviewDialog({
               <button
                 type="button"
                 onClick={onRotate}
-                aria-label="顺时针旋转 90 度"
-                title="旋转 90°"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[4px] border border-[var(--ff-line)] text-[var(--ff-paper-muted)] hover:bg-[var(--ff-panel-soft)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)]"
+                aria-label="顺时针旋转 90°"
+                aria-keyshortcuts="R"
+                title="顺时针旋转 90°"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[4px] border border-[var(--ff-line)] px-3 text-xs text-[var(--ff-paper-muted)] hover:bg-[var(--ff-panel-soft)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)]"
               >
-                <RotateCwIcon />
+                <RotateCwIcon size={17} />
+                旋转 90°
               </button>
             )}
             {onApply && (
