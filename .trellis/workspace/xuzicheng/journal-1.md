@@ -270,3 +270,38 @@ Added a persistent global real-135 sprocket color override with source-template 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 完成 P0 导出闭环与全型号 Worker
+
+**Date**: 2026-07-29
+**Task**: 完成 P0 导出闭环与全型号 Worker
+**Branch**: `main`
+
+### Summary
+
+修复部分 ZIP 静默漏图，新增补齐后导出与显式部分导出；将 16 款真实 135 单帧和长条迁移到 Worker，停止时真实终止并支持自动重建；全量 165 项单测、构建和 36 条 Chromium E2E 通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `34b1306` | (see git log) |
+| `651de14` | (see git log) |
+| `4ef3201` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
