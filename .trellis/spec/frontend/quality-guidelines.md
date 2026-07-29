@@ -358,6 +358,70 @@ imagesRef.current = [];
 setImages([]);
 ```
 
+### Scenario: Complete Single-Frame ZIP Export
+
+#### 1. Scope / Trigger
+
+Apply this contract whenever the single-frame ZIP command, artifact validity rules, batch completion, or selection behavior changes.
+
+#### 2. Signatures
+
+```ts
+type ExportReadinessStatus = 'empty' | 'complete' | 'incomplete';
+
+interface ExportReadiness<TItem, TArtifact> {
+  status: ExportReadinessStatus;
+  totalCount: number;
+  readyCount: number;
+  pendingCount: number;
+  pendingIds: string[];
+  readyEntries: Array<{ item: TItem; index: number; artifact: TArtifact }>;
+}
+```
+
+#### 3. Contracts
+
+- Evaluate only included photos and preserve their original roll indexes for ZIP filenames.
+- An artifact is ready only when its MIME and render settings key match the current per-image settings; a Blob URL alone is insufficient.
+- A complete selection downloads directly. An incomplete selection requires a focused choice between processing the remainder or explicitly exporting the current `N/M` results.
+- The default incomplete path reuses current artifacts, processes only pending photos, then re-evaluates the latest refs before downloading.
+- Stop, generation invalidation, or any failed pending image prevents automatic download and preserves successful artifacts.
+- Ordered-strip download remains independently gated by a current strip key.
+
+#### 4. Validation & Error Matrix
+
+- No included photos -> show selection guidance and do not open an export dialog.
+- `M/M` current artifacts -> run ZIP admission and download without confirmation.
+- `N/M` current artifacts -> show both explicit partial export and finish-then-export actions.
+- `0/M` current artifacts -> show only finish-then-export.
+- Missing byte size or ZIP budget block -> show the existing actionable error and do not create a ZIP.
+- Processing failure or cancellation -> do not download; retain every accepted result.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: `2/3` opens a dialog, explicit partial export contains two entries, and the default path produces three entries after the final render succeeds.
+- Base: `3/3` keeps the one-click ZIP flow.
+- Bad: filtering current artifacts inside the ZIP command silently creates a two-entry archive for a three-photo selection.
+
+#### 6. Tests Required
+
+- Unit tests cover empty, complete, incomplete, excluded, and stale candidates.
+- Playwright verifies cancel focus restoration, absence of partial export at `0/M`, both `N/M` actions, and exact ZIP central-directory entry counts.
+- Stop/failure coverage asserts that no download event fires and completed cards remain available.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: silently drops selected photos without current artifacts.
+const files = images.flatMap(image => image.processedUrl ? [image] : []);
+downloadZip(files);
+
+// Correct: make incompleteness explicit, then re-evaluate after processing.
+const readiness = evaluateExportReadiness(candidates);
+if (readiness.status === 'incomplete') openIncompleteExportDialog();
+else downloadZip(readiness.readyEntries);
+```
+
 ## Accessibility Review
 
 - Use role/name selectors in E2E tests; this verifies both interaction and accessible naming.

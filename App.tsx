@@ -3,6 +3,10 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
 import { disposeFilmWorkerClient, processImage, generateFilmStrip } from './services/filmWorkerClient';
 import { createZipBlob } from './services/zip';
+import {
+  evaluateExportReadiness,
+  type ExportReadyEntry,
+} from './services/exportReadiness';
 import { loadPreferences, mergeSettings, savePreferences } from './services/settingsStorage';
 import { buildPreviewDownload } from './services/previewDownload';
 import { prepareUploadedImages } from './services/uploadFiles';
@@ -69,6 +73,7 @@ import { NoticeToast as DarkroomNoticeToast } from './components/feedback/Notice
 import { ErrorDialog } from './components/feedback/ErrorDialog';
 import { SupportDialog } from './components/feedback/SupportDialog';
 import { DeleteAllPhotosDialog } from './components/feedback/DeleteAllPhotosDialog';
+import { IncompleteExportDialog } from './components/feedback/IncompleteExportDialog';
 // Security Fix: Import EXIF from local dependency instead of external CDN
 import EXIF from 'exif-js';
 
@@ -112,6 +117,9 @@ type PreviewRenderRequest = {
   settings: FilmSettings;
 };
 
+type BatchProcessOutcome = 'completed' | 'failed' | 'cancelled' | 'blocked' | 'noop';
+type SingleExportEntry = ExportReadyEntry<ImageItem, RenderArtifact>;
+
 function revokeObjectUrl(url?: string | null) {
   if (url?.startsWith('blob:')) {
     URL.revokeObjectURL(url);
@@ -154,6 +162,15 @@ function getCurrentImageArtifact(
     settingsKey: item.processedSettingsKey,
     byteSize: item.processedByteSize,
   };
+}
+
+function getSingleExportReadiness(images: readonly ImageItem[], settings: FilmSettings) {
+  return evaluateExportReadiness(images.map((item, index) => ({
+    item,
+    index,
+    included: isImageIncluded(item),
+    artifact: getCurrentImageArtifact(item, index, settings),
+  })));
 }
 
 function readImageSize(src: string): Promise<{ width: number; height: number }> {
@@ -246,6 +263,7 @@ const App: React.FC = () => {
   const [isCropping, setIsCropping] = useState(false);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [deleteAllPhotosOpen, setDeleteAllPhotosOpen] = useState(false);
+  const [incompleteExportOpen, setIncompleteExportOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const cropTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -483,26 +501,27 @@ const App: React.FC = () => {
     setNotice(null);
     setIsDraggingUpload(false);
     setDeleteAllPhotosOpen(false);
+    setIncompleteExportOpen(false);
 
     window.requestAnimationFrame(() => {
       document.getElementById('workspace-add-photos')?.focus({ preventScroll: true });
     });
   };
 
-  const processAll = async (force = false) => {
-    if (processing || exporting) return;
+  const processAll = async (force = false): Promise<BatchProcessOutcome> => {
+    if (processing || exporting) return 'noop';
 
     const sourceImages = [...imagesRef.current];
     const batchSettings = settings;
     const batchMode = outputMode;
-    if (sourceImages.length === 0) return;
+    if (sourceImages.length === 0) return 'noop';
 
     const includedEntries = sourceImages
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => isImageIncluded(item));
     if (includedEntries.length === 0) {
       setNotice({ tone: 'info', message: '请先选择至少一张照片，再开始冲洗。' });
-      return;
+      return 'blocked';
     }
 
     const batchEntries = includedEntries
@@ -517,7 +536,7 @@ const App: React.FC = () => {
     const batchImages = batchEntries.map(entry => entry.item);
     if (batchImages.length === 0) {
       setNotice({ tone: 'info', message: '当前成片均为最新，无需重新冲洗。' });
-      return;
+      return 'completed';
     }
 
     const admission = batchMode === 'strip'
@@ -537,7 +556,7 @@ const App: React.FC = () => {
         admission,
         batchMode === 'strip' ? '生成胶片长条' : '开始冲洗',
       ));
-      return;
+      return 'blocked';
     }
 
     const generation = ++renderGenerationRef.current;
@@ -563,7 +582,7 @@ const App: React.FC = () => {
 
         if (!mountedRef.current || generation !== renderGenerationRef.current || currentKey !== settingsKey) {
           revokeObjectUrl(result.url);
-          return;
+          return 'cancelled';
         }
 
         const artifact: RenderArtifact = {
@@ -658,6 +677,9 @@ const App: React.FC = () => {
             }
           }
         }
+        if (!mountedRef.current || generation !== renderGenerationRef.current) {
+          return 'cancelled';
+        }
         if (mountedRef.current && generation === renderGenerationRef.current) {
           if (failedFiles.length > 0) {
             setErrorMsg(`以下文件处理失败，其他图片已保留处理结果：\n${failedFiles.map(name => `"${name}"`).join('\n')}`);
@@ -669,11 +691,14 @@ const App: React.FC = () => {
               : `这一卷冲洗完成，共 ${completedCount} 张成片。`,
           });
         }
+        return failedFiles.length > 0 ? 'failed' : 'completed';
       }
+      return 'completed';
     } catch (e) {
-      if (!mountedRef.current || generation !== renderGenerationRef.current) return;
+      if (!mountedRef.current || generation !== renderGenerationRef.current) return 'cancelled';
       console.error(e);
       setErrorMsg('处理过程中发生错误，可能是图片文件损坏或内存不足。');
+      return 'failed';
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
         setProcessing(false);
@@ -824,75 +849,102 @@ const App: React.FC = () => {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const exportSingleEntries = async (
+    readyEntries: readonly SingleExportEntry[],
+    totalImageCount: number,
+  ) => {
+    if (readyEntries.length === 0) {
+      setErrorMsg('暂无可下载的成片，请先完成冲洗。');
+      return;
+    }
+    if (readyEntries.some(({ artifact }) => artifact.byteSize === undefined)) {
+      setErrorMsg('部分成片缺少容量信息，请重新冲洗这些照片后再打包。');
+      return;
+    }
+
+    const initialZipAdmission = evaluateBatchAdmission({
+      operation: 'zip',
+      includedImages: readyEntries.map(({ item }) => item),
+      totalImageCount,
+      zipInputBytes: readyEntries.reduce((total, { artifact }) => total + artifact.byteSize!, 0),
+    });
+    if (initialZipAdmission.status === 'blocked') {
+      setErrorMsg(formatAdmissionFeedback(initialZipAdmission, '打包下载'));
+      return;
+    }
+    if (initialZipAdmission.status === 'warning') {
+      setNotice({ tone: 'warning', message: formatAdmissionFeedback(initialZipAdmission, '打包下载') });
+    }
+
+    try {
+      setExporting(true);
+      setExportMessage(`正在打包 0/${readyEntries.length}`);
+      const zipFiles = [];
+      for (let idx = 0; idx < readyEntries.length; idx++) {
+        setExportMessage(`正在打包 ${idx + 1}/${readyEntries.length}`);
+        const { item, artifact, index } = readyEntries[idx];
+        const response = await fetch(artifact.url);
+        if (!response.ok) throw new Error(`Failed to read generated image ${idx + 1}`);
+        const blob = await response.blob();
+        zipFiles.push({
+          name: `${String(index + 1).padStart(2, '0')}_${createArtifactFilename(item.file.name, artifact.mime)}`,
+          blob,
+        });
+      }
+
+      const zipBlob = await createZipBlob(zipFiles);
+      downloadBlob(zipBlob, `filmframe_${timestampForFilename()}.zip`);
+    } catch (error) {
+      console.error('Failed to create ZIP archive', error);
+      setErrorMsg('打包下载失败，请重新处理图片后再试。');
+    } finally {
+      setExporting(false);
+      setExportMessage('');
+    }
+  };
+
   const downloadAll = async () => {
     if (exporting || processing) return;
-    const includedImages = getIncludedImages(images);
-    if (includedImages.length === 0) {
+    const currentImages = imagesRef.current;
+    const currentSettings = settingsRef.current;
+    if (getIncludedImageCount(currentImages) === 0) {
       setNotice({ tone: 'info', message: '请先选择至少一张照片，再导出成片。' });
       return;
     }
 
     if (outputMode === 'strip') {
-      const currentKey = createOrderedStripKey(settings, getIncludedStripImages(images));
-      if (stripResult?.settingsKey === currentKey && stripResult.mime === settings.outputFormat) {
-        downloadImage(stripResult, `film_strip_${Date.now()}`);
+      const currentKey = createOrderedStripKey(currentSettings, getIncludedStripImages(currentImages));
+      const currentStrip = stripResultRef.current;
+      if (currentStrip?.settingsKey === currentKey && currentStrip.mime === currentSettings.outputFormat) {
+        downloadImage(currentStrip, `film_strip_${Date.now()}`);
       }
     } else {
-      const processedImages = images.flatMap((img, index) => {
-        if (!isImageIncluded(img)) return [];
-        const artifact = getCurrentImageArtifact(img, index, settings);
-        return artifact ? [{ img, artifact, index }] : [];
-      });
-      if (processedImages.length === 0) {
-        setErrorMsg('暂无可下载的成片，请先点击“处理全部单张”。');
+      const readiness = getSingleExportReadiness(currentImages, currentSettings);
+      if (readiness.status === 'incomplete') {
+        setIncompleteExportOpen(true);
         return;
       }
-      if (processedImages.some(({ artifact }) => artifact.byteSize === undefined)) {
-        setErrorMsg('部分成片缺少容量信息，请重新冲洗这些照片后再打包。');
-        return;
-      }
-
-      const zipSourceImages = processedImages.map(({ img }) => img);
-      const initialZipAdmission = evaluateBatchAdmission({
-        operation: 'zip',
-        includedImages: zipSourceImages,
-        totalImageCount: images.length,
-        zipInputBytes: processedImages.reduce((total, { artifact }) => total + artifact.byteSize!, 0),
-      });
-      if (initialZipAdmission.status === 'blocked') {
-        setErrorMsg(formatAdmissionFeedback(initialZipAdmission, '打包下载'));
-        return;
-      }
-      if (initialZipAdmission.status === 'warning') {
-        setNotice({ tone: 'warning', message: formatAdmissionFeedback(initialZipAdmission, '打包下载') });
-      }
-
-      try {
-        setExporting(true);
-        setExportMessage(`正在打包 0/${processedImages.length}`);
-        const zipFiles = [];
-        for (let idx = 0; idx < processedImages.length; idx++) {
-          setExportMessage(`正在打包 ${idx + 1}/${processedImages.length}`);
-          const { img, artifact, index } = processedImages[idx];
-          const response = await fetch(artifact.url);
-          if (!response.ok) throw new Error(`Failed to read generated image ${idx + 1}`);
-          const blob = await response.blob();
-          zipFiles.push({
-            name: `${String(index + 1).padStart(2, '0')}_${createArtifactFilename(img.file.name, artifact.mime)}`,
-            blob,
-          });
-        }
-
-        const zipBlob = await createZipBlob(zipFiles);
-        downloadBlob(zipBlob, `filmframe_${timestampForFilename()}.zip`);
-      } catch (error) {
-        console.error('Failed to create ZIP archive', error);
-        setErrorMsg('打包下载失败，请重新处理图片后再试。');
-      } finally {
-        setExporting(false);
-        setExportMessage('');
-      }
+      await exportSingleEntries(readiness.readyEntries, currentImages.length);
     }
+  };
+
+  const processRemainingAndExport = async () => {
+    setIncompleteExportOpen(false);
+    const outcome = await processAll();
+    if (outcome !== 'completed') return;
+
+    const currentImages = imagesRef.current;
+    const readiness = getSingleExportReadiness(currentImages, settingsRef.current);
+    if (readiness.status !== 'complete') return;
+    await exportSingleEntries(readiness.readyEntries, currentImages.length);
+  };
+
+  const exportCurrentResults = async () => {
+    setIncompleteExportOpen(false);
+    const currentImages = imagesRef.current;
+    const readiness = getSingleExportReadiness(currentImages, settingsRef.current);
+    if (readiness.readyCount === 0) return;
+    await exportSingleEntries(readiness.readyEntries, currentImages.length);
   };
 
   const moveImage = (id: string, direction: 'up' | 'down') => {
@@ -1079,6 +1131,7 @@ const App: React.FC = () => {
     (count, image) => count + Number(currentImageArtifacts.has(image.id)),
     0,
   );
+  const singleExportReadiness = getSingleExportReadiness(images, settings);
   const imageWorkflowStatuses = new Map(
     images.map((img, index) => {
       const imageSettings = settingsForImage(settings, index);
@@ -1097,7 +1150,7 @@ const App: React.FC = () => {
     .map(image => imageWorkflowStatuses.get(image.id)!)
     .filter(status => status.kind === 'unprocessed' || status.kind === 'stale' || status.kind === 'failed')
     .length;
-  const hasAnyResult = outputMode === 'single' ? includedProcessedCount > 0 : Boolean(currentStripResult);
+  const hasExportAction = outputMode === 'single' ? includedCount > 0 : Boolean(currentStripResult);
   const previewImageIndex =
     preview?.type === 'single' ? getPreviewImageIndex(images, preview.imageId) : -1;
   const previewImageItem = previewImageIndex >= 0 ? images[previewImageIndex] : null;
@@ -1181,7 +1234,9 @@ const App: React.FC = () => {
   const downloadButtonLabel =
     outputMode === 'strip'
       ? '下载长条大图'
-      : `打包下载 ZIP${includedProcessedCount > 0 ? ` (${includedProcessedCount})` : ''}`;
+      : singleExportReadiness.status === 'complete'
+        ? `打包下载 ZIP (${singleExportReadiness.readyCount})`
+        : `完成冲洗并导出 ZIP (${singleExportReadiness.readyCount}/${singleExportReadiness.totalCount})`;
   const primaryActionState = exporting
     ? 'exporting'
     : processing
@@ -1329,7 +1384,7 @@ const App: React.FC = () => {
             imageCount={images.length}
             processedCount={includedProcessedCount}
             outputMode={outputMode}
-            hasDownloadableResult={hasAnyResult}
+            hasDownloadableResult={hasExportAction}
             processing={processing}
             exporting={exporting}
             busyLabel={processing ? processingMessage : exporting ? exportMessage : undefined}
@@ -1354,7 +1409,7 @@ const App: React.FC = () => {
                 stripStatusLabel={stripStatusLabel}
                 statusSummary={workspaceSummary}
                 controlsDisabled={processing || exporting}
-                canExport={hasAnyResult}
+                canExport={hasExportAction}
                 exportLabel={exporting ? exportMessage || '正在导出' : downloadButtonLabel}
                 onOutputModeChange={mode => {
                   if (!processing && !exporting) setOutputMode(mode);
@@ -1545,6 +1600,14 @@ const App: React.FC = () => {
               photoCount={images.length}
               onCancel={() => setDeleteAllPhotosOpen(false)}
               onConfirm={confirmDeleteAllPhotos}
+            />
+            <IncompleteExportDialog
+              open={incompleteExportOpen}
+              readyCount={singleExportReadiness.readyCount}
+              totalCount={singleExportReadiness.totalCount}
+              onCancel={() => setIncompleteExportOpen(false)}
+              onProcessAndExport={() => void processRemainingAndExport()}
+              onExportReady={() => void exportCurrentResults()}
             />
           </>
         )}

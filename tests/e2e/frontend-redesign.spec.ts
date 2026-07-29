@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { expect, test, type Download, type Page } from '@playwright/test';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/aperture-mask-derived.png');
 const curationFixtures = [
@@ -19,6 +20,17 @@ function curationCheckbox(page: Page, action: '取消入选' | '入选', fileNam
 
 function photoCard(page: Page, fileName: string) {
   return page.getByRole('img', { name: fileName }).locator('xpath=ancestor::article');
+}
+
+async function countZipEntries(download: Download): Promise<number> {
+  const downloadPath = await download.path();
+  if (!downloadPath) throw new Error('Downloaded ZIP path is unavailable');
+  const bytes = await readFile(downloadPath);
+  let count = 0;
+  for (let offset = 0; offset <= bytes.length - 4; offset++) {
+    if (bytes.readUInt32LE(offset) === 0x02014b50) count += 1;
+  }
+  return count;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -621,6 +633,48 @@ test('batch curation keeps card, strip, summary, and zero-selection recovery in 
   await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${firstName}` })).toBeChecked();
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${thirdName}` })).toBeChecked();
+});
+
+test('incomplete ZIP export requires an explicit partial export or finishes the roll first', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await uploadCurationFixtures(page);
+
+  const thirdName = curationNames[2];
+  await curationCheckbox(page, '取消入选', thirdName).uncheck();
+  const emptyExportButton = page.getByRole('button', { name: '完成冲洗并导出 ZIP (0/2)' });
+  await emptyExportButton.click();
+  const dialog = page.getByRole('dialog', { name: '这一卷还没有全部冲洗完成' });
+  await expect(dialog).toContainText('当前 0/2 张已有成片，另有 2 张待冲洗。');
+  await expect(dialog.getByRole('button', { name: /仅导出当前/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(emptyExportButton).toBeFocused();
+
+  await page.getByRole('button', { name: /冲洗待更新照片 \(2\)/ }).click();
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(2, { timeout: 30_000 });
+
+  await curationCheckbox(page, '入选', thirdName).check();
+  const exportButton = page.getByRole('button', { name: '完成冲洗并导出 ZIP (2/3)' });
+  await exportButton.click();
+
+  await expect(dialog).toContainText('当前 2/3 张已有成片，另有 1 张待冲洗。');
+  await expect(dialog.getByRole('button', { name: '仅导出当前 2/3 张' })).toBeVisible();
+
+  const partialDownload = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: '仅导出当前 2/3 张' }).click();
+  const partialZip = await partialDownload;
+  await expect(partialZip.suggestedFilename()).toMatch(/^filmframe_.*\.zip$/);
+  expect(await countZipEntries(partialZip)).toBe(2);
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(2);
+
+  await exportButton.click();
+  await expect(dialog).toBeVisible();
+  const completeDownload = page.waitForEvent('download', { timeout: 30_000 });
+  await dialog.getByRole('button', { name: '冲洗剩余 1 张并导出' }).click();
+  const completeZip = await completeDownload;
+  await expect(completeZip.suggestedFilename()).toMatch(/^filmframe_.*\.zip$/);
+  expect(await countZipEntries(completeZip)).toBe(3);
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(3);
+  await expect(page.getByRole('button', { name: '打包下载 ZIP (3)' })).toBeVisible();
 });
 
 test('delete all photos requires confirmation and resets only the current roll', async ({ page }) => {

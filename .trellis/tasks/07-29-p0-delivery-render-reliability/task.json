@@ -1,0 +1,29 @@
+{
+  "id": "p0-delivery-render-reliability",
+  "name": "p0-delivery-render-reliability",
+  "title": "P0 交付可靠性与渲染响应",
+  "description": "Close the incomplete-export gap and move every real-135 render off the main thread with real cancellation.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-07-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-29-complete-process-export",
+    "07-29-all-film-worker-cancellation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
