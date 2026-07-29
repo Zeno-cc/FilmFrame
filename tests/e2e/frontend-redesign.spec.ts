@@ -674,15 +674,20 @@ test('crop editor returns focus to its trigger after Escape and cancel', async (
   await expect(processedMode).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('support dialog replaces a broken QR image with a fallback', async ({ page }) => {
+test('support dialog loads the payment QR image and retains focus trapping', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '支持 FilmFrame' }).click();
 
   const dialog = page.getByRole('dialog', { name: '支持 FilmFrame' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('二维码暂不可用，请在资源替换后重试。')).toBeVisible();
-  await expect(dialog.locator('img')).toHaveCount(0);
+  const qrImage = dialog.getByRole('img', { name: '支持 FilmFrame 的二维码' });
+  await expect(qrImage).toBeVisible();
+  await expect.poll(() => qrImage.evaluate(image => ({
+    width: (image as HTMLImageElement).naturalWidth,
+    height: (image as HTMLImageElement).naturalHeight,
+  }))).toEqual({ width: 1260, height: 1890 });
+  await expect(dialog.getByText('二维码暂不可用，请在资源替换后重试。')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(dialog.getByRole('button', { name: '关闭支持窗口' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
@@ -698,6 +703,7 @@ test('support opened from mobile settings replaces the Sheet', async ({ page }) 
   await sheet.getByRole('menuitem', { name: '支持 FilmFrame' }).click();
   const support = page.getByRole('dialog', { name: '支持 FilmFrame' });
   await expect(support).toBeVisible();
+  await expect(support.getByRole('img', { name: '支持 FilmFrame 的二维码' })).toBeVisible();
   await expect(sheet).toBeHidden();
   await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
 });
