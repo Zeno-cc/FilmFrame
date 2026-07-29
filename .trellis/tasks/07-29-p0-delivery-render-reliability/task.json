@@ -3,7 +3,7 @@
   "name": "p0-delivery-render-reliability",
   "title": "P0 交付可靠性与渲染响应",
   "description": "Close the incomplete-export gap and move every real-135 render off the main thread with real cancellation.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

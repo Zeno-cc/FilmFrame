@@ -13,11 +13,11 @@
 
 ## Acceptance Criteria
 
-- [ ] 部分照片已冲洗时，主操作会先处理剩余照片再导出，界面不再无提示遗漏。
-- [ ] 用户仍可明确选择只导出当前有效成片，并能看到 `N/M` 范围。
-- [ ] 16 款已注册真实 135 单帧与长条渲染在支持环境中均进入 Worker。
-- [ ] 停止批量处理会终止 Worker，已完成结果保留，迟到结果不会覆盖状态或显示错误。
-- [ ] 单元测试、类型检查、构建和端到端测试全部通过。
+- [x] 部分照片已冲洗时，主操作会先处理剩余照片再导出，界面不再无提示遗漏。
+- [x] 用户仍可明确选择只导出当前有效成片，并能看到 `N/M` 范围。
+- [x] 16 款已注册真实 135 单帧与长条渲染在支持环境中均进入 Worker。
+- [x] 停止批量处理会终止 Worker，已完成结果保留，迟到结果不会覆盖状态或显示错误。
+- [x] 单元测试、类型检查、构建和端到端测试全部通过。
 
 ## Task Map
 
@@ -29,3 +29,9 @@
 - 不引入新的运行时依赖。
 - 不把父任务作为直接实现目标；子任务分别启动、检查和归档。
 - 不借机调整视觉资产或扩大到会话恢复、HEIC、撤销等后续需求。
+
+## Verification Evidence
+
+- `npm run check`: 24 test files / 165 tests, strict typecheck, and production build passed.
+- `npm run test:e2e`: 36 Chromium journeys passed, including all 16 real-135 single/strip paths, exact partial/full ZIP entry counts, Worker termination, and retry through a new Worker.
+- `git diff --check`: passed before both implementation commits.
