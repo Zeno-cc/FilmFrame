@@ -1185,7 +1185,6 @@ const App: React.FC = () => {
     : null;
   const previewTransform = normalizeRenderTransform(previewImageItem?.transform ?? DEFAULT_RENDER_TRANSFORM);
   useEffect(() => {
-    setPreviewSourceMode('after');
     setIsCropping(false);
   }, [preview?.type, previewImageItem?.id]);
   useEffect(() => {

@@ -327,6 +327,42 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   expect(Math.abs(stripSprocketPixel[2] - 204)).toBeLessThan(18);
 });
 
+test('single preview keeps the selected source mode across navigation and reopen', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await uploadCurationFixtures(page, 2);
+
+  const firstName = curationNames[0];
+  const secondName = curationNames[1];
+  await page.getByRole('button', { name: `查看 ${firstName}` }).click();
+
+  let preview = page.getByRole('dialog', { name: new RegExp(firstName) });
+  const originalMode = preview.getByRole('button', { name: '原图' });
+  const processedMode = preview.getByRole('button', { name: '成片', exact: true });
+  await expect(processedMode).toHaveAttribute('aria-pressed', 'true');
+
+  await originalMode.click();
+  await expect(originalMode).toHaveAttribute('aria-pressed', 'true');
+  await preview.getByRole('button', { name: '下一张' }).click();
+
+  preview = page.getByRole('dialog', { name: new RegExp(secondName) });
+  await expect(preview.getByRole('button', { name: '原图' })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('ArrowLeft');
+
+  preview = page.getByRole('dialog', { name: new RegExp(firstName) });
+  await expect(preview.getByRole('button', { name: '原图' })).toHaveAttribute('aria-pressed', 'true');
+  await preview.getByRole('button', { name: '关闭预览' }).click();
+  await page.getByRole('button', { name: `查看 ${secondName}` }).click();
+
+  preview = page.getByRole('dialog', { name: new RegExp(secondName) });
+  await expect(preview.getByRole('button', { name: '原图' })).toHaveAttribute('aria-pressed', 'true');
+  await preview.getByRole('button', { name: '成片', exact: true }).click();
+  await expect(preview.getByRole('button', { name: '成片', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('ArrowRight');
+
+  preview = page.getByRole('dialog', { name: new RegExp(firstName) });
+  await expect(preview.getByRole('button', { name: '成片', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const inspector = page.getByRole('complementary', { name: '暗房配方' });
@@ -480,6 +516,10 @@ test('crop editor returns focus to its trigger after Escape and cancel', async (
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: /查看 aperture-mask-derived\.png/ }).click();
+  const originalMode = page.getByRole('button', { name: '原图' });
+  const processedMode = page.getByRole('button', { name: '成片', exact: true });
+  await originalMode.click();
+  await expect(originalMode).toHaveAttribute('aria-pressed', 'true');
   const cropTrigger = page.getByRole('button', { name: '调整构图' });
   await cropTrigger.click();
   const cropStage = page.locator('[data-crop-stage]');
@@ -538,6 +578,7 @@ test('crop editor returns focus to its trigger after Escape and cancel', async (
   await expect(cropViewport).toBeVisible();
   await page.getByRole('button', { name: '取消' }).click();
   await expect(cropTrigger).toBeFocused();
+  await expect(originalMode).toHaveAttribute('aria-pressed', 'true');
 
   await cropTrigger.click();
   await expect(cropViewport).toBeVisible();
@@ -547,6 +588,7 @@ test('crop editor returns focus to its trigger after Escape and cancel', async (
   await page.getByRole('button', { name: '完成' }).click();
   await expect(cropViewport).toBeHidden();
   await expect(cropTrigger).toBeFocused();
+  await expect(processedMode).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('support dialog replaces a broken QR image with a fallback', async ({ page }) => {
