@@ -63,7 +63,7 @@ export function getFilmTemplateFrameNumberMark(
 }
 
 export function drawFilmTemplateFrameNumber(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings,
 ) {
@@ -84,7 +84,7 @@ export function drawFilmTemplateFrameNumber(
 }
 
 export function drawKodakGoldFrameNumbers(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings
 ) {

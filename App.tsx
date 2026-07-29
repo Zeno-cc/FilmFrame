@@ -1,7 +1,12 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
-import { disposeFilmWorkerClient, processImage, generateFilmStrip } from './services/filmWorkerClient';
+import {
+  cancelFilmRendering,
+  disposeFilmWorkerClient,
+  processImage,
+  generateFilmStrip,
+} from './services/filmWorkerClient';
 import { createZipBlob } from './services/zip';
 import {
   evaluateExportReadiness,
@@ -713,6 +718,7 @@ const App: React.FC = () => {
   const stopProcessing = () => {
     if (!processing) return;
     renderGenerationRef.current += 1;
+    cancelFilmRendering();
     setProcessing(false);
     setActiveBatchMode(null);
     setProcessingMessage('');

@@ -7,13 +7,22 @@ import {
   REAL135_SPROCKET_MASK_HEIGHT,
   REAL135_SPROCKET_MASK_WIDTH,
 } from './filmSprocket';
-import { drawKodakGoldFrameNumbers, getFrameNumberColor, getFrameNumberForImage } from './filmFrameNumber';
 import {
+  drawFilmTemplateFrameNumber,
+  drawKodakGoldFrameNumbers,
+  getFrameNumberColor,
+  getFrameNumberForImage,
+} from './filmFrameNumber';
+import {
+  createFilmTemplateStripLayout,
   createKodakGoldOverlayLayout,
   createKodakGoldStripLayout,
+  drawKodakGoldOverlayLayer,
+  getReal135OverlayUrl,
   KODAK_GOLD_APERTURE_MASK_URL,
   KODAK_GOLD_APERTURE_SHADOW_URL,
   KODAK_GOLD_BASE_URL,
+  supportsReal135Template,
 } from './filmOverlay';
 import { drawImageCoverAutoRotate, drawImageCoverWithTransform } from './filmGeometry';
 import { getAutoQuarterTurns, getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
@@ -61,7 +70,8 @@ function assertCanvasBudget(width: number, height: number) {
 }
 
 let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
-let kodakGoldSprocketMaskPromise: Promise<ImageBitmap> | null = null;
+const real135OverlayPromises = new Map<string, Promise<ImageBitmap>>();
+const real135SprocketMaskPromises = new Map<string, Promise<ImageBitmap>>();
 
 function roundedRect(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -118,6 +128,21 @@ async function loadBitmapFromUrl(url: string): Promise<ImageBitmap> {
   return createImageBitmap(await response.blob());
 }
 
+function loadCachedBitmap(
+  cache: Map<string, Promise<ImageBitmap>>,
+  url: string,
+): Promise<ImageBitmap> {
+  const existing = cache.get(url);
+  if (existing) return existing;
+
+  const pending = loadBitmapFromUrl(url).catch(error => {
+    cache.delete(url);
+    throw error;
+  });
+  cache.set(url, pending);
+  return pending;
+}
+
 function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   if (!kodakGoldLayeredAssetsPromise) {
     kodakGoldLayeredAssetsPromise = (async () => {
@@ -143,16 +168,16 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   return kodakGoldLayeredAssetsPromise;
 }
 
-function loadKodakGoldSprocketMask(): Promise<ImageBitmap> {
-  if (!kodakGoldSprocketMaskPromise) {
-    const maskUrl = getReal135SprocketMaskUrl(FilmType.KODAK_GOLD_200);
-    if (!maskUrl) return Promise.reject(new Error('Kodak Gold sprocket mask is not registered'));
-    kodakGoldSprocketMaskPromise = loadBitmapFromUrl(maskUrl).catch(error => {
-      kodakGoldSprocketMaskPromise = null;
-      throw error;
-    });
-  }
-  return kodakGoldSprocketMaskPromise;
+function loadReal135Overlay(brand: FilmType): Promise<ImageBitmap> {
+  const overlayUrl = getReal135OverlayUrl(brand);
+  if (!overlayUrl) return Promise.reject(new Error(`Real 135 overlay is not registered: ${brand}`));
+  return loadCachedBitmap(real135OverlayPromises, overlayUrl);
+}
+
+function loadReal135SprocketMask(brand: FilmType): Promise<ImageBitmap> {
+  const maskUrl = getReal135SprocketMaskUrl(brand);
+  if (!maskUrl) return Promise.reject(new Error(`Real 135 sprocket mask is not registered: ${brand}`));
+  return loadCachedBitmap(real135SprocketMaskPromises, maskUrl);
 }
 
 async function createTintedSprocketOverlay(settings: FilmSettings): Promise<OffscreenCanvas | null> {
@@ -160,7 +185,7 @@ async function createTintedSprocketOverlay(settings: FilmSettings): Promise<Offs
   if (!color) return null;
 
   try {
-    const mask = await loadKodakGoldSprocketMask();
+    const mask = await loadReal135SprocketMask(settings.brandText);
     const canvas = new OffscreenCanvas(REAL135_SPROCKET_MASK_WIDTH, REAL135_SPROCKET_MASK_HEIGHT);
     const context = canvas.getContext('2d', { alpha: true });
     if (!context) return null;
@@ -371,9 +396,82 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
   }
 }
 
+function drawFlattenedReal135Frame(
+  ctx: WorkerContext,
+  img: WorkerImage,
+  overlay: WorkerImage,
+  layout: ReturnType<typeof createKodakGoldOverlayLayout>,
+  settings: FilmSettings,
+  transform?: RenderTransform,
+  sprocketOverlay?: WorkerCanvas | null,
+) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#050403';
+  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+
+  ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
+  drawImageCoverAutoRotate(
+    ctx,
+    img,
+    layout.imageX,
+    layout.imageY,
+    layout.imageW,
+    layout.imageH,
+    transform,
+  );
+  drawGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
+  drawKodakGoldOverlayLayer(ctx, overlay, layout);
+  if (sprocketOverlay) {
+    ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
+  }
+  drawFilmTemplateFrameNumber(ctx, layout, settings);
+}
+
+async function renderFlattenedReal135Frame(
+  file: File,
+  settings: FilmSettings,
+  transform?: RenderTransform,
+): Promise<Blob> {
+  const [overlay, sprocketOverlay] = await Promise.all([
+    loadReal135Overlay(settings.brandText),
+    createTintedSprocketOverlay(settings),
+  ]);
+  const img = await createImageBitmap(file);
+
+  try {
+    const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
+    const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+    assertCanvasBudget(layout.filmW, layout.filmH);
+    const canvas = new OffscreenCanvas(layout.filmW, layout.filmH);
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('Canvas init failed');
+
+    drawFlattenedReal135Frame(ctx, img, overlay, layout, settings, transform, sprocketOverlay);
+
+    const finalCanvas =
+      (settings.scanOutputAspect ?? 'native') === '4:3'
+        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+        : canvas;
+    const outputCanvas = restoreOutputOrientationForSource(
+      finalCanvas,
+      img,
+      targetImageWidthPx,
+      Math.round(targetImageWidthPx * 2 / 3),
+      transform,
+    );
+    return canvasToBlob(outputCanvas, settings);
+  } finally {
+    img.close();
+  }
+}
+
 async function renderReal135Frame(file: File, settings: FilmSettings, transform?: RenderTransform): Promise<Blob> {
-  if (settings.brandText !== FilmType.KODAK_GOLD_200 || settings.useFilmOverlayTemplate === false) {
+  if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
     return renderClassicFrame(file, { ...settings, frameRenderMode: 'classic' }, undefined, transform);
+  }
+  if (settings.brandText !== FilmType.KODAK_GOLD_200) {
+    return renderFlattenedReal135Frame(file, settings, transform);
   }
 
   const assets = await loadKodakGoldLayeredAssets();
@@ -414,7 +512,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
     }
     // Keep aperture shadow disabled to match the current main-thread renderer.
     // ctx.drawImage(assets.apertureShadow, 0, 0, layout.filmW, layout.filmH);
-    drawKodakGoldFrameNumbers(ctx as unknown as CanvasRenderingContext2D, layout, settings);
+    drawKodakGoldFrameNumbers(ctx, layout, settings);
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
@@ -626,10 +724,68 @@ function drawContinuousStripMarkings(
   ctx.restore();
 }
 
+async function renderFlattenedReal135Strip(
+  images: ImageItem[],
+  settings: FilmSettings,
+): Promise<Blob> {
+  const [overlay, sprocketOverlay] = await Promise.all([
+    loadReal135Overlay(settings.brandText),
+    createTintedSprocketOverlay(settings),
+  ]);
+  const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
+  const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
+  assertCanvasBudget(layout.totalW, layout.totalH);
+  const canvas = new OffscreenCanvas(layout.totalW, layout.totalH);
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Canvas init failed');
+
+  ctx.fillStyle = '#161514';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let index = 0; index < images.length; index++) {
+    const img = await createImageBitmap(images[index].file);
+    try {
+      const row = Math.floor(index / layout.maxPerRow);
+      const col = index % layout.maxPerRow;
+      const x = layout.padding + col * layout.frameStride;
+      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+      const frameSettings = {
+        ...settings,
+        frameNumber: getFrameNumberForImage(
+          settings.frameNumber,
+          images[index],
+          index,
+          settings.maxRollFrames ?? 36,
+        ),
+      };
+
+      ctx.save();
+      ctx.translate(x, y);
+      drawFlattenedReal135Frame(
+        ctx,
+        img,
+        overlay,
+        layout.frame,
+        frameSettings,
+        images[index].transform,
+        sprocketOverlay,
+      );
+      ctx.restore();
+    } finally {
+      img.close();
+    }
+  }
+
+  return canvasToBlob(canvas, settings);
+}
+
 async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): Promise<Blob> {
   if (images.length === 0) throw new Error('No images to render');
-  if (settings.brandText !== FilmType.KODAK_GOLD_200 || settings.useFilmOverlayTemplate === false) {
+  if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
     return renderClassicStrip(images, { ...settings, frameRenderMode: 'classic' });
+  }
+  if (settings.brandText !== FilmType.KODAK_GOLD_200) {
+    return renderFlattenedReal135Strip(images, settings);
   }
 
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);

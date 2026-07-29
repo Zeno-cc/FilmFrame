@@ -4,8 +4,10 @@ import type { FilmSettings } from '../types';
 import {
   WorkerCancelledError,
   createWorkerRenderer,
+  isWorkerCancelledError,
   shouldUseWorkerForSettings,
 } from '../services/filmWorkerClient';
+import { REAL135_TEMPLATE_URLS } from '../services/filmOverlay';
 
 type WorkerMessage = { id: number } & Record<string, unknown>;
 
@@ -90,7 +92,9 @@ describe('createWorkerRenderer', () => {
 
     renderer.dispose();
 
-    await expect(pending).rejects.toBeInstanceOf(WorkerCancelledError);
+    const cancellation = await pending.catch(error => error);
+    expect(cancellation).toBeInstanceOf(WorkerCancelledError);
+    expect(isWorkerCancelledError(cancellation)).toBe(true);
     expect(worker.terminated).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -205,14 +209,13 @@ describe('createWorkerRenderer', () => {
 });
 
 describe('worker routing policy', () => {
-  it('allows only the Kodak Gold real135 template path', () => {
-    expect(shouldUseWorkerForSettings(settings)).toBe(true);
-    expect(shouldUseWorkerForSettings({ ...settings, frameRenderMode: 'classic' })).toBe(false);
-    for (const brandText of Object.values(FilmType)) {
-      if (brandText !== FilmType.KODAK_GOLD_200) {
-        expect(shouldUseWorkerForSettings({ ...settings, brandText })).toBe(false);
-      }
+  it('allows every registered real135 template path', () => {
+    const registeredStocks = Object.keys(REAL135_TEMPLATE_URLS) as FilmType[];
+    expect(registeredStocks).toHaveLength(16);
+    for (const brandText of registeredStocks) {
+      expect(shouldUseWorkerForSettings({ ...settings, brandText })).toBe(true);
     }
+    expect(shouldUseWorkerForSettings({ ...settings, frameRenderMode: 'classic' })).toBe(false);
     expect(shouldUseWorkerForSettings({ ...settings, useFilmOverlayTemplate: false })).toBe(false);
   });
 });

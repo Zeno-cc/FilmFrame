@@ -192,7 +192,7 @@ export function createFilmTemplateStripLayout(
 }
 
 export function drawKodakGoldOverlayLayer(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   overlay: CanvasImageSource,
   layout: KodakGoldOverlayLayout
 ) {
@@ -203,7 +203,7 @@ export function drawKodakGoldOverlayLayer(
 }
 
 function drawOverlayBand(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   overlay: CanvasImageSource,
   layout: KodakGoldOverlayLayout,
   x: number,

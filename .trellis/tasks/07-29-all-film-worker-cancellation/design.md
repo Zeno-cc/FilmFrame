@@ -8,7 +8,7 @@ Worker 内保留 Gold 200 分层专用渲染；其他真实 135 使用通用扁�
 
 ## Resource Loading
 
-把真实 135 overlay URL 与齿孔 mask URL 随请求传入 Worker，避免 Worker 复制注册表。Worker 维护按 URL 或 `FilmType` 键控的 `Map<string, Promise<ImageBitmap>>`：
+Worker 直接导入共享的 overlay 与齿孔 mask 注册表，避免复制注册表或扩展消息协议。Worker 维护按 URL 键控的 `Map<string, Promise<ImageBitmap>>`：
 
 - overlay 缓存独立于齿孔 mask 缓存；
 - 加载失败从缓存删除，允许下次重试；
@@ -34,7 +34,7 @@ Worker 内保留 Gold 200 分层专用渲染；其他真实 135 使用通用扁�
 
 ## Compatibility And Rollback
 
-请求协议只增加通用模板所需的 URL 字段，无持久化迁移。回滚可恢复 Gold-only 路由并移除取消 API，主线程实现保持完整，形成天然回退路径。
+请求协议和持久化格式均不变化。回滚可恢复 Gold-only 路由并移除取消 API，主线程实现保持完整，形成天然回退路径。
 
 ## Testing
 

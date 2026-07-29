@@ -102,7 +102,7 @@ createImageBitmap
 ### 策略条件
 
 - classic：暂不允许 Worker，统一走主线程，避免当前双实现的尺寸和标记差异暴露给用户。
-- real135：16 种 `FilmType` 均由模板注册表开放；仅 `brandText === KODAK_GOLD_200` 且 `useFilmOverlayTemplate !== false` 允许 Worker，其余 15 款走主线程扁平模板路径。
+- real135：`brandText` 已注册模板且 `useFilmOverlayTemplate !== false` 时，16 款胶片均允许 Worker；Gold 200 走分层路径，其余 15 款走扁平模板路径。
 - 不满足时直接主线程。
 
 ### 请求协议
@@ -117,7 +117,7 @@ Worker client 懒创建；构造器被 CSP/策略阻止时返回 null 并走主�
 4. terminate Worker；
 5. 把错误记为永久 unavailable。
 
-单个任务返回业务错误不会终止 Worker。普通任务错误会回退主线程；dispose 产生 `WorkerCancelledError`，不会在卸载后再次启动主线程。请求有 120 秒超时，App 卸载会 dispose、reject pending 并 terminate；晚到响应找不到 pending，因此不创建 Object URL。
+单个任务返回业务错误不会终止 Worker。普通任务错误会回退主线程；dispose/cancel 产生 `WorkerCancelledError`，不会再次启动主线程。请求有 120 秒超时；App 卸载或用户停止会 reject pending、terminate 并清空单例，下一次请求可懒创建新 Worker。晚到响应找不到 pending，因此不创建 Object URL。
 
 仍缺失：细粒度单请求 AbortSignal、进度、主动健康检查和传输列表优化。
 
@@ -187,7 +187,7 @@ processed object URLs
 运行时没有图片上传请求。已知网络边界只有：
 
 - 页面上的 GitHub 外链，用户点击后打开；
-- Worker 用 `fetch()` 加载同源 `/film-overlays/*`；
+- Worker 用 `fetch()` 加载同源 `/film-overlays/*` 与 `/film-sprocket-masks/*`；
 - README 徽章，不属于应用运行时。
 
 应用不申请相机、麦克风、位置、剪贴板或文件系统写权限。下载通过 `<a download>` 和 Blob URL 完成。

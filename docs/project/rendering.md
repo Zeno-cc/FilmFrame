@@ -1,6 +1,6 @@
 # 渲染引擎与图像算法
 
-> 最后核验：2026-07-14。核心文件：`filmEngine.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
+> 最后核验：2026-07-29。核心文件：`filmEngine.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
 
 ## 路由决策
 
@@ -16,7 +16,7 @@ strip
   real135 -> Gold continuous strip or complete flattened-template frames
 ```
 
-Worker 和主线程仍是独立实现，不是同一组平台无关绘制函数。为避免已知差异影响用户，classic 当前固定主线程；Worker 只服务 Gold 200 真实 135 分层模板路径。其余 15 款胶片的扁平模板均由主线程渲染。
+classic 当前固定主线程，避免其两套实现的已知差异影响用户。16 款已注册真实 135 在能力满足时都进入 Worker：Gold 200 使用分层专用路径，其余 15 款使用共享模板几何的扁平 overlay 路径；Worker 不可用或执行失败时由 client 回退完整主线程引擎。
 
 ## 135 物理模型
 
@@ -95,9 +95,9 @@ h = 800
 
 ## Worker 真实单张路径
 
-Worker 用 `createImageBitmap(file)` 解码原图，用 `fetch()` + `createImageBitmap(blob)` 读取同源分层资产，用 `OffscreenCanvas.convertToBlob()` 导出。成功返回 Blob，而不是 URL。
+Worker 用 `createImageBitmap(file)` 解码原图，用 `fetch()` + `createImageBitmap(blob)` 读取同源资产，用 `OffscreenCanvas.convertToBlob()` 导出。成功返回 Blob，而不是 URL。overlay 与齿孔 mask 从共享注册表解析，并按 URL 缓存 `ImageBitmap`；失败会移除缓存项以允许下次重试。
 
-结构大体与主线程分层路径相同，但通过类型断言把 `OffscreenCanvasRenderingContext2D` 交给接收 `CanvasRenderingContext2D` 的色彩函数。浏览器 API 兼容是实际运行前提。
+Gold 200 结构与主线程分层路径相同。其余 15 款复用 `createKodakGoldOverlayLayout()`、`drawKodakGoldOverlayLayer()`、共享 cover、颗粒、齿孔 mask 和模板帧号函数，四条 overlay 边带与主线程保持同一片窗边界。
 
 Worker 若缺资产或任一步报错，不在 Worker 内执行 legacy 模板 fallback，而是把错误回主线程；client 随后让完整主线程引擎重新处理。
 
@@ -182,7 +182,7 @@ Gold 200 使用 `createKodakGoldStripLayout(target, count, 4)`：
 
 主线程先为每一行画连续片基，再逐帧加载图片、cover、Gold 色彩、颗粒和文字。Worker 同样程序化绘制连续片基，不读取分层 PNG。
 
-其余 15 款胶片使用 `createFilmTemplateStripLayout(target, count, 4)`，逐帧保留完整的扁平模板和片边，并让相邻模板边缘直接相接，不额外添加帧间空隙；照片、颗粒和动态帧号在各自模板内绘制。此路径只在主线程运行。
+其余 15 款胶片使用 `createFilmTemplateStripLayout(target, count, 4)`，逐帧保留完整的扁平模板和片边，并让相邻模板边缘直接相接，不额外添加帧间空隙；照片、颗粒和动态帧号在各自模板内绘制。主线程与 Worker 使用同一布局和绘制 helper。
 
 旧版 `getKodakGoldStripSegment()` 没有生产调用，且它的分段算法与真实布局契约不一致，已经连同失真断言删除。当前几何测试覆盖实际使用的 strip layout、旋转和帧号契约。
 

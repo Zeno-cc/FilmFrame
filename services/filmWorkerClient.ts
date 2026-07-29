@@ -1,6 +1,6 @@
-import { FilmType } from '../types';
 import type { FilmSettings, ImageItem, RenderTransform } from '../types';
 import * as mainThreadEngine from './filmEngine';
+import { supportsReal135Template } from './filmOverlay';
 
 type WorkerResponse =
   | { id: number; ok: true; blob: Blob }
@@ -76,14 +76,14 @@ export class WorkerCancelledError extends Error {
   }
 }
 
-function isWorkerCancelledError(error: unknown): error is WorkerCancelledError {
+export function isWorkerCancelledError(error: unknown): error is WorkerCancelledError {
   return error instanceof WorkerCancelledError;
 }
 
 export function shouldUseWorkerForSettings(settings: FilmSettings): boolean {
   return (
     (settings.frameRenderMode ?? 'real135') === 'real135' &&
-    settings.brandText === FilmType.KODAK_GOLD_200 &&
+    supportsReal135Template(settings.brandText) &&
     settings.useFilmOverlayTemplate !== false
   );
 }
@@ -209,6 +209,10 @@ function getWorkerRenderer(): WorkerRenderer | null {
 export function disposeFilmWorkerClient() {
   workerRenderer?.dispose();
   workerRenderer = undefined;
+}
+
+export function cancelFilmRendering() {
+  disposeFilmWorkerClient();
 }
 
 const withImageSourceUrl = async <T>(

@@ -162,6 +162,66 @@ if (maskUrl && color) {
 }
 ```
 
+### Scenario: Real-135 Worker Routing And Cancellation
+
+#### 1. Scope / Trigger
+
+Apply this contract whenever real-135 template registration, Worker routing, Worker rendering, or the batch stop command changes.
+
+#### 2. Signatures
+
+```ts
+function shouldUseWorkerForSettings(settings: FilmSettings): boolean;
+function cancelFilmRendering(): void;
+class WorkerCancelledError extends Error {}
+```
+
+#### 3. Contracts
+
+- Every stock in `REAL135_TEMPLATE_URLS` uses Worker single and strip rendering when Worker, OffscreenCanvas, `convertToBlob`, and `createImageBitmap` are available and templates are enabled.
+- Gold 200 keeps its layered Worker path. Other registered stocks use the flattened overlay path with shared layout, aperture bands, cover placement, grain, sprocket mask, and frame-number helpers.
+- Overlay and sprocket-mask `ImageBitmap` promises are cached by URL inside the Worker. Failed loads remove their cache entry so a later request can retry.
+- Classic rendering and unsupported browsers stay on the main thread. Ordinary Worker failures fall back once to the main-thread engine.
+- User cancellation rejects pending work with `WorkerCancelledError`, terminates the Worker, clears the singleton, and never falls back to main-thread rendering.
+- The App increments its generation before cancellation. Completed artifacts remain owned; cancelled or late results cannot update state or create an Object URL. A later request lazily creates a new Worker.
+
+#### 4. Validation & Error Matrix
+
+- Registered real-135 template plus capabilities -> Worker route.
+- Classic mode, templates disabled, or missing capability -> direct main-thread route.
+- Worker business/asset error -> main-thread fallback.
+- Dispose, stop, or unmount -> cancellation error, no fallback, no user-facing processing error.
+- Response after cancellation -> missing pending entry, no Object URL.
+- Asset load failure -> remove cached promise; main-thread fallback remains available.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: Portra 160 single and strip render in Worker, stop calls `terminate()`, and retry completes through a new Worker.
+- Base: a browser without OffscreenCanvas renders the same request on the main thread.
+- Bad: treating cancellation as an ordinary Worker error starts an expensive main-thread render after the user pressed stop.
+
+#### 6. Tests Required
+
+- Unit tests enumerate all 16 registry keys through `shouldUseWorkerForSettings` and cover classic/template-disabled rejection.
+- Worker lifecycle tests cover pending rejection, timer cleanup, late-response suppression, message errors, timeout, and cancellation type guards.
+- Playwright instruments `Worker.terminate()`, proves stop is quiet, then reruns the same batch successfully.
+- Real-browser coverage renders every registered stock in single and strip modes; representative flattened output also samples aperture/sprocket pixels.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: cancellation falls through and keeps rendering on the main thread.
+try { return await worker.processImage(file, settings); }
+catch { return mainThread.processImage(source, settings); }
+
+// Correct: cancellation remains terminal; only real failures fall back.
+try { return await worker.processImage(file, settings); }
+catch (error) {
+  if (isWorkerCancelledError(error)) throw error;
+  return mainThread.processImage(source, settings);
+}
+```
+
 ### Scenario: Seamless Decorative CSS Motion
 
 #### 1. Scope / Trigger

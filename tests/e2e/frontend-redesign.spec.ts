@@ -748,9 +748,28 @@ test('batch processing skips excluded cards without renumbering or discarding cu
 
 test('processing locks batch order and rejects dropped files until the snapshot completes', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    class TrackingWorker extends NativeWorker {
+      terminate() {
+        const trackedWindow = window as Window & { __filmWorkerTerminations?: number };
+        trackedWindow.__filmWorkerTerminations = (trackedWindow.__filmWorkerTerminations ?? 0) + 1;
+        super.terminate();
+      }
+    }
+    Object.defineProperty(window, 'Worker', {
+      configurable: true,
+      value: TrackingWorker,
+    });
+  });
+  await page.reload();
   await page.route('**/film-overlays/film-base.png', async route => {
     await new Promise(resolve => setTimeout(resolve, 1_000));
-    await route.continue();
+    try {
+      await route.continue();
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('Route is already handled')) throw error;
+    }
   });
   await uploadCurationFixtures(page);
 
@@ -771,6 +790,15 @@ test('processing locks batch order and rejects dropped files until the snapshot 
   await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(3);
   await page.getByRole('button', { name: '停止后续' }).click();
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __filmWorkerTerminations?: number }
+  ).__filmWorkerTerminations ?? 0)).toBe(1);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+
+  await page.waitForTimeout(1_100);
+  await page.unroute('**/film-overlays/film-base.png');
+  await page.getByRole('button', { name: /冲洗待更新照片 \(3\)/ }).click();
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(3, { timeout: 30_000 });
 });
 
 test('changing the included subset marks a generated film strip stale', async ({ page }) => {
