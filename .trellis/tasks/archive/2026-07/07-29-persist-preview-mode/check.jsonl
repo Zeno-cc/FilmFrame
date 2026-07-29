@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines required unit, E2E, accessibility, typecheck, build, and diff verification gates."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Review must confirm the mode remains session-only and does not mutate image or persistent settings state."}
