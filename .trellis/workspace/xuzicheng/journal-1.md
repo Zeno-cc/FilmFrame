@@ -327,3 +327,24 @@ Added a persistent global real-135 sprocket color override with source-template 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: 将长条 Canvas 预算提升至 700 MiB
+
+**Date**: 2026-07-31
+**Task**: 将长条 Canvas 预算提升至 700 MiB
+**Branch**: `main`
+
+### Summary
+
+将默认 Canvas RGBA 预算提升至 700 MiB，保留 32767 单边限制与现有工作集、ZIP 限制；补充边界和批次准入测试，并同步渲染维护文档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7744d1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
