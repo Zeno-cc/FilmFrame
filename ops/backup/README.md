@@ -9,6 +9,8 @@ This protects against volume-level mistakes, not host or provider loss.
 The deployed release is addressed through the stable
 `/opt/filmframe/current` symlink. The service and scripts use that path by
 default so a release switch does not require rewriting the timer.
+Set `COMPOSE_PROJECT_NAME=filmframe` in the production `.env` so interactive
+deployments and the systemd backup service always address the same data volume.
 
 ```bash
 install -d -m 0700 -o root -g root /opt/filmframe/backups/access
@@ -44,7 +46,7 @@ The long-running access service has no `/backups` mount.
 Restore always targets a new, non-existing named volume:
 
 ```bash
-FILMFRAME_ACCESS_IMAGE='registry.example/filmframe-access@sha256:...' \
+FILMFRAME_ACCESS_IMAGE='sha256:...' \
   ops/backup/restore-access.sh \
   access-20260731T032000Z.sqlite \
   filmframe_access_restore_20260731

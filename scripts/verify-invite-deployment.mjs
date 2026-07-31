@@ -175,8 +175,8 @@ async function verifyCompose() {
         `${serviceName} records a committed release revision`,
       );
       check(
-        /@sha256:[0-9a-f]{64}$/i.test(image),
-        `${serviceName} deploys an immutable image digest`,
+        isImmutableImageReference(image),
+        `${serviceName} deploys an immutable image digest or local image ID`,
       );
     } else {
       check(Boolean(image), `${serviceName} has an explicit image name`);
@@ -810,5 +810,13 @@ function isExactPatchImage(value) {
     typeof value === "string" &&
     /:\d+\.\d+\.\d+(?:[-@]|$)/.test(value) &&
     !/:latest(?:@|$)/.test(value)
+  );
+}
+
+function isImmutableImageReference(value) {
+  return (
+    typeof value === "string" &&
+    (/^sha256:[0-9a-f]{64}$/i.test(value) ||
+      /@sha256:[0-9a-f]{64}$/i.test(value))
   );
 }
