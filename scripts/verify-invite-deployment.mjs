@@ -170,14 +170,18 @@ async function verifyCompose() {
     const revision = service.labels?.["org.opencontainers.image.revision"] ?? "";
     const image = service.image ?? "";
     if (options.production) {
+      const immutableImage = isImmutableImageReference(image);
       check(
         /^[0-9a-f]{7,64}$/i.test(revision) && revision !== "uncommitted",
         `${serviceName} records a committed release revision`,
       );
       check(
-        isImmutableImageReference(image),
+        immutableImage,
         `${serviceName} deploys an immutable image digest or local image ID`,
       );
+      if (immutableImage && isLocalImageId(image)) {
+        verifyLocalImage(image, revision, serviceName);
+      }
     } else {
       check(Boolean(image), `${serviceName} has an explicit image name`);
     }
@@ -816,7 +820,38 @@ function isExactPatchImage(value) {
 function isImmutableImageReference(value) {
   return (
     typeof value === "string" &&
-    (/^sha256:[0-9a-f]{64}$/i.test(value) ||
-      /@sha256:[0-9a-f]{64}$/i.test(value))
+    (isLocalImageId(value) || /@sha256:[0-9a-f]{64}$/i.test(value))
+  );
+}
+
+function isLocalImageId(value) {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/i.test(value);
+}
+
+function verifyLocalImage(image, revision, serviceName) {
+  const result = spawnSync(
+    "docker",
+    [
+      "image",
+      "inspect",
+      "--format",
+      '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}',
+      image,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.error || result.status !== 0) {
+    fail(`${serviceName} local image ID is not available to Docker`);
+    return;
+  }
+
+  const [inspectedId, inspectedRevision] = result.stdout.trim().split(/\s+/, 2);
+  check(
+    inspectedId?.toLowerCase() === image.toLowerCase(),
+    `${serviceName} local image ID resolves exactly`,
+  );
+  check(
+    inspectedRevision === revision,
+    `${serviceName} local image records the release revision`,
   );
 }
