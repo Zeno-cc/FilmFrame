@@ -6,17 +6,26 @@ import {
 
 describe('canvas render budget', () => {
   it('accepts dimensions exactly at the default pixel limit', () => {
-    expect(validateCanvasBudget(8_000, 8_000)).toEqual({
+    expect(validateCanvasBudget(28_672, 6_400)).toEqual({
       ok: true,
-      pixels: 64_000_000,
+      pixels: 183_500_800,
     });
   });
 
   it('rejects dimensions one pixel beyond the default pixel limit', () => {
-    expect(validateCanvasBudget(8_000, 8_001)).toEqual({
+    expect(validateCanvasBudget(183_500_801, 1, {
+      maxEdge: Number.MAX_SAFE_INTEGER,
+    })).toEqual({
       ok: false,
-      pixels: 64_008_000,
+      pixels: 183_500_801,
       reason: 'max-pixels-exceeded',
+    });
+  });
+
+  it('accepts the previously blocked 245.5 MiB strip canvas', () => {
+    expect(validateCanvasBudget(8_000, 8_045)).toEqual({
+      ok: true,
+      pixels: 64_360_000,
     });
   });
 
@@ -52,11 +61,8 @@ describe('Kodak strip render budget', () => {
     expect(validateKodakStripBudget(1_400, 4).ok).toBe(true);
   });
 
-  it('rejects a 36-frame high-resolution strip by pixel area', () => {
-    expect(validateKodakStripBudget(1_400, 36)).toMatchObject({
-      ok: false,
-      reason: 'max-pixels-exceeded',
-    });
+  it('accepts a 36-frame high-resolution strip within the larger budget', () => {
+    expect(validateKodakStripBudget(1_400, 36).ok).toBe(true);
   });
 
   it('rejects an 81-frame high-resolution strip', () => {

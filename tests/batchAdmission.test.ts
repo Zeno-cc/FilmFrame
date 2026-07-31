@@ -85,15 +85,15 @@ describe('batch admission', () => {
     const result = evaluateBatchAdmission({
       operation: 'strip',
       includedImages: [image(1200, 800)],
-      stripCanvas: { width: 8_000, height: 8_001 },
+      stripCanvas: { width: 28_672, height: 6_401 },
     });
 
     expect(result).toMatchObject({
       status: 'blocked',
       reason: 'strip-canvas-exceeded',
       stripCanvas: {
-        pixels: 64_008_000,
-        estimatedBytes: 64_008_000 * RGBA_BYTES_PER_PIXEL,
+        pixels: 183_529_472,
+        estimatedBytes: 183_529_472 * RGBA_BYTES_PER_PIXEL,
         budget: { ok: false, reason: 'max-pixels-exceeded' },
       },
     });

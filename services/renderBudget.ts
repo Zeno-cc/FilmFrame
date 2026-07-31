@@ -17,7 +17,10 @@ export type RenderBudgetLimits = {
 };
 
 const DEFAULT_MAX_EDGE = 32_767;
-const DEFAULT_MAX_PIXELS = 64_000_000;
+const MEBIBYTE = 1024 * 1024;
+const RGBA_BYTES_PER_PIXEL = 4;
+const DEFAULT_MAX_CANVAS_BYTES = 700 * MEBIBYTE;
+const DEFAULT_MAX_PIXELS = DEFAULT_MAX_CANVAS_BYTES / RGBA_BYTES_PER_PIXEL;
 
 export function validateCanvasBudget(
   width: number,
