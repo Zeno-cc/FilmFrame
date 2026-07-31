@@ -1,138 +1,176 @@
-# 风险、排障与后续计划
+# 风险、排障与上线控制
 
-> 最后核验：2026-07-29。优先级是建议，不代表已获批准的开发计划。
+> 最后核验：2026-07-30。本文区分“仓库已实现”和“生产外部状态”，避免把配置模板误认为已经上线。
 
-## 已完成的 P0 稳定化
+## 当前状态
 
-- Vitest 已接管真实测试，`npm run check` 聚合 137 项断言、类型检查和构建。
-- 单图和长条结果记录 MIME 与设置/顺序签名；stale 结果不再显示或下载。
-- 批次按图片 ID 合并，删除晚到结果会 revoke，不再整体覆盖最新数组。
-- Worker client 已有懒创建、构造失败回退、120 秒超时、`messageerror`、真实取消、自动重建和晚到保护。
-- 16 款真实 135 的单帧与长条均可进入 Worker；Gold 保留分层路径，其余胶片使用扁平模板路径。
-- classic 暂固定主线程，避免已知双实现差异影响用户。
-- 画布和 ZIP 在分配/读取前执行统一容量预算。
+| 范围 | 状态 |
+| --- | --- |
+| Express/SQLite 邀请码与会话 sidecar | 已实现 |
+| 邀请页、管理页、SSH CLI 和设备授权续期 | 已实现 |
+| OpenResty 公开/管理 vhost 示例 | 已实现，尚需合并到线上目标站点 |
+| Compose 回环端口、私网、持久卷与容器加固 | 已实现 |
+| 根 Vitest | 2026-07-30 实测 24 文件、165 项通过 |
+| Access 自动化 | 27 项；必须在 Node 22 和匹配 ABI 的原生依赖环境执行 |
+| Cloudflare Google IdP、精确邮箱 policy、Independent MFA | 外部配置，尚需生产预检和验收 |
+| 管理 DNS、证书路径、缓存 bypass/purge、活动 OpenResty reload | 外部配置，尚需生产实施和验收 |
 
-### 当前 P0/P1 工作区
+## 不可降低的安全边界
 
-`e5c5a84` 之后的主流程、移动端、RenderTransform、即时预览、配方和分享升级尚未提交。每次接手必须先运行 `git status` 并阅读本轮两组计划文档。
+### 不能只做前端弹窗
 
-## P1：渲染与资源可靠性
+React state、localStorage、打包进 JS 的邀请码或密钥都可被用户修改或提取。真正的边界是 OpenResty 在返回任何应用字节前调用 access sidecar。首页受保护但 JS、Worker 或胶片素材公开，仍然等于门禁可绕过。
 
-### Worker / 主线程漂移
+### 鉴权必须失败关闭
 
-已知差异：Worker 文件中的 classic 长条仍为 1200，主线程为 1600；当前 client 已禁用 classic Worker，所以用户结果不再由浏览器能力决定。
+access sidecar 停机、超时、数据库异常或返回 5xx 时，OpenResty 必须返回 503/拒绝，不能退回静态 upstream。`auth_request` 内部 Host 必须为 `access`，否则 sidecar 的 Host allowlist 会拒绝正常子请求。
 
-建议：先抽取平台无关的布局/参数/标记描述；不必一次重写全部 Canvas，但必须建立输出尺寸、帧号和路由契约测试。
+### 管理断言必须在源站验签
 
-### Worker/主线程共享契约仍不完整
+Cloudflare IP、橙云状态或 `Cf-Access-Jwt-Assertion` 请求头的存在都不是授权。Node 必须验证 RS256 签名、exact issuer、管理应用 audience、`exp`/`nbf` 和精确管理员邮箱。JWKS 获取或密钥轮换失败时拒绝请求。
 
-Gold 真实 135 的布局、色彩和标记仍有两套实现。当前已有路由和生命周期测试，但尚无完整视觉等价性测试。
+### 图片隐私边界不能被门禁侵蚀
 
-### 内存峰值
+access sidecar 不得新增图片、EXIF、构图、渲染结果或 Object URL 接口。普通图片工作流仍应只产生同源素材请求。生产验收必须用 Network 记录证明照片没有上传，而不是只依据代码说明。
 
-来源：解码后的源图、多个 Object URL、内存内 ZIP 和随机纹理中间画布。画布已限制为 32767 边长/6400 万像素，ZIP 输入限制为 256 MiB 并顺序 fetch。当前已在上传后提示批次压力，并在冲洗、长条和 ZIP 前执行源像素、工作集、Canvas 与已知 Blob 字节准入。
+### 门禁的安全上限
 
-建议：长期使用流式 ZIP，继续补真实设备阈值数据。25 MiB/8000px 单图提示仍只是 warning，最终是否阻断由整批准入决定。
+合法会话取得静态应用后，可以保存或转发已下载的前端代码和素材。本期只保护官方分发入口；不能用混淆、前端加密或设备指纹夸大保护能力。
 
-### 损坏二维码
+## 上线前高风险项
 
-`public/alipay.jpg` 文件头不是 JPEG SOI，系统无法读取尺寸。
+### 1. 外部认证能力和锁死风险
 
-建议：由所有者提供原图后替换，构建 smoke 检查 `naturalWidth > 0`。
+必须先确认当前 Cloudflare Zero Trust 账号可用 Google IdP、Independent MFA biometrics/security key 和目标 policy。先在管理域名验证以下矩阵，再切公开站点：
 
-### 发布包含中间素材
+- 精确白名单 Google + WebAuthn：通过；
+- 白名单 Google、没有 WebAuthn：拒绝；
+- 非白名单 Google + WebAuthn：拒绝；
+- 缺失/伪造/过期/错误 issuer 或 audience 的 JWT：拒绝。
 
-`public` 约 4.6MB；Vite 复制所有内容。当前运行时只明确需要 4 个 overlay 文件，其中 shadow-derived 还不绘制。
+至少登记两个 WebAuthn 凭据。管理端锁死时使用 SSH CLI，不得临时公开管理 API、关闭源站 JWT 验证或把管理员密码写进前端。
 
-建议：确认素材工作流，把源素材放到不发布目录，只把运行时文件留在 public；移除 `.DS_Store`。
+### 2. 公网端口与源站直连
 
-## P1：产品正确性
+Compose 必须显示 `127.0.0.1:18082->80` 和 `127.0.0.1:18083->3000`，不能出现 `0.0.0.0` 或 `[::]` 发布。还要检查宿主机防火墙和旧容器，确认历史应用端口不再公网监听。
 
-### 输入契约
+直连源站 443 并伪造 Host/SNI 时，公开站点仍应 303 到 `/access`，管理站点缺有效 Access JWT 时应 401/403。
 
-当前只接受 JPEG/PNG/WebP 并要求尺寸解码成功。后续若支持 HEIC/动画格式，必须新增显式转码或首帧策略，不能扩大 MIME allowlist 后交给渲染阶段失败。
+### 3. Cloudflare 旧缓存
 
-### 起始编号当前会话可为负数
+门禁启用前公开缓存的 hashed JS、Worker、overlay 或 mask 可能绕过新鉴权。切换前必须：
 
-输入无 min/max，只有下次从 storage 加载时才 clamp。
+1. 对完整 FilmFrame hostname 设置 cache bypass；
+2. purge 既有缓存；
+3. 确认源站与边缘都返回 `private, no-store`；
+4. 匿名请求真实已知素材路径，验证不返回资源且 `CF-Cache-Status` 为 BYPASS/DYNAMIC。
 
-建议：UI、状态更新和渲染入口统一 normalize。
+回滚也不能恢复匿名公共缓存。
 
-## P2：可维护性与体验
+### 4. SQLite 数据与备份
 
-- 拆分 `App.tsx` 的 settings/sidebar、workspace、preview dialogs 和 workflow hooks，但避免引入重型状态框架。
-- 扩展现有 Playwright E2E 至排序、stale、Crop、部分失败、ZIP gate、reduced motion 和 200% 缩放场景。
-- 增加真实 Canvas/OffscreenCanvas 的 transform 构图基准矩阵。
-- 删除死配置或真正实现 `autoCropToFilmRatio`。
-- 决定是否加载 JetBrains Mono，或从预设说明移除。
-- 增加 LICENSE、CI、CHANGELOG、发布和 ADR 流程。
+数据库必须位于 named volume，目录 `0700`、数据库/WAL/SHM `0600`。备份使用 SQLite 在线 backup，不要在高写入时直接复制单个主文件。恢复演练需验证邀请码状态、会话、撤销级联和 migration idempotency。
 
-## 故障排查顺序
+数据库只存哈希并不意味着可以公开：标签、时间和访问关系仍属于运维数据，备份必须受限。
 
-### 页面无法启动
+### 5. 秘密泄漏
 
-1. `node --version` 是否 >=20。
-2. 用干净 `npm ci`，不要依赖当前有 extraneous 的 node_modules。
-3. `npm run build` 看 TypeScript/Vite 首个错误。
-4. 检查 `index.html` 的 `/index.tsx` 和 `#root`。
-5. 检查浏览器 console；开发模式仅出现 React DevTools 信息不算错误。
+不得记录或提交 Google Client Secret、Cloudflare token、Access JWT、Cookie、邀请码明文、请求 body 或完整管理员身份。重点检查：
 
-### 图片无法加入
+- `.env` 与 shell history；
+- OpenResty access/error log；
+- Docker build args、image history 和 Compose rendered config；
+- CI 输出、测试 fixture、截图和问题报告；
+- SQLite 表和备份包。
 
-1. 检查 `file.type` 是否以 `image/` 开头。
-2. 检查 `Image` 是否能解码预览 URL。
-3. 尺寸读取失败当前不会拒绝，所以继续查看渲染阶段。
-4. EXIF 失败不应阻止加入；它只影响日期。
+邀请码明文只允许出现在创建响应或 SSH CLI stdout 一次，交付后立即从管理页清除。
 
-### Worker 没有启用
+### 6. Node 原生模块 ABI
 
-1. 浏览器 console 检查 Worker 构造或模块加载错误。
-2. 确认四项能力全部存在。
-3. 确认设置是已注册胶片 + real135 + template enabled；classic 当前设计为主线程。
-4. Network 检查 `/film-overlays/*` 是否 200 且 MIME 正确。
-5. Worker 报错会自动回主线程；功能成功不代表 Worker 成功。
+`better-sqlite3` 是原生模块。典型错误为 `ERR_DLOPEN_FAILED`、`NODE_MODULE_VERSION ...` 不匹配，原因通常是用另一 Node major 安装/运行。处理方式：
 
-### Gold 模板失效
+```bash
+# 确认当前 node --version 为 22.x
+npm --prefix server/access ci
+npm run check:access
+```
 
-按 fallback 链检查 console warning：
+不要把本机 `node_modules` 复制进镜像。Access Dockerfile 会在 Node 22 build stage 安装编译工具并从源码构建，runtime 只复制生产依赖和编译结果。
 
-1. 分层 `film-base.png`、`aperture-mask-derived.png`、`aperture-shadow-derived.png`。
-2. legacy `kodak-gold-200.png`。
-3. 程序化 renderer。
+## 常见故障排查
 
-若素材能加载但错位，先核对 1307x1203 与 aperture 92/211/1123/800，不要先调 CSS。
+### 匿名用户直接看到应用
 
-### 竖图方向错误
+1. 检查请求是否经过预期的 FilmFrame OpenResty vhost。
+2. 检查 `location /` 是否实际执行 `auth_request /_filmframe_session_check`。
+3. 匿名请求真实 `/assets/*`、Worker、overlay 和 mask，而不是只测首页。
+4. 检查 Cloudflare 旧缓存和其他更高优先级 location。
+5. 检查静态容器端口是否仍对公网开放。
 
-1. 记录浏览器解码后的 `img.width/height`，不要只看文件 EXIF。
-2. 检查 `shouldAutoRotateForFilmFrame()` 是否触发。
-3. 单张应片窗内 +90 度、最终 -90 度；长条不做最终恢复。
-4. 对比 Worker 与主线程，强制回退可帮助定位。
+### 所有人都被拒绝或返回 503
 
-### 下载打不开或后缀错误
+1. `docker compose ps` 检查 access health。
+2. 从宿主机请求 `http://127.0.0.1:18083/healthz` 并设置 `Host: access`。
+3. 确认内部 subrequest 传 `Host: access`，而不是公开域名。
+4. 检查 SQLite volume 权限、migration 和磁盘空间。
+5. 查看脱敏后的固定事件日志，不要临时打印 Cookie 或请求 body。
 
-1. 检查源 URL 对应 Blob 的真实 `type`。
-2. 检查结果是否在设置变化前生成。
-3. 未处理原图和 stale 结果不会显示成片下载入口。
-4. ZIP 只收集 current artifact；部分失败会少文件。
-5. 大包先检查 256 MiB 输入预算，再检查 ZIP32 上限。
+### 邀请码无法兑换
 
-### 内存不足/页面崩溃
+1. 确认请求是 `application/x-www-form-urlencoded` POST，body 未超过 4 KiB。
+2. 确认表单 nonce 签名有效且未过 10 分钟。
+3. 检查邀请码是否已兑换、过期或撤销；对用户仍返回统一失败文案。
+4. 检查反代是否保留 exact Host/HTTPS 语义及 Cookie Set-Cookie。
+5. 并发问题用 20 路一次性兑换测试复现，不手工修改数据库计数。
 
-1. 记录原图像素，不只记录文件 MB。
-2. 检查是否触发 6400 万像素/32767 边长画布预算。
-3. 减少图片数和长条行数。
-4. 避免同时生成 ZIP。
-5. 检查旧结果 Object URL 是否仍被持有。
+### 管理端循环登录或 401
 
-## 浏览器兼容待测矩阵
+1. 检查 Cloudflare Access 应用 hostname、audience 和 team domain 是否与 sidecar 环境一致。
+2. policy 必须 Include 精确邮箱并 Require Google，不能 Include Everyone。
+3. 检查 Independent MFA 是否开启且 IdP MFA AMR 复用已关闭。
+4. 确认 OpenResty 转发原始 `Cf-Access-Jwt-Assertion`，但清空普通 Cookie。
+5. 检查服务器时钟；JWT `exp`/`nbf` 对时钟漂移敏感。
+6. 未知 `kid` 应触发远程 JWKS 刷新，不能写死旧公钥。
 
-至少覆盖：Chrome/Edge 最新、Safari macOS、Safari iOS、Firefox。每个浏览器验证：Worker 路由、主线程 fallback、JPEG/PNG、竖图方向、EXIF、长条、ZIP、多文件下载、超大图提示。
+### 设备授权没有自动续期
 
-## 建议执行顺序
+1. 浏览器进入应用后必须发送同源 `POST /auth/refresh`、Cookie 与 `X-FilmFrame-CSRF: 1`。
+2. Origin 必须精确等于公开站点 HTTPS origin。
+3. 成功应返回 204，并原子轮换 256-bit token、更新数据库会话与 HttpOnly Cookie 的 400 天有效期；提交后旧 token 必须立即失效。
+4. 管理员撤销所属邀请码后，续期与后续访问都必须失败；不得由前端状态绕过。
 
-1. 提交或至少继续保护当前稳定化开发态。
-2. 修二维码、清理发布素材、补 LICENSE/CI。
-3. 增加跨浏览器 E2E 与视觉回归基线。
-4. 继续补充真实设备上的 Worker/主线程视觉等价性基线。
-5. 再处理移动端、可访问性和组件拆分。
+### 图片处理异常
+
+门禁与渲染是独立层。先确认应用资源已授权加载，再按原有顺序检查 MIME/尺寸解码、同源胶片素材、Worker 能力、主线程 fallback、Canvas 预算、stale 结果和 Object URL 回收。不要通过上传用户照片到 sidecar 来规避浏览器兼容问题。
+
+## 回滚原则
+
+上线前保存时间戳备份：当前 Compose、两个目标 OpenResty vhost、证书引用和迁移前 SQLite。任何 reload 前先运行 `openresty -t`。
+
+发生故障时：
+
+1. 恢复上一版应用镜像或目标 vhost；
+2. 保持静态/access 端口只监听回环；
+3. 保持 Cloudflare cache bypass 和旧缓存清理结果；
+4. 若管理端不可用，使用 SSH break-glass CLI；
+5. 若数据迁移失败，从已验证备份恢复 SQLite；
+6. 无法安全恢复时返回维护页/503，不开放匿名静态站作为捷径；
+7. 回归其他 1Panel vhost 的状态、证书和内容。
+
+回滚成功的标准不是“页面能打开”，而是公开入口仍不可匿名绕过、管理入口仍要求双因素、照片仍不上传，且邀请码/会话状态一致。
+
+## 发布证据
+
+每次生产切换至少保存以下不含秘密的结果：
+
+```bash
+npm run check:all
+npm run test:e2e
+git diff --check
+docker compose config
+docker compose build
+npm run verify:deployment -- --live
+openresty -t
+```
+
+再补充外网 HTTPS、直连源站、Cloudflare cache、Google + WebAuthn、管理员撤销、站点数据清理、access 停机 fail-closed、数据库恢复和其他 vhost 回归结果。缺少这些外部证据时，只能说仓库实现完成，不能说生产门禁完成。

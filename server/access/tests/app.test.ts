@@ -1,0 +1,589 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { afterEach, describe, it } from "node:test";
+import request from "supertest";
+
+import type { AccessJwtVerifier } from "../src/accessJwt.js";
+import { createApp } from "../src/app.js";
+import { loadConfig, type AccessConfig } from "../src/config.js";
+import { GENERIC_INVITE_ERROR, SESSION_TTL_MS } from "../src/constants.js";
+import { openDatabase, type AccessDatabase } from "../src/db.js";
+import {
+  createInvite,
+  isSessionValid,
+  listSessions,
+  redeemInvite,
+  revokeInvite,
+} from "../src/store.js";
+import { testConfig } from "./helpers.js";
+
+const databases: AccessDatabase[] = [];
+afterEach(() => {
+  for (const database of databases.splice(0)) database.close();
+});
+
+function fixture(now = 1_000_000, configOverrides: Partial<AccessConfig> = {}) {
+  const config = testConfig(configOverrides);
+  const database = openDatabase(":memory:");
+  databases.push(database);
+  const verifier: AccessJwtVerifier = async (token) => {
+    if (token !== "valid-access-token") throw new Error("unauthorized");
+    return { subject: "admin", email: config.adminEmail };
+  };
+  const app = createApp({ config, database, accessJwtVerifier: verifier, now: () => now });
+  return { app, config, database, now };
+}
+
+function formNonce(html: string): string {
+  const match = /name="nonce" value="([^"]+)"/.exec(html);
+  assert.ok(match?.[1]);
+  return match[1];
+}
+
+function firstSetCookie(headers: Record<string, unknown>): string {
+  const value = headers["set-cookie"];
+  assert.ok(Array.isArray(value));
+  assert.equal(typeof value[0], "string");
+  return value[0] as string;
+}
+
+function cookiePair(setCookie: string): string {
+  return setCookie.split(";", 1)[0] as string;
+}
+
+function cookieToken(setCookie: string): string {
+  const pair = cookiePair(setCookie);
+  return pair.slice(pair.indexOf("=") + 1);
+}
+
+describe("public invitation gateway", () => {
+  it("serves only the server-rendered gate before authentication", async () => {
+    const { app, config } = fixture();
+    const response = await request(app).get("/access").set("Host", config.filmframeHost);
+
+    assert.equal(response.status, 200);
+    assert.match(response.text, /进入暗房/);
+    assert.match(response.text, /width:min\(calc\(100% - 32px\),960px\)/);
+    assert.doesNotMatch(response.text, /<script[^>]+src=/);
+    assert.match(response.headers["cache-control"], /private, no-store/);
+    assert.match(response.headers["content-security-policy"], /default-src 'none'/);
+  });
+
+  it("sets the hardened host-only session cookie only after successful redemption", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "HTTP 兑换", now);
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .type("form")
+      .send({ code: created.code, nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.location, "/");
+    const cookie = firstSetCookie(response.headers);
+    assert.match(cookie, /^__Host-filmframe_session=/);
+    assert.match(cookie, /Max-Age=34560000/);
+    assert.match(cookie, /Path=\//);
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /Secure/);
+    assert.match(cookie, /SameSite=Strict/);
+
+    const check = await request(app)
+      .get("/internal/session-check")
+      .set("Host", "access")
+      .set("Cookie", cookiePair(cookie));
+    assert.equal(check.status, 204);
+  });
+
+  it("uses one generic failure and never sets a cookie for invalid codes", async () => {
+    const { app, config } = fixture();
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .type("form")
+      .send({ code: "not-an-invite", nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 400);
+    assert.match(response.text, new RegExp(GENERIC_INVITE_ERROR));
+    assert.equal(response.headers["set-cookie"], undefined);
+  });
+
+  it("rejects oversized redemption bodies without setting a cookie", async () => {
+    const { app, config } = fixture();
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .type("form")
+      .send({ code: "A".repeat(5_000), nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 413);
+    assert.equal(response.headers["set-cookie"], undefined);
+  });
+
+  it("allows exactly one of 20 concurrent requests to redeem a code", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "并发兑换", now);
+    const pages = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        request(app).get("/access").set("Host", config.filmframeHost),
+      ),
+    );
+    const responses = await Promise.all(
+      pages.map((page) =>
+        request(app)
+          .post("/auth/redeem")
+          .set("Host", config.filmframeHost)
+          .type("form")
+          .send({ code: created.code, nonce: formNonce(page.text) }),
+      ),
+    );
+
+    assert.equal(responses.filter((response) => response.status === 303).length, 1);
+    assert.deepEqual(
+      database.prepare("SELECT redemption_count FROM invites").get(),
+      { redemption_count: 1 },
+    );
+    assert.deepEqual(
+      database.prepare("SELECT count(*) AS count FROM sessions").get(),
+      { count: 1 },
+    );
+  });
+
+  it("requires exact Origin and CSRF header to refresh a session", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "续期", now);
+    const session = redeemInvite(database, created.code, now);
+    const cookie = `${config.sessionCookieName}=${session.token}`;
+
+    const missing = await request(app)
+      .post("/auth/refresh")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", cookie);
+    const wrongOrigin = await request(app)
+      .post("/auth/refresh")
+      .set("Host", config.filmframeHost)
+      .set("Origin", "https://attacker.example.test")
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Cookie", cookie);
+    const wrongCsrf = await request(app)
+      .post("/auth/refresh")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-FilmFrame-CSRF", "wrong")
+      .set("Cookie", cookie);
+    assert.equal(missing.status, 403);
+    assert.equal(wrongOrigin.status, 403);
+    assert.equal(wrongCsrf.status, 403);
+
+    const response = await request(app)
+      .post("/auth/refresh")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Cookie", cookie);
+    assert.equal(response.status, 204);
+    const renewedCookie = firstSetCookie(response.headers);
+    const renewedToken = cookieToken(renewedCookie);
+    assert.notEqual(renewedToken, session.token);
+    assert.match(renewedCookie, /Max-Age=34560000/);
+
+    const oldCheck = await request(app)
+      .get("/internal/session-check")
+      .set("Host", "access")
+      .set("Cookie", cookie);
+    const renewedCheck = await request(app)
+      .get("/internal/session-check")
+      .set("Host", "access")
+      .set("Cookie", `${config.sessionCookieName}=${renewedToken}`);
+    assert.equal(oldCheck.status, 401);
+    assert.equal(renewedCheck.status, 204);
+  });
+
+  it("lets one concurrent refresh rotate the cookie without clearing the winner", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "多标签页", now);
+    const session = redeemInvite(database, created.code, now);
+    const cookie = `${config.sessionCookieName}=${session.token}`;
+    const refresh = () =>
+      request(app)
+        .post("/auth/refresh")
+        .set("Host", config.filmframeHost)
+        .set("Origin", config.publicOrigin)
+        .set("X-FilmFrame-CSRF", "1")
+        .set("Cookie", cookie);
+
+    const responses = await Promise.all([refresh(), refresh()]);
+    const winner = responses.find((response) => response.status === 204);
+    const loser = responses.find((response) => response.status === 401);
+    assert.ok(winner);
+    assert.ok(loser);
+    assert.equal(loser.headers["set-cookie"], undefined);
+
+    const rotatedToken = cookieToken(firstSetCookie(winner.headers));
+    const check = await request(app)
+      .get("/internal/session-check")
+      .set("Host", "access")
+      .set("Cookie", `${config.sessionCookieName}=${rotatedToken}`);
+    assert.equal(check.status, 204);
+  });
+
+  it("rejects expired, revoked, and tampered sessions during refresh", async () => {
+    const { app, config, database, now } = fixture();
+    const refresh = (cookie: string) =>
+      request(app)
+        .post("/auth/refresh")
+        .set("Host", config.filmframeHost)
+        .set("Origin", config.publicOrigin)
+        .set("X-FilmFrame-CSRF", "1")
+        .set("Cookie", cookie);
+
+    const expiredInvite = createInvite(database, "过期会话", now - SESSION_TTL_MS - 1);
+    const expired = redeemInvite(
+      database,
+      expiredInvite.code,
+      now - SESSION_TTL_MS,
+    );
+    const revokedInvite = createInvite(database, "撤销会话", now);
+    const revoked = redeemInvite(database, revokedInvite.code, now);
+    revokeInvite(database, revokedInvite.invite.id, now);
+    const tampered = `${revoked.token.slice(0, -1)}${revoked.token.endsWith("A") ? "B" : "A"}`;
+
+    for (const token of [expired.token, revoked.token, tampered]) {
+      const response = await refresh(`${config.sessionCookieName}=${token}`);
+      assert.equal(response.status, 401);
+      assert.equal(response.headers["set-cookie"], undefined);
+    }
+  });
+
+  it("does not expose a public logout route", async () => {
+    const { app, config } = fixture();
+    const response = await request(app)
+      .post("/auth/logout")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-FilmFrame-CSRF", "1");
+    assert.equal(response.status, 404);
+  });
+
+  it("rejects unknown hosts and public access to internal endpoints", async () => {
+    const { app, config } = fixture();
+    assert.equal((await request(app).get("/access").set("Host", "attacker.test")).status, 421);
+    assert.equal(
+      (await request(app).get("/healthz").set("Host", config.filmframeHost)).status,
+      404,
+    );
+  });
+
+  it("proves database writes in health checks without leaving probe rows", async () => {
+    const { app, database } = fixture(1_000_000, { nodeEnv: "production" });
+    const healthy = await request(app).get("/healthz").set("Host", "access");
+    assert.equal(healthy.status, 200);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM health_checks").get(), {
+      count: 0,
+    });
+
+    database.exec(`
+      CREATE TRIGGER block_health_writes
+      BEFORE INSERT ON health_checks
+      BEGIN
+        SELECT RAISE(FAIL, 'blocked');
+      END
+    `);
+    const messages: string[] = [];
+    const originalError = console.error;
+    console.error = (message?: unknown) => messages.push(String(message));
+    let unhealthy;
+    try {
+      unhealthy = await request(app).get("/healthz").set("Host", "access");
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(unhealthy.status, 503);
+    assert.equal(unhealthy.text, "Service Unavailable");
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM health_checks").get(), {
+      count: 0,
+    });
+    assert.equal(messages.length, 1);
+    const log = JSON.parse(messages[0] as string) as Record<string, unknown>;
+    assert.equal(log.operation, "database_health");
+    assert.equal(log.category, "database");
+    assert.equal("message" in log, false);
+    assert.equal(unhealthy.headers["x-request-id"], log.requestId);
+  });
+
+  it("returns a redacted 500 and request category for unexpected redemption errors", async () => {
+    const config = testConfig({ nodeEnv: "production" });
+    const database = openDatabase(":memory:");
+    const created = createInvite(database, "数据库异常", 1_000_000);
+    const app = createApp({
+      config,
+      database,
+      accessJwtVerifier: async () => ({ subject: "admin", email: config.adminEmail }),
+      now: () => 1_000_000,
+    });
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    database.close();
+
+    const messages: string[] = [];
+    let responseRequestId: string | undefined;
+    const originalError = console.error;
+    console.error = (message?: unknown) => messages.push(String(message));
+    try {
+      const response = await request(app)
+        .post("/auth/redeem")
+        .set("Host", config.filmframeHost)
+        .type("form")
+        .send({ code: created.code, nonce: formNonce(access.text) });
+      assert.equal(response.status, 500);
+      assert.equal(response.text, "Internal Server Error");
+      assert.equal(response.headers["set-cookie"], undefined);
+      responseRequestId = response.headers["x-request-id"];
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.equal(messages.length, 1);
+    const log = JSON.parse(messages[0] as string) as Record<string, unknown>;
+    assert.equal(log.event, "request_error");
+    assert.equal(log.operation, "invite_redeem");
+    assert.equal(log.category, "internal");
+    assert.equal(typeof log.requestId, "string");
+    assert.equal(responseRequestId, log.requestId);
+    assert.equal(JSON.stringify(log).includes(created.code), false);
+  });
+});
+
+describe("administrator routes", () => {
+  it("requires a verified Access assertion for the page and APIs", async () => {
+    const { app, config } = fixture();
+    const missing = await request(app).get("/").set("Host", config.adminHost);
+    const invalid = await request(app)
+      .get("/")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "invalid");
+    const valid = await request(app)
+      .get("/")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+
+    assert.equal(missing.status, 401);
+    assert.equal(invalid.status, 401);
+    assert.equal(valid.status, 200);
+    assert.match(valid.text, /暗房邀请管理/);
+  });
+
+  it("allows the local admin token only in development", async () => {
+    const token = "local-admin-token-with-at-least-32-bytes";
+    const config = testConfig();
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const developmentApp = createApp({
+      config: {
+        ...config,
+        nodeEnv: "development",
+        devAdminToken: token,
+      },
+      database,
+      accessJwtVerifier: async () => {
+        throw new Error("Access JWT should not be used");
+      },
+    });
+
+    const missing = await request(developmentApp)
+      .get("/")
+      .set("Host", config.adminHost);
+    const invalid = await request(developmentApp)
+      .get("/")
+      .set("Host", config.adminHost)
+      .set("X-FilmFrame-Dev-Admin", `${token}-wrong`);
+    const valid = await request(developmentApp)
+      .get("/")
+      .set("Host", config.adminHost)
+      .set("X-FilmFrame-Dev-Admin", token);
+
+    assert.equal(missing.status, 401);
+    assert.equal(invalid.status, 401);
+    assert.equal(valid.status, 200);
+    assert.match(valid.text, /暗房邀请管理/);
+  });
+
+  it("rejects development admin tokens in production configuration", () => {
+    assert.throws(
+      () =>
+        loadConfig({
+          NODE_ENV: "production",
+          FILMFRAME_HOST: "filmframe.example.test",
+          ADMIN_HOST: "filmframe-admin.example.test",
+          CF_ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
+          CF_ACCESS_AUDIENCE: "production-access-audience",
+          CF_ACCESS_ADMIN_EMAIL: "admin@example.test",
+          DEV_ADMIN_TOKEN: "local-admin-token-with-at-least-32-bytes",
+        }),
+      /DEV_ADMIN_TOKEN cannot be enabled in production/,
+    );
+  });
+
+  it("enforces JSON, exact Origin, and custom CSRF header on writes", async () => {
+    const { app, config } = fixture();
+    const base = () =>
+      request(app)
+        .post("/api/invites")
+        .set("Host", config.adminHost)
+        .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+
+    assert.equal((await base().send({ label: "访客" })).status, 403);
+    assert.equal(
+      (
+        await base()
+          .set("Origin", config.adminOrigin)
+          .set("X-FilmFrame-CSRF", "1")
+          .type("form")
+          .send({ label: "访客" })
+      ).status,
+      415,
+    );
+  });
+
+  it("returns plaintext once and never serializes stored hashes", async () => {
+    const { app, config } = fixture();
+    const idempotencyKey = randomUUID();
+    const response = await request(app)
+      .post("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Idempotency-Key", idempotencyKey)
+      .send({ label: "移动端访客" });
+
+    assert.equal(response.status, 201);
+    assert.match(response.body.code, /^FF1-/);
+    assert.equal(response.body.replayed, false);
+    assert.equal("codeHash" in response.body.invite, false);
+
+    const replay = await request(app)
+      .post("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Idempotency-Key", idempotencyKey)
+      .send({ label: "移动端访客" });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal(replay.body.invite.id, response.body.invite.id);
+    assert.equal("code" in replay.body, false);
+
+    const list = await request(app)
+      .get("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(list.status, 200);
+    assert.equal(list.body.invites.length, 1);
+    assert.equal(JSON.stringify(list.body).includes(response.body.code), false);
+    assert.equal(JSON.stringify(list.body).includes("codeHash"), false);
+  });
+
+  it("requires a UUID idempotency key before creating an invite", async () => {
+    const { app, config, database } = fixture();
+    const create = (key?: string) => {
+      const pending = request(app)
+        .post("/api/invites")
+        .set("Host", config.adminHost)
+        .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+        .set("Origin", config.adminOrigin)
+        .set("X-FilmFrame-CSRF", "1");
+      if (key) pending.set("Idempotency-Key", key);
+      return pending.send({ label: "幂等校验" });
+    };
+
+    assert.equal((await create()).status, 400);
+    assert.equal((await create("not-a-uuid")).status, 400);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 0,
+    });
+  });
+
+  it("creates one invite for concurrent requests sharing an idempotency key", async () => {
+    const { app, config, database } = fixture();
+    const idempotencyKey = randomUUID();
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        request(app)
+          .post("/api/invites")
+          .set("Host", config.adminHost)
+          .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+          .set("Origin", config.adminOrigin)
+          .set("X-FilmFrame-CSRF", "1")
+          .set("Idempotency-Key", idempotencyKey)
+          .send({ label: "并发创建" }),
+      ),
+    );
+
+    assert.equal(responses.filter((response) => response.status === 201).length, 1);
+    assert.equal(responses.filter((response) => response.status === 200).length, 19);
+    assert.equal(responses.filter((response) => typeof response.body.code === "string").length, 1);
+    assert.equal(new Set(responses.map((response) => response.body.invite.id)).size, 1);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 1,
+    });
+  });
+
+  it("lists session metadata and revokes only the selected session", async () => {
+    const { app, config, database, now } = fixture();
+    const firstInvite = createInvite(database, "第一台设备", now);
+    const secondInvite = createInvite(database, "第二台设备", now);
+    const firstSession = redeemInvite(database, firstInvite.code, now);
+    const secondSession = redeemInvite(database, secondInvite.code, now);
+    const [firstSummary] = listSessions(database, now).filter(
+      (session) => session.inviteId === firstInvite.invite.id,
+    );
+    assert.ok(firstSummary);
+
+    const list = await request(app)
+      .get("/api/sessions")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(list.status, 200);
+    assert.equal(list.body.sessions.length, 2);
+    assert.equal(JSON.stringify(list.body).includes(firstSession.token), false);
+    assert.equal(JSON.stringify(list.body).includes("tokenHash"), false);
+    assert.equal(list.body.sessions.some(
+      (session: { inviteLabel?: unknown }) => session.inviteLabel === "第一台设备",
+    ), true);
+
+    const revoked = await request(app)
+      .post(`/api/sessions/${firstSummary.id}/revoke`)
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .send({});
+    assert.equal(revoked.status, 204);
+    assert.equal(isSessionValid(database, firstSession.token, now), false);
+    assert.equal(isSessionValid(database, secondSession.token, now), true);
+  });
+
+  it("renders idempotent create and session controls without exposing secrets", async () => {
+    const { app, config, database, now } = fixture();
+    const invite = createInvite(database, "页面设备", now);
+    const session = redeemInvite(database, invite.code, now);
+    const response = await request(app)
+      .get("/")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+
+    assert.equal(response.status, 200);
+    assert.match(response.text, /Idempotency-Key/);
+    assert.match(response.text, /createButton\.disabled=true/);
+    assert.match(response.text, /设备会话/);
+    assert.match(response.text, /撤销会话/);
+    assert.match(response.text, /data-label="会话 ID"/);
+    assert.match(response.text, /content:attr\(data-label\)/);
+    assert.match(response.text, /\[hidden\]\{display:none!important\}/);
+    assert.doesNotMatch(response.text, new RegExp(session.token));
+  });
+});

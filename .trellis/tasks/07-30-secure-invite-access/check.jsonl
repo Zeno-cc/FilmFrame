@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Provides the required project-wide frontend quality gate."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines regression, privacy, browser and responsive verification requirements."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Review must verify all untrusted authentication and form inputs are narrowed at runtime."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/threat-model.md","reason":"Review must test every identified cache, origin, client-state, replay and secret-leak bypass."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/google-cloudflare-admin-auth.md","reason":"Review must verify Google and WebAuthn are AND requirements and Access JWT validation is fail closed."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/admin-auth-options.md","reason":"Review must cover admin credential enrollment, multi-device behavior and recovery boundaries."}

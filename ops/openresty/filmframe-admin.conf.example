@@ -1,0 +1,76 @@
+# FilmFrame admin vhost. Install this as a complete vhost file included from
+# OpenResty's http context. Cloudflare Access must enforce the exact
+# administrator Google identity plus Independent MFA before origin traffic.
+
+upstream filmframe_admin_backend {
+    server 127.0.0.1:18083;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name filmframe-admin.astrocean.space;
+    return 308 https://filmframe-admin.astrocean.space$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name filmframe-admin.astrocean.space;
+
+    # Replace only these paths with the certificate paths already managed by 1Panel.
+    ssl_certificate /path/to/existing/astrocean.space/fullchain.pem;
+    ssl_certificate_key /path/to/existing/astrocean.space/privkey.pem;
+
+    include /usr/local/openresty/nginx/conf/conf.d/cloudflare-real-ip.conf;
+
+    server_tokens off;
+    client_max_body_size 16k;
+
+    add_header Cache-Control "private, no-store" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    if ($host != "filmframe-admin.astrocean.space") {
+        return 421;
+    }
+
+    location = /healthz {
+        return 404;
+    }
+
+    location ^~ /internal/ {
+        return 404;
+    }
+
+    location / {
+        proxy_pass http://filmframe_admin_backend;
+        proxy_set_header Host filmframe-admin.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe-admin.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cookie "";
+        proxy_set_header Cf-Access-Jwt-Assertion $http_cf_access_jwt_assertion;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        proxy_hide_header ETag;
+        add_header Cache-Control "private, no-store" always;
+        proxy_connect_timeout 1s;
+        proxy_read_timeout 10s;
+        proxy_intercept_errors on;
+        error_page 500 502 503 504 = @filmframe_admin_unavailable;
+    }
+
+    location @filmframe_admin_unavailable {
+        default_type text/plain;
+        add_header Cache-Control "private, no-store" always;
+        add_header Retry-After "30" always;
+        return 503 "FilmFrame admin service unavailable\n";
+    }
+}

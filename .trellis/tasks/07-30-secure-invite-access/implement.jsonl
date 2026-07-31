@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Defines the FilmFrame frontend development and verification entry points for the logout integration."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Defines menu, accessibility, focus and responsive UI conventions for logout and management-adjacent frontend work."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Requires explicit runtime validation and typed boundaries for new browser/server inputs."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines required Vitest, Playwright, privacy and responsive checks."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/threat-model.md","reason":"Defines bypass paths, trust boundaries and negative security tests that implementation must close."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/google-cloudflare-admin-auth.md","reason":"Defines the approved Google plus Independent MFA flow and origin JWT validation contract."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/admin-auth-options.md","reason":"Captures WebAuthn enrollment, recovery and alternative-auth tradeoffs relevant to admin operations."}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/architecture-options.md","reason":"Records rejected architectures and the rationale for the stateful gateway."}

@@ -311,6 +311,14 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    void fetch('/auth/refresh', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-FilmFrame-CSRF': '1' },
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     savePreferences(settings, outputMode);
   }, [settings, outputMode]);
 

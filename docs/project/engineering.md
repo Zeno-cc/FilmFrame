@@ -1,135 +1,158 @@
 # 开发、测试与部署
 
-> 最后核验：2026-07-12。验证环境为 macOS arm64、Node v22.8.0、npm 11.17.0；项目声明的最低 Node 为 20。
+> 最后核验：2026-07-30。仓库已包含邀请码门禁实现和部署模板，但 Google、Cloudflare 与生产 OpenResty 配置仍需外部完成。
 
-## 安装与运行
+## 运行环境
+
+| 部分 | 版本/约束 |
+| --- | --- |
+| React/Vite 前端 | Node.js `>=20` |
+| Access sidecar | Node.js `>=22 <23`，生产镜像固定 Node 22 |
+| 数据库 | SQLite，由 `better-sqlite3` 提供 |
+| 容器 | Docker Compose v2 |
+| 入口代理 | 具备 `http_auth_request_module` 的 1Panel/OpenResty |
+
+Access 包含原生 Node 模块，不能把在 Node 22 下安装的 `server/access/node_modules` 交给 Node 26 运行，反之亦然。切换 Node major 后必须在 Node 22 环境重新执行 `npm --prefix server/access ci`。
+
+## 本地安装与开发
+
+前端：
 
 ```bash
 npm ci
 npm run dev
-npm run build
-npm run preview
-npm run test:e2e
 ```
 
-开发使用 Vite。无 `.env`、`.nvmrc`、`.node-version`、Dockerfile 或 Makefile。建议团队增加 Node 20 锁定文件，CI 以最低支持版本为准，而不是依赖个人机器的 Node 26。
-
-## 构建
-
-`npm run build` 等于：
-
-```text
-tsc && vite build
-```
-
-暗房重构后实测成功：95 modules；主 JS 约 344.32KB（gzip 105.20KB），CSS 51.29KB（gzip 10.06KB），Worker 18.28KB。完整静态输出的大部分仍来自 `public` 素材。
-
-构建会写入 `dist/`，并复制 `public/` 的所有文件，包括未被代码引用的 PNG、素材 README 和 `.DS_Store`。
-
-## 测试与验证
-
-项目已使用与 Vite 5 兼容的 Vitest 2.1.9。当前命令：
+Access sidecar：
 
 ```bash
-npm test
-npm run typecheck
-npm run build
-npm run check
-npm run test:e2e
+npm --prefix server/access ci
+npm --prefix server/access run dev
 ```
 
-`npm run check` 依次执行真实测试、类型检查和构建。2026-07-12 实测 18 个测试文件、137 项断言全部通过；`npm run test:e2e` 的 14 条 Chromium 旅程也通过。E2E 覆盖桌面空态/Inspector、手机 Sheet 与底栏焦点恢复、平板 Drawer 焦点恢复、手机 secondary actions、上传冲洗预览/长条、裁切取消回焦、损坏二维码 fallback、单一 active modal、Header 更多菜单键盘导航和 Toast 位置，以及选片同步、仅处理入选、长条 stale 与移动端无横向溢出。新增单元覆盖连续 transform/zoom 几何、批次选片/准入、完整卷帧号、artifact 字节数、结果 key、Worker payload、工作流状态与 task ownership、严格上传、即时预览 generation、配方和 Web Share。
+sidecar 的必需配置见 `server/access/.env.example`。本地 HTTP 只能在明确的 development 环境使用 `SECURE_COOKIES=false`；生产配置强制使用安全 Cookie。真实 Cloudflare team domain、audience 和管理员邮箱只写未提交的环境文件或部署平台，不写文档、日志和镜像。
 
-旧 geometry 失败来自只被测试引用的 `getKodakGoldStripSegment()`；连续片基生产实现已不使用该 helper。本轮删除死 helper、死绘制函数和对应失真断言，其余几何断言保留。
-
-Worker client 已支持注入 fake Worker，测试构造失败、dispose、timeout、`messageerror`、晚到响应和路由策略。浏览器 smoke 另验证了上传、处理、预览下载出现以及格式变化后 stale 下载消失。
-
-## 当前缺失的工程门禁
-
-- 无 CI；
-- 无 ESLint/format；
-- 无 coverage；
-- 无完整的主线程/Worker 视觉等价性测试；
-- 无发布脚本、tag、CHANGELOG 或版本策略。
-
-审计初期的 `App.tsx` 行尾空白已清理，当前 `git diff --check` 通过。
-
-## 依赖状态
-
-直接生产依赖：React、ReactDOM、exif-js。其余为构建开发依赖。
-
-审计初期本机存在带 `2` 后缀的 extraneous 包；安装 Vitest 时 npm 已移除残余。当前 `npm ls --depth=0` 干净，但正式发布仍应使用全新 `npm ci` 验证。
-
-工程审计在官方 npm registry 得到 4 个开发工具链漏洞：1 high、2 moderate、1 low，涉及旧 Vite/esbuild/plugin-react/Babel 路径或 dev server 风险；`npm audit --omit=dev` 为 0。修复应单独立项，因为 Vite 最新版是 major upgrade，不能在文档任务中顺手升级。
-
-建议审计命令：
+## 构建与质量门禁
 
 ```bash
-npm audit --registry=https://registry.npmjs.org
-npm audit --omit=dev --registry=https://registry.npmjs.org
-```
-
-lockfile 中 tarball 使用 `registry.npmmirror.com`，README 的“供应链安全”不应写成绝对保证。
-
-## CI 建议
-
-最小 CI：
-
-```text
-checkout
-setup Node 20 with npm cache
-npm ci
+npm test                         # 根 Vitest：24 文件、165 项测试
 npm run typecheck
-npm test
 npm run build
+npm run check                   # 根测试 + 类型检查 + Vite 生产构建
+
+npm --prefix server/access test # Node test：27 项，要求 Node 22
+npm run check:access            # sidecar 测试 + 类型检查 + 构建
+npm run check:all               # 前端和 sidecar 完整检查
+
+npm run test:e2e                # Playwright 浏览器流程
+git diff --check
 ```
 
-随后再加：依赖审计策略、Playwright smoke、产物体积阈值。CI 与生产部署分开，最初不要在 main 检查成功后直接自动生产发布。
+`server/access/tests/all.test.ts` 在单一 Node test 进程中导入 5 个测试模块，并将 concurrency 固定为 1。这样既覆盖 SQLite 并发事务，又避免 `better-sqlite3` 在多测试子进程退出时发生本机不稳定。
 
-## 部署现状
+根 `tsconfig.json` 明确排除 `server/access`；根构建不会误用浏览器 TypeScript 配置检查 Express 代码，`check:all` 会显式检查两边。
 
-应用是静态站，无路由，因此任何能托管 `dist/` 的平台都能运行。README 提到 Zeabur/Netlify/Vercel，但仓库没有有效平台配置：`netlify.toml` 为空。
+## Docker 构建
 
-平台参数：
+```bash
+cp .env.example .env
+# 只在本地 .env 填写非公开部署值，不提交
 
-| 项 | 值 |
-| --- | --- |
-| Install | `npm ci` |
-| Build | `npm run build` |
-| Output | `dist` |
-| Node | >=20，建议固定 20 |
-| 环境变量 | 无 |
+docker compose config
+docker compose build
+docker compose up -d
+docker compose ps
+npm run verify:deployment -- --live
+```
 
-如果未来引入客户端路由，需要添加 SPA fallback；当前不需要。
+前端镜像使用 Node 20 build stage 和 Nginx runtime。Access 镜像使用 Node 22；build stage 安装 `python3`、`make`、`g++` 并从源码构建 `better-sqlite3`，runtime 不保留编译工具。
 
-生产配置待补：
+Compose 安全合同：
 
-- immutable hashed asset cache；
-- HTML no-cache/revalidate；
-- CSP，注意 Worker、blob URL、data favicon 和同源图片；
-- `X-Content-Type-Options`、`Referrer-Policy`、frame policy；
-- 是否需要 COOP/COEP。当前 OffscreenCanvas 不要求 cross-origin isolation，SharedArrayBuffer 才需要。
+- `filmframe` 只绑定 `127.0.0.1:18082`；
+- `access` 只绑定 `127.0.0.1:18083`；
+- 两者加入 `filmframe_private`；
+- SQLite 位于 `filmframe_access_data:/data`；
+- access runtime 使用非 root 用户、只读根文件系统、`no-new-privileges` 并丢弃全部 capabilities；
+- `.env`、数据库和凭据不进入 build context 或镜像层。
 
-## 发布检查单
+## 部署验收脚本
 
-1. 确认工作区干净或所有变更已明确纳入版本。
-2. 使用 Node 20 全新 `npm ci`。
-3. 真正执行测试，而非只执行现有 test 脚本。
-4. `npm run build`。
-5. 在 Chromium 和至少一个不支持/禁用 Worker 路径的浏览器做相同样例检查。
-6. 验证竖图、横图、单张、长条、JPEG、PNG、ZIP。
-7. 检查 `dist/` 没有 `.DS_Store` 和不必要素材。
-8. 检查二维码、模板 200 响应和 MIME。
-9. 更新版本、CHANGELOG、handoff 当前快照。
-10. 发布后用真实生产 URL做 smoke。
+默认命令只检查仓库配置，不发送邀请码、Cookie、JWT 或管理员身份：
 
-## README 待修项目
+```bash
+npm run verify:deployment
+```
 
-- clone URL 从 `your-username` 改为真实仓库；
-- `npm install` 改为可复现的 `npm ci`；
-- 说明 Worker、transform 与体验升级的当前提交边界；
-- 修正素材 fallback 顺序；
-- 不要说只复制单个 overlay，Vite 复制整个 public；
-- 补 `LICENSE` 后再明确 MIT；
-- 大图是警告，不是防崩溃限制；
-- 经典长条帧号不保证 36 循环。
+容器启动后检查回环 health：
+
+```bash
+npm run verify:deployment -- --live
+```
+
+生产服务器上还应传入实际 URL 和 OpenResty 二进制，验证活动配置、公开 HTTPS 和直连源站边界：
+
+```bash
+npm run verify:deployment -- \
+  --live \
+  --site-url https://filmframe.astrocean.space \
+  --admin-url https://filmframe-admin.astrocean.space \
+  --origin-url https://ORIGIN_ADDRESS \
+  --admin-origin-url https://ORIGIN_ADDRESS \
+  --openresty-bin /path/to/openresty
+```
+
+`ORIGIN_ADDRESS` 和二进制路径属于服务器环境，不应硬编码进仓库。生产探针验证：匿名站点 303 到 `/access`、邀请页不预载 Vite bundle、内部 endpoint 隐藏、真实素材匿名不可取得、Cloudflare cache bypass、匿名管理访问进入 Access、直连管理源站缺少 JWT 时被拒绝。
+
+## 生产切换顺序
+
+以下步骤同时完成前，不启用线上门禁：
+
+1. 备份当前 Compose、FilmFrame vhost、证书引用和数据库目标目录。
+2. 在 Google Cloud 创建 Web OAuth Client；Client Secret 只录入 Cloudflare Zero Trust，启用 PKCE。
+3. 在 Cloudflare Access 创建管理应用：Include 精确管理员邮箱，Require Google 登录方式。
+4. 启用 Independent MFA WebAuthn，关闭 IdP MFA AMR 复用，并至少登记两个凭据。
+5. 为管理子域创建橙云 DNS；确认现有泛域名或站点证书覆盖两个 hostname。
+6. 构建并启动两个仅回环容器，运行迁移和 health 检查，确认公网端口拒绝连接。
+7. 将 `ops/openresty/` 示例合并到两个对应 1Panel vhost，只替换真实证书路径，不修改其他站点。
+8. 对 FilmFrame hostname 设置整站 cache bypass，关闭陈旧公开缓存路径并 purge 旧缓存。
+9. 执行 `openresty -t`；成功后再 reload。
+10. 运行部署脚本和手工验收矩阵，最后回归其他 1Panel vhost。
+
+不能把“Cloudflare 橙云已开启”当作源站授权。公开站点仍依赖 OpenResty session subrequest，管理站点仍由 Node 逐请求验证 Access JWT。
+
+## 线上手工验收
+
+- 匿名 `/`、已知 JS、Worker、overlay、mask 都不能返回应用字节。
+- 有效邀请码成功；随机、过期、撤销、已用邀请码统一失败且不设置 Cookie。
+- Cookie 篡改、会话过期、用户清理站点数据和管理员撤销邀请后，下一请求立即失败。
+- 鉴权容器停止时公开应用返回 503，而不是匿名静态页面。
+- 白名单 Google + 已登记 WebAuthn 可进入管理端；缺任一因素、非白名单账号或错误 audience 均拒绝。
+- 直连源站并设置生产 Host/SNI 仍不能绕过公开或管理鉴权。
+- `CF-Cache-Status` 为 BYPASS/DYNAMIC，旧 hashed asset URL 匿名不可读。
+- 完整上传、Worker/主线程渲染、长条、JPEG/PNG、ZIP 和设备授权续期流程正常。
+- 浏览器 Network 中没有照片、EXIF、Blob 或渲染结果上传请求。
+- iOS Safari、Android Chrome、桌面 Safari/Chrome/Edge 至少完成一次管理登录和邀请码操作。
+
+## 数据备份与 SSH 应急
+
+只通过服务器 SSH 或 `docker compose exec` 使用 sidecar CLI：
+
+```bash
+node dist/src/cli.js create --label "临时访客"
+node dist/src/cli.js list
+node dist/src/cli.js revoke <invite-id>
+docker compose --profile maintenance run --rm --no-deps access-backup \
+  node dist/src/cli.js backup /backups/access-$(date -u +%Y%m%dT%H%M%SZ).sqlite
+```
+
+`create` 会在 stdout 显示一次邀请码明文，执行时应避免 shell 历史和会话录屏。手工 backup 通过无网络的短生命周期 Compose profile 使用 SQLite 在线备份并写入独立的 `/backups` 宿主机挂载；长期运行的 access 服务不能修改该目录。正式定时任务应运行 `ops/backup/backup-access.sh`，同时完成完整性、校验和、保留期与状态检查。备份成功不等于可恢复；上线前和定期运维都要做独立恢复演练。
+
+## 当前工程门禁缺口
+
+- 仓库尚无正式 CI、coverage、ESLint/format、tag/CHANGELOG 自动化和发布流水线。
+- Playwright 以 Chromium 为主，Safari/Firefox/移动设备仍需手工或新增 CI 覆盖。
+- Canvas/OffscreenCanvas 尚无完整像素级视觉等价性基线。
+- Cloudflare Access、Google OAuth Client、DNS、证书和线上 OpenResty 属于外部状态，仓库测试无法证明其已经正确配置。
+
+因此发布证据必须同时包含仓库检查、Docker 构建、活动 OpenResty `-t`、回环探针、直连源站探针和外网 HTTPS 验收，不能只引用 `npm run build`。

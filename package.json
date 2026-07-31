@@ -18,8 +18,15 @@
     "test:download": "vitest run tests/previewDownload.test.ts",
     "test:quotes": "vitest run tests/photographyQuotes.test.ts tests/wikiquoteSync.test.mjs",
     "test:e2e": "playwright test",
+    "test:backup": "node scripts/test-backup-boundaries.mjs",
+    "test:e2e:access-proxy": "node scripts/test-invite-proxy.mjs",
     "sync:quotes": "node scripts/sync-photography-quotes.mjs",
     "check": "npm run test && npm run typecheck && npm run build",
+    "check:access": "npm --prefix server/access run check",
+    "check:all": "npm run check && npm run check:access",
+    "check:release": "npm run check:all && npm run test:e2e && npm run test:backup && npm run test:e2e:access-proxy && npm run verify:deployment",
+    "verify:deployment": "node scripts/verify-invite-deployment.mjs",
+    "verify:production": "node scripts/verify-invite-deployment.mjs --production",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -30,6 +37,7 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^22.20.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.2.1",

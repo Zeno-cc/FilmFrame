@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"逐项复核访问控制、失败关闭与测试矩阵"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"复核单元、浏览器、Canvas 和隐私回归门槛"}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/threat-model.md","reason":"对照负面场景执行正式上线审查"}
+{"file":".trellis/tasks/07-31-harden-invite-production-readiness/research/review-findings.md","reason":"确认所有已识别上线阻断项均有修复与证据"}

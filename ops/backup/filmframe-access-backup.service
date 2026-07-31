@@ -1,0 +1,24 @@
+[Unit]
+Description=FilmFrame access database online backup
+Requires=docker.service
+After=docker.service
+ConditionPathIsDirectory=/opt/filmframe/current
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/filmframe/current
+EnvironmentFile=-/opt/filmframe/current/.env
+ExecStart=/opt/filmframe/current/ops/backup/backup-access.sh
+ExecStartPost=/opt/filmframe/current/ops/backup/check-access-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/filmframe/backups/access /run /var/run
+
+[Install]
+WantedBy=multi-user.target

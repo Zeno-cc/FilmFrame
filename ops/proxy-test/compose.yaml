@@ -1,0 +1,123 @@
+services:
+  filmframe:
+    image: filmframe-proxy-test:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        NODE_BUILD_IMAGE: node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46
+        NGINX_RUNTIME_IMAGE: nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
+        FILMFRAME_REVISION: proxy-test
+    networks:
+      - private
+
+  access:
+    image: filmframe-access-proxy-test:local
+    build:
+      context: ../../server/access
+      dockerfile: Dockerfile
+      args:
+        ACCESS_NODE_IMAGE: node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46
+        FILMFRAME_REVISION: proxy-test
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /data/access.sqlite
+      FILMFRAME_HOST: filmframe.test
+      ADMIN_HOST: filmframe-admin.test
+      INTERNAL_HOSTS: access,localhost,127.0.0.1
+      CF_ACCESS_TEAM_DOMAIN: proxy-test.cloudflareaccess.com
+      CF_ACCESS_AUDIENCE: proxy-test-audience
+      CF_ACCESS_ADMIN_EMAIL: admin@example.test
+      SECURE_COOKIES: "false"
+    volumes:
+      - access_data:/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/healthz',{headers:{Host:'access'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  cookie-probe:
+    image: filmframe-access-proxy-test:local
+    pull_policy: never
+    command:
+      - node
+      - -e
+      - >-
+        require('node:http').createServer((request,response)=>{
+        response.end(request.headers.cookie||'')}).listen(3001,'0.0.0.0')
+    networks:
+      - private
+    depends_on:
+      access:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  proxy:
+    image: nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
+    ports:
+      - "127.0.0.1:${FILMFRAME_PROXY_TEST_PORT:-18084}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../openresty/cloudflare-real-ip.conf:/etc/nginx/cloudflare-real-ip.conf:ro
+    networks:
+      private: {}
+      edge: {}
+    depends_on:
+      access:
+        condition: service_healthy
+      filmframe:
+        condition: service_started
+      cookie-probe:
+        condition: service_started
+
+  proxy-trusted:
+    image: nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../openresty/cloudflare-real-ip.conf:/etc/nginx/cloudflare-real-ip.conf:ro
+    networks:
+      private: {}
+      cloudflare:
+        ipv4_address: 103.21.244.2
+    depends_on:
+      access:
+        condition: service_healthy
+      filmframe:
+        condition: service_started
+      cookie-probe:
+        condition: service_started
+
+  proxy-client:
+    image: filmframe-access-proxy-test:local
+    pull_policy: never
+    command: ["sleep", "infinity"]
+    networks:
+      cloudflare:
+        ipv4_address: 103.21.244.3
+    depends_on:
+      proxy-trusted:
+        condition: service_started
+    healthcheck:
+      disable: true
+
+networks:
+  private:
+    internal: true
+  edge: {}
+  cloudflare:
+    ipam:
+      config:
+        - subnet: 103.21.244.0/28
+
+volumes:
+  access_data:

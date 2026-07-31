@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"邀请码、会话、JWT、SQLite 与反向代理的现有强制契约"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"真实浏览器流程、资源边界与发布质量门槛"}
+{"file":".trellis/tasks/07-30-secure-invite-access/research/threat-model.md","reason":"父任务已确认的资产、信任边界与绕过路径"}
+{"file":".trellis/tasks/07-31-harden-invite-production-readiness/research/review-findings.md","reason":"本次正式环境审查发现、验证证据和已接受风险"}

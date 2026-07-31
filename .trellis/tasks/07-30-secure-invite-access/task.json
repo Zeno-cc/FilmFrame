@@ -1,0 +1,28 @@
+{
+  "id": "secure-invite-access",
+  "name": "secure-invite-access",
+  "title": "安全邀请码访问门禁",
+  "description": "为 FilmFrame 增加服务端邀请码门禁、可撤销会话及 Google + Passkey 公网管理端。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-07-30",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-31-harden-invite-production-readiness"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

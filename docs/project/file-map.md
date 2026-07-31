@@ -1,118 +1,111 @@
 # 文件与模块地图
 
-> 最后核验：2026-07-14。排除 `.git/`、`node_modules/`、`dist/` 和被忽略的手工浏览器产物。
+> 最后核验：2026-07-30。排除 `.git/`、`node_modules/`、`dist/`、测试产物和本地秘密文件。
 
-## 根目录
+## 根目录与部署入口
 
 | 文件 | 职责 | 维护注意 |
 | --- | --- | --- |
-| `App.tsx` | 根 controller；状态、上传、处理、重试、预览、下载、URL 生命周期与 feature 组件编排 | 展示层已拆分，仍需保留 service 业务契约 |
-| `types.ts` | 领域类型、16 种 FilmType、预设 | 新设置必须同步 storage 和两套引擎 |
-| `index.tsx` | React 挂载 | StrictMode 开启 |
-| `index.html` | 页面壳、favicon、process polyfill | 无 CSP/meta description |
-| `styles.css` | Tailwind v4 source、token/base/component 样式入口 | 扫描根组件与 `components/` |
-| `package.json` | 脚本、依赖、Node >=20 | Vitest、typecheck、build 和聚合 check |
-| `package-lock.json` | npm lockfile v3 | 已加入 Vitest 2.1.9，当前直接依赖树干净 |
-| `vite.config.ts` | React/Vitest 配置 | 排除 Playwright E2E 文件，避免被 Vitest 发现 |
-| `playwright.config.ts` | Chromium E2E web server 与输出配置 | 使用已安装的系统 Chrome channel |
-| `tsconfig.json` | strict TS、ES2020、bundler resolution | unused 检查关闭 |
-| `postcss.config.cjs` | Tailwind v4 PostCSS + autoprefixer | 当前实际 CSS 管线 |
-| `tailwind.config.cjs` | 旧式 content/font 配置 | v4 主要通过 CSS `@source` 扫描，需确认此文件是否仍生效 |
-| `metadata.json` | 应用名、描述、空权限 | 非运行时核心 |
-| `netlify.toml` | 空文件 | 不构成部署配置 |
-| `README.md` | 用户介绍和快速开发说明 | clone URL、素材、许可等有过期内容 |
-| `.gitignore` | 忽略依赖、dist、日志、Playwright、DS_Store | `public/.DS_Store` 仍会被构建复制 |
-| `handoff.md` | 项目接手入口 | 发布前更新快照 |
+| `App.tsx` | 根 controller；上传、选片、处理、预览、导出、URL 生命周期和设备授权续期 | 鉴权判断不在 React；启动时只调用服务端固定续期路由 |
+| `types.ts` | 胶片、设置、图片与构图领域类型 | 新字段需同步 storage、主线程与 Worker |
+| `index.tsx` | React 挂载入口 | `React.StrictMode` 开启 |
+| `index.html` | 页面壳、favicon、module 入口 | 已无 `window.process` polyfill；安全响应头由 Nginx 设置 |
+| `styles.css` | Tailwind v4 source、token/base/component 样式 | 扫描根组件与 `components/` |
+| `package.json` | 前端脚本和根级聚合检查 | `check:access`、`check:all`、`verify:deployment` 已接入 |
+| `tsconfig.json` | 浏览器 TypeScript 配置 | 明确排除独立的 `server/access` 包 |
+| `Dockerfile` | 前端多阶段构建，最终由 Nginx 提供 `dist/` | Node 20 build stage；运行镜像不含源码工具链 |
+| `nginx.conf` | 静态容器路由、健康检查和安全响应头 | 受保护资源统一 `private, no-store`，不能改回公开 immutable 缓存 |
+| `compose.yaml` | 静态容器、access sidecar、私有网络与 SQLite 卷 | 两个端口都只绑定 `127.0.0.1` |
+| `.env.example` | Compose 非秘密配置模板 | 真实值写本地 `.env`，不得提交 |
+| `.dockerignore` | 限制前端 Docker build context | `server/access` 由自己的 build context 构建 |
+| `vite.config.ts` | React/Vitest 配置 | 排除 Playwright E2E 文件 |
+| `playwright.config.ts` | Chromium E2E web server 与输出配置 | E2E 使用独立测试服务，不代表生产门禁已上线 |
+| `README.md` | 用户、开发、隐私和部署入口 | 架构事实应与本目录文档同步 |
 
-## `components/`
+## 浏览器应用
+
+### `components/`
 
 | 目录/文件 | 职责 | 维护注意 |
 | --- | --- | --- |
-| `CropEditor.tsx` | 自由裁切本地草稿、直接拖动、缩放、旋转、复位与提交 | 只在完成时提交；预览几何必须继续复用 renderTransform 语义 |
-| `app/` | AppShell、Header、SessionMeter、MoreMenu | Header 只派发既有 callback，不复制业务判断 |
-| `workspace/` | 空态、Toolbar、接触印样、卡片、长条审片台、序列 Rail | 图片排序/状态来自 App 与 workflow service |
-| `settings/` | Recipe Inspector、桌面栏与移动/平板设置面板 | 所有字段仍通过 App 的 FilmSettings 更新 |
-| `preview/` | Preview Dialog、Before/After、导航与构图入口 | 正式 artifact 与临时 preview URL 必须分离 |
-| `feedback/` | Toast、错误和支持 Dialog | QR 加载失败必须保留 fallback，不伪造二维码 |
-| `mobile/` | 固定底部主操作栏 | Sheet 打开时必须隐藏，避免双 CTA |
-| `ui/` | Button、Field、Sheet、Modal 等通用 primitive | 维持 focus-visible 与 reduced-motion 行为 |
-| `icons/` | FilmFrame 本地 SVG 图标 | 保持 `currentColor`、明确的 aria label |
+| `CropEditor.tsx` | 构图草稿、拖动、缩放、旋转、复位与提交 | 取消不写回正式 transform |
+| `app/` | AppShell、Header、SessionMeter、MoreMenu | 桌面/移动菜单不提供会清除设备授权的退出命令 |
+| `workspace/` | 空态、Toolbar、接触印样、卡片、长条审片台和序列 Rail | 顺序和选择状态来自 App/service |
+| `settings/` | 桌面与移动设置面板、配方 | 所有设置通过 `FilmSettings` 更新 |
+| `preview/` | 原图/成片预览、导航、旋转和构图入口 | 正式 artifact 与临时预览 URL 分离 |
+| `feedback/` | Toast、错误与支持弹窗 | 资源加载失败保留明确 fallback |
+| `mobile/` | 移动端底部主操作 | Sheet 打开时避免重复 CTA |
+| `ui/` | Button、Field、Sheet、Modal 等通用 primitive | 维持焦点、键盘和 reduced-motion 合同 |
 
-## `services/`
+### `services/`
 
-| 文件 | 公开入口 | 职责 |
-| --- | --- | --- |
-| `filmWorkerClient.ts` | `processImage`, `generateFilmStrip` | Worker 能力/策略判断、请求 Map、失败回退 |
-| `filmWorker.ts` | Worker `self.onmessage` | OffscreenCanvas 两模式两输出的渲染 |
-| `filmEngine.ts` | `processImage`, `processImageReal135`, `generateFilmStrip` | 主线程完整渲染、模板 fallback、经典模式 |
-| `filmGeometry.ts` | layout、cover、rotate helpers | 135 物理几何和图像装框 |
-| `filmOverlay.ts` | 真实 135 模板注册表与 layout/draw helpers | 模板 aperture 与连续长条布局 |
-| `filmResolution.ts` | 两个 target width helper | 真实模式 preview/high 尺寸 |
-| `filmColor.ts` | `applyGold200Look` | Gold 200 像素色彩变换 |
-| `filmTexture.ts` | grain/dust/scratch/base texture | 主线程真实程序化纹理 |
-| `filmMarkings.ts` | 135 marking helpers | 程序化文字和 DX-like 标记 |
-| `filmFrameNumber.ts` | normalize/positions/draw | 帧号循环和模板动态编号 |
-| `settingsStorage.ts` | normalize/merge/load/save | `filmFrame.preferences.v1` |
-| `uploadFiles.ts` | `prepareUploadedImages` | MIME allowlist、尺寸解码、大图警告、EXIF 编排 |
-| `previewNavigation.ts` | index/next/source | 纯函数预览导航 |
-| `previewDownload.ts` | source/name/build | 预览下载 |
-| `zip.ts` | `createZipBlob` | 自研 Store ZIP32、CRC32 |
-| `renderResult.ts` | settings key、artifact、MIME 命名 | current/stale 结果身份 |
-| `imageBatch.ts` | 按 ID 合并、generation gate | 防旧批次覆盖最新列表 |
-| `renderBudget.ts` | canvas/strip budget | 分配大画布前拒绝超限 |
-| `renderTransform.ts` | normalize/key/cover placement | 连续位置、1-3x 缩放、用户旋转与自动旋入契约 |
-| `workflowState.ts` | status/select/move/primary action | UI 工作流纯函数 |
-| `previewRenderController.ts` | debounce/generation/revoke | 即时预览生命周期 |
-| `recipeStorage.ts` | load/save/delete | `filmFrame.recipes.v1` 本地配方 |
-| `shareArtifact.ts` | capability/share result | Web Share 文件边界 |
-
-依赖方向原则：UI 可以依赖 service；通用纯 service 不应反向依赖 `App`。渲染 helper 依赖 `types.ts`，但不应依赖 React。
-
-## `tests/`
-
-| 文件 | 覆盖意图 | 当前实况 |
-| --- | --- | --- |
-| `filmGeometry.test.ts` | 135 尺寸、帧号、旋转、模板/长条布局、分辨率 | Vitest 真实执行通过 |
-| `previewNavigation.test.ts` | 循环导航、源选择 | 真实执行通过 |
-| `settingsStorage.test.ts` | 白名单、钳制、存取 | 真实执行通过 |
-| `uploadFiles.test.ts` | MIME、大图、EXIF、解码失败回收 | Vitest 真实执行通过 |
-| `previewDownload.test.ts` | artifact 下载与未处理原图禁用 | Vitest 真实执行通过 |
-| `renderResult.test.ts` | MIME、settings key、stale、顺序 | Vitest 真实执行通过 |
-| `imageBatch.test.ts` | 删除晚到、新增/排序保留、generation | Vitest 真实执行通过 |
-| `filmWorkerClient.test.ts` | 构造、超时、dispose、晚到、路由 | Vitest 真实执行通过 |
-| `renderBudget.test.ts` | 画布边长/面积和长条边界 | Vitest 真实执行通过 |
-| `zip.test.ts` | ZIP 签名和输入内存预算 | Vitest 真实执行通过 |
-
-测试由 Vitest 执行，当前 18 个文件、137 项断言。新增 transform、batch curation/admission、workflow、preview controller、recipe 和 share 覆盖；`tests/e2e/frontend-redesign.spec.ts` 使用 Playwright 覆盖桌面空态、移动/平板设置、上传冲洗审片、选片、长条和二维码 fallback。
-
-## `public/`
-
-| 文件 | 状态 |
+| 模块 | 职责 |
 | --- | --- |
-| `alipay.jpg` | 约 252KB，但不是可解析 JPEG，需替换 |
-| `.DS_Store` | 不应发布；当前会被 Vite 复制 |
-| `film-overlays/film-base.png` | 运行时分层素材 |
-| `film-overlays/aperture-mask-derived.png` | 运行时分层 mask |
-| `film-overlays/aperture-shadow-derived.png` | 运行时加载但不绘制 |
-| `film-overlays/kodak-gold-200.png` | Gold 200 legacy fallback |
-| `film-overlays/kodak-portra-160.png` | Portra 160 flattened real-135 template |
-| `film-overlays/kodak-portra-400.png` | Portra 400 flattened real-135 template |
-| `film-overlays/kodak-ektar-100.png` | Ektar 100 flattened real-135 template |
-| `film-overlays/kodak-portra-800.png` | Portra 800 flattened real-135 template |
-| `film-overlays/kodak-{ultramax-400,colorplus-200,pro-image-100}.png` | Kodak 彩色负片 flattened real-135 templates |
-| `film-overlays/kodak-ektachrome-e100.png` | Ektachrome E100 flattened real-135 template |
-| `film-overlays/kodak-{tri-x-400,tmax-100,tmax-400,tmax-p3200}.png` | Kodak 黑白 flattened real-135 templates |
-| `film-overlays/fuji-superia-400.png` | Fuji Superia 400 flattened real-135 template |
-| `film-overlays/cinestill-800t.png` | CineStill 800T flattened real-135 template |
-| `film-overlays/ilford-hp5-plus.png` | Ilford HP5 Plus flattened real-135 template |
-| 其他 mask/shadow PNG | 当前源码未引用，疑似中间素材 |
-| `film-overlays/README.md` | runtime template geometry and normalization contract |
+| `filmWorkerClient.ts` / `filmWorker.ts` | Worker 能力/策略、请求协议、超时、取消和主线程回退 |
+| `filmEngine.ts` | 主线程经典/真实 135 单图与长条渲染 |
+| `filmGeometry.ts` / `filmResolution.ts` | 135 几何、cover、旋转和输出分辨率 |
+| `filmOverlay.ts` / `filmSprocket.ts` | 真实 135 模板、片窗和齿孔合成 |
+| `filmTexture.ts` / `filmMarkings.ts` / `filmFrameNumber.ts` | 片基纹理、标记与帧号 |
+| `renderTransform.ts` / `previewRenderController.ts` | 构图归一化与即时预览生命周期 |
+| `renderResult.ts` / `imageBatch.ts` / `workflowState.ts` | 结果签名、generation gate、批次和 UI 状态推导 |
+| `uploadFiles.ts` | MIME、尺寸解码、大图提示和 EXIF 编排 |
+| `settingsStorage.ts` / `recipeStorage.ts` | 白名单本地偏好和配方 |
+| `renderBudget.ts` / `zip.ts` | Canvas、工作集与 ZIP 容量边界 |
+| `previewDownload.ts` / `shareArtifact.ts` | 下载和 Web Share 文件边界 |
+| `photographyQuotes.ts` | 随应用发布的审核名言快照，不在浏览器运行时请求第三方 API |
 
-Vite 会原样复制整个 `public/`，不是只复制被 import 的资源。
+依赖方向保持为 UI -> service -> 纯 helper/types。鉴权服务不应被浏览器 bundle import，浏览器 service 也不应直接读取 SQLite 或 Access JWT。
 
-## 生成与忽略目录
+## Access sidecar
 
-- `node_modules/`：非源码；安装 Vitest 时 npm 已移除审计初期发现的重复 extraneous 目录。
-- `dist/`：生产构建，忽略，不应作为源码事实来源。
-- `.playwright-cli/`：手工浏览器快照/日志，忽略，不能替代自动化测试。
-- `output/`：可用于本地 QA 产物，但不应把临时截图当成源码或长期测试证据。
+`server/access/` 是独立的 Express 5 + TypeScript + SQLite 包，有自己的 lockfile、TypeScript 配置、测试和 Dockerfile。
+
+| 路径 | 职责 |
+| --- | --- |
+| `src/config.ts` | 用 Zod 校验 Host、数据库、Cloudflare Access 和 Cookie 配置 |
+| `src/constants.ts` | 7 天邀请码、400 天滚动设备会话、表单 nonce 和 Cookie 常量 |
+| `src/inviteCode.ts` | 128 bit Crockford 邀请码生成、规范化与 SHA-256 |
+| `src/db.ts` / `src/migrate.ts` | SQLite 打开、权限、WAL、迁移和 readiness |
+| `src/store.ts` | 创建/列出/兑换/撤销邀请码与会话事务 |
+| `src/accessJwt.ts` | 远程 JWKS 与 Cloudflare Access JWT 验证 |
+| `src/middleware/` | Host、私有来源、管理员断言、CSRF、Content-Type 和限速 |
+| `src/routes/publicRoutes.ts` | `/access`、`/auth/redeem`、`/auth/refresh` |
+| `src/routes/adminRoutes.ts` | 管理页、列表、创建和撤销 API |
+| `src/views/html.ts` | 无第三方脚本的服务端邀请页和管理页；一次性明文可清除 |
+| `src/cli.ts` | SSH 应急 create/list/revoke/backup |
+| `migrations/001_initial.sql` | invites、sessions 和索引的初始 schema |
+| `tests/all.test.ts` | 单进程聚合测试入口，避免原生 SQLite 多进程退出问题 |
+| `Dockerfile` | Node 22 多阶段构建；build stage 编译 `better-sqlite3`，非 root runtime |
+| `.env.example` | sidecar 配置示例，不包含真实身份或凭据 |
+| `README.md` | 路由、环境和 SSH 运维契约 |
+
+## OpenResty 与部署验收
+
+| 路径 | 职责 | 关键边界 |
+| --- | --- | --- |
+| `ops/openresty/filmframe-auth.conf.example` | 公开站点 vhost 示例 | `auth_request` 覆盖全部应用路径；内部子请求固定 `Host: access`；失败关闭 |
+| `ops/openresty/filmframe-admin.conf.example` | 管理站点 vhost 示例 | 只转发 Access assertion，Node 端逐请求验签 |
+| `scripts/verify-invite-deployment.mjs` | 无秘密的配置与可选线上探针 | 检查回环端口、私网、卷、CSP、no-store、公开/源站边界和 `openresty -t` |
+
+示例 vhost 不能直接覆盖 1Panel 配置。上线时只合并 FilmFrame 的两个站点，并替换为 1Panel 已管理的真实证书路径。
+
+## 测试地图
+
+| 测试层 | 当前实况 | 重点 |
+| --- | --- | --- |
+| 根 Vitest | 24 个文件、165 项测试 | 上传、几何、设置、构图、批次、Worker、结果、预算、ZIP、模板、齿孔、纹理和名言 |
+| Access Node test | 单进程聚合测试 | 邀请码、nonce、SQLite、并发兑换、Cookie、续期、管理 API 和 Access JWT |
+| Playwright | `tests/e2e/` | 前端主流程、胶片素材和设备授权续期 POST 合同 |
+
+根 Vitest 数量来自 2026-07-30 的真实执行。Access 测试必须在 Node 22 LTS 且原生依赖由同一 Node 版本安装的环境运行。
+
+## 静态素材与生成目录
+
+- `public/film-overlays/`：16 款真实 135 模板及 Gold 分层素材。
+- `public/film-sprocket-masks/`：真实齿孔蒙版。
+- `data/photography-quotes.json`：应用使用的摄影名言审核快照，由 Vite 打包进应用。
+- `generated/`：`npm run sync:quotes` 按需创建的 Wikiquote 候选目录，不直接覆盖生产快照。
+- `dist/`：Vite 生产构建，忽略且不作为源码事实来源。
+- `node_modules/` 与 `server/access/node_modules/`：分别属于前端和 Node 22 sidecar，不能跨 Node major 复用原生模块。
+- `test-results/`、`playwright-report/`：自动化产物，不提交。
+- `.env`、SQLite/WAL/SHM：本地或生产状态，必须忽略且不得进入镜像/仓库。

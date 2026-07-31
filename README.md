@@ -2,7 +2,7 @@
 
 FilmFrame 是一间运行在浏览器里的数字暗房。它把本地照片排成接触印样，为单张照片或整卷长条生成 35mm（135）胶片边框，并在当前设备完成裁切、渲染与导出。
 
-照片不会上传到 FilmFrame 服务。刷新或关闭页面后，照片和处理结果不会保留；胶片设置与本地配方会保存在浏览器中。
+照片不会上传到 FilmFrame 服务。刷新或关闭页面后，照片和处理结果不会保留；胶片设置与本地配方会保存在浏览器中。生产部署可以启用服务端邀请码门禁，但鉴权服务只处理邀请码哈希与会话状态，不接触照片。
 
 [![React 19](https://img.shields.io/badge/React-19-149eca?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)](https://www.typescriptlang.org/)
@@ -95,9 +95,12 @@ npm run typecheck    # TypeScript 类型检查
 npm test             # 运行 Vitest 单元测试
 npm run test:e2e     # 运行 Playwright 浏览器测试
 npm run check        # 单元测试 + 类型检查 + 生产构建
+npm run check:access # 鉴权服务测试 + 类型检查 + 构建
+npm run check:all    # 前端与鉴权服务完整检查
 npm run build        # 构建 dist 静态站点
 npm run preview      # 本地预览生产构建
 npm run sync:quotes  # 从 Wikiquote 生成待人工审核的名言候选
+npm run verify:deployment # 校验 Compose、OpenResty 边界与可选线上探针
 ```
 
 `sync:quotes` 只生成 `generated/` 下的候选文件，不会自动覆盖应用使用的审核快照。
@@ -105,12 +108,17 @@ npm run sync:quotes  # 从 Wikiquote 生成待人工审核的名言候选
 ## 技术结构
 
 ```text
-React UI
-  -> App 工作流与会话状态
-  -> Canvas 渲染服务
-      -> 能力和策略允许时使用 Web Worker + OffscreenCanvas
-      -> 不支持或失败时回退到主线程 Canvas
-  -> Blob URL 预览、下载与 ZIP
+Cloudflare / OpenResty
+  -> 服务端邀请码与会话检查
+  -> 通过后分发 React 静态应用
+      -> App 工作流与页面状态
+      -> Canvas / Worker 本地图像处理
+      -> Blob URL 预览、下载与 ZIP
+
+独立管理域名
+  -> Cloudflare Access：白名单 Google + Independent MFA Passkey
+  -> 鉴权服务验证 Access JWT
+  -> 生成、查看和撤销邀请码
 ```
 
 - React 19 + TypeScript + Vite 5
@@ -118,6 +126,8 @@ React UI
 - Canvas / OffscreenCanvas 图像合成
 - Web Worker 可选渲染路径
 - `exif-js` 本地读取拍摄日期
+- Express 5 + SQLite 邀请码与服务端会话
+- Cloudflare Access JWT 源站校验
 - Vitest 单元测试与 Playwright 浏览器测试
 
 关键文档：
@@ -130,7 +140,9 @@ React UI
 
 ## 隐私与数据边界
 
-应用没有账户、数据库、图片上传接口、云同步或遥测。用户照片只通过浏览器 `File`、Canvas、Worker 和 Blob URL 在当前页面会话中流转。
+应用没有普通用户账户、图片上传接口、云同步或遥测。用户照片只通过浏览器 `File`、Canvas、Worker 和 Blob URL 在当前页面会话中流转。
+
+可选的生产门禁使用 SQLite 保存邀请码与会话 token 的 SHA-256 哈希、有效期和撤销状态。数据库不保存邀请码明文、照片、EXIF、胶片设置或渲染结果。
 
 运行时网络请求仅用于同源静态素材，例如真实 135 模板和齿孔蒙版。摄影名言来自随应用发布的审核快照；只有用户主动点击出处链接时才会打开 Wikiquote。
 
@@ -139,7 +151,9 @@ React UI
 提交前建议运行：
 
 ```bash
-npm run check
+npm ci
+npm --prefix server/access ci
+npm run check:all
 npm run test:e2e
 git diff --check
 ```
@@ -148,18 +162,26 @@ git diff --check
 
 ## 部署
 
-生产构建输出到 `dist/`，可以部署到 Netlify、Vercel、Zeabur、GitHub Pages 或任意静态文件服务器。
+不启用访问控制时，`dist/` 仍可部署到任意静态文件服务器。需要不可由前端状态绕过的邀请码门禁时，必须使用仓库中的 Compose 与 OpenResty 反代方案；纯静态托管不能形成权限边界。
 
 | 配置项 | 值 |
 | --- | --- |
-| Node.js | `>=20` |
-| 安装命令 | `npm ci` |
-| 构建命令 | `npm run build` |
-| 输出目录 | `dist` |
-| 必需环境变量 | 无 |
-| 后端 / 数据库 | 无 |
+| 前端 Node.js | `>=20` |
+| 鉴权服务 Node.js | `22 LTS` |
+| 静态容器 | `127.0.0.1:18082` |
+| 鉴权容器 | `127.0.0.1:18083` |
+| 持久化 | SQLite named volume |
+| 配置模板 | `.env.example` |
+| OpenResty 模板 | `ops/openresty/` |
 
-项目适合使用 Docker 多阶段构建：Node 镜像负责生成 `dist/`，Nginx 或 Caddy 负责提供静态文件。仓库当前没有提交 `Dockerfile` 或 Compose 配置，因此尚不属于开箱即用的容器部署。
+```bash
+cp .env.example .env
+# 填写 Cloudflare Access team domain、管理应用 audience 和管理员邮箱
+docker compose up -d --build
+npm run verify:deployment -- --live
+```
+
+生产切换前还必须配置 Cloudflare Access 的精确管理员邮箱、Google 登录方式与 Independent MFA WebAuthn，清理旧缓存，并把两个 OpenResty 示例合并到对应的 1Panel 站点。任何 Google Client Secret 都只能保存在 Google/Cloudflare 配置中，不能写入 `.env` 或仓库。
 
 ## 浏览器兼容性
 

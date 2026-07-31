@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    include: ['tests/**/*.test.{ts,tsx,js,mjs,cjs}'],
+    exclude: ['tests/e2e/**'],
   },
 })

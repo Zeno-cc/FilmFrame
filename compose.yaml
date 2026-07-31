@@ -1,0 +1,143 @@
+services:
+  filmframe:
+    image: "${FILMFRAME_IMAGE:-filmframe:${FILMFRAME_RELEASE:-local}}"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_BUILD_IMAGE: "${FILMFRAME_NODE_BUILD_IMAGE:-node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46}"
+        NGINX_RUNTIME_IMAGE: "${FILMFRAME_NGINX_IMAGE:-nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883}"
+        FILMFRAME_REVISION: "${FILMFRAME_REVISION:-uncommitted}"
+    restart: unless-stopped
+    init: true
+    labels:
+      org.opencontainers.image.revision: "${FILMFRAME_REVISION:-uncommitted}"
+    ports:
+      - "127.0.0.1:${FILMFRAME_PORT:-18082}:80"
+    networks:
+      - filmframe_private
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=1m,mode=0755
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "${FILMFRAME_MEMORY_LIMIT:-128m}"
+    cpus: "${FILMFRAME_CPU_LIMIT:-0.50}"
+    pids_limit: "${FILMFRAME_PIDS_LIMIT:-100}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${FILMFRAME_LOG_MAX_SIZE:-10m}"
+        max-file: "${FILMFRAME_LOG_MAX_FILES:-5}"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  access:
+    image: "${FILMFRAME_ACCESS_IMAGE:-filmframe-access:${FILMFRAME_RELEASE:-local}}"
+    build:
+      context: ./server/access
+      dockerfile: Dockerfile
+      args:
+        ACCESS_NODE_IMAGE: "${FILMFRAME_ACCESS_NODE_IMAGE:-node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46}"
+        FILMFRAME_REVISION: "${FILMFRAME_REVISION:-uncommitted}"
+    restart: unless-stopped
+    init: true
+    labels:
+      org.opencontainers.image.revision: "${FILMFRAME_REVISION:-uncommitted}"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /data/access.sqlite
+      SECURE_COOKIES: "true"
+      FILMFRAME_HOST: "${FILMFRAME_HOST:-filmframe.astrocean.space}"
+      ADMIN_HOST: "${ADMIN_HOST:-filmframe-admin.astrocean.space}"
+      CF_ACCESS_TEAM_DOMAIN: "${CF_ACCESS_TEAM_DOMAIN:-}"
+      CF_ACCESS_AUDIENCE: "${CF_ACCESS_AUDIENCE:-}"
+      CF_ACCESS_ADMIN_EMAIL: "${CF_ACCESS_ADMIN_EMAIL:-}"
+    ports:
+      - "127.0.0.1:${FILMFRAME_ACCESS_PORT:-18083}:3000"
+    volumes:
+      - filmframe_access_data:/data
+    networks:
+      - filmframe_private
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "${FILMFRAME_ACCESS_MEMORY_LIMIT:-256m}"
+    cpus: "${FILMFRAME_ACCESS_CPU_LIMIT:-1.00}"
+    pids_limit: "${FILMFRAME_ACCESS_PIDS_LIMIT:-128}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${FILMFRAME_LOG_MAX_SIZE:-10m}"
+        max-file: "${FILMFRAME_LOG_MAX_FILES:-5}"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/healthz',{headers:{Host:'access'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+  access-backup:
+    image: "${FILMFRAME_ACCESS_IMAGE:-filmframe-access:${FILMFRAME_RELEASE:-local}}"
+    profiles:
+      - maintenance
+    user: "0:0"
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/access.sqlite
+    volumes:
+      # SQLite WAL mode needs directory access for -wal/-shm coordination even
+      # when the application connection itself is opened read-only.
+      - filmframe_access_data:/data
+      - "${FILMFRAME_BACKUP_DIR:-/opt/filmframe/backups/access}:/backups"
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    # This short-lived, network-isolated job opens SQLite read-only, but needs
+    # DAC_OVERRIDE for WAL/SHM coordination in the 0700 data directory.
+    cap_add:
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "${FILMFRAME_ACCESS_MEMORY_LIMIT:-256m}"
+    cpus: "${FILMFRAME_ACCESS_CPU_LIMIT:-1.00}"
+    pids_limit: "${FILMFRAME_ACCESS_PIDS_LIMIT:-128}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${FILMFRAME_LOG_MAX_SIZE:-10m}"
+        max-file: "${FILMFRAME_LOG_MAX_FILES:-5}"
+
+networks:
+  filmframe_private:
+    driver: bridge
+
+volumes:
+  filmframe_access_data:
+    name: "${FILMFRAME_ACCESS_VOLUME:-filmframe_access_data}"
