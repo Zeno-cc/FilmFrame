@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-08-01
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~371 | Active |
+| `journal-1.md` | ~392 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-08-01 | Update Trellis tooling | `692b20a` | `main` |
 | 12 | 2026-08-01 | Upgrade invitation batch management | `5845809` | `main` |
 | 11 | 2026-07-31 | 将长条 Canvas 预算提升至 700 MiB | `c7744d1` | `main` |
 | 10 | 2026-07-29 | 预览模式保持与快捷旋转 | `efabd7a`, `8bdb260` | `main` |

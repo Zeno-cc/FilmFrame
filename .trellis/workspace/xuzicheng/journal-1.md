@@ -369,3 +369,24 @@ Implemented atomic 1-50 invitation batches with payload-bound idempotency, weigh
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: Update Trellis tooling
+
+**Date**: 2026-08-01
+**Task**: Update Trellis tooling
+**Branch**: `main`
+
+### Summary
+
+Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workflow and active-task improvements, refreshed agent definitions, configuration, hooks, and journal merge attributes.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `692b20a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
