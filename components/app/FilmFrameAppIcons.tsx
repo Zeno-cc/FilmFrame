@@ -65,4 +65,3 @@ export function FilmLogoIcon({ size = 32, ...props }: AppIconProps) {
     </svg>
   );
 }
-
