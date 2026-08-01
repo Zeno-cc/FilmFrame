@@ -117,7 +117,10 @@ if ! docker run --rm --network none -v "$volume_name:/data" --entrypoint node "$
   exit 1
 fi
 
-target_state=$(docker run --rm --read-only --network none --user 0:0 -v "$volume_name:/data:ro" \
+# SQLite may need to create a transient -shm/-wal file even when the database
+# connection is opened readonly. Keep the container root filesystem readonly,
+# but leave the isolated restore volume writable for this validation step.
+target_state=$(docker run --rm --read-only --network none --user 0:0 -v "$volume_name:/data" \
   --entrypoint node "$ACCESS_IMAGE" --input-type=module -e "$snapshot_script" /data/access.sqlite) \
   || { write_status failure "restored volume validation failed" "$backup_name" "$volume_name"; exit 1; }
 
