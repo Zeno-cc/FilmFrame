@@ -348,3 +348,24 @@ Added a persistent global real-135 sprocket color override with source-template 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: Upgrade invitation batch management
+
+**Date**: 2026-08-01
+**Task**: Upgrade invitation batch management
+**Branch**: `main`
+
+### Summary
+
+Implemented atomic 1-50 invitation batches with payload-bound idempotency, weighted rate limits, one-time copy/CSV delivery, batch revocation, redacted audit logs, management filters, and full regression coverage.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5845809` | (see git log) |
+
+### Status
+
+[OK] **Completed**
