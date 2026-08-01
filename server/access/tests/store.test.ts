@@ -16,15 +16,19 @@ import { openDatabase } from "../src/db.js";
 import { runMigrations } from "../src/migrate.js";
 import {
   createInvite,
+  createInviteBatchIdempotent,
   createInviteIdempotent,
+  BatchIdempotencyConflictError,
   InviteUnavailableError,
   isSessionValid,
   listInvites,
+  listBatches,
   listSessions,
   pruneSessions,
   redeemInvite,
   refreshSession,
   revokeInvite,
+  revokeBatch,
   revokeSession,
 } from "../src/store.js";
 
@@ -114,6 +118,148 @@ describe("invitation and session store", () => {
     assert.equal(replay.invite.label, "幂等访客");
     assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
       count: 1,
+    });
+    database.close();
+  });
+
+  it("creates atomic batches at the supported boundaries and persists hashes only", () => {
+    const database = openDatabase(":memory:");
+    const one = createInviteBatchIdempotent(
+      database,
+      "单个批次",
+      1,
+      "12345678-1234-4234-9234-123456789ab1",
+      1_000,
+    );
+    const fifty = createInviteBatchIdempotent(
+      database,
+      "大型批次",
+      50,
+      "12345678-1234-4234-9234-123456789ab2",
+      2_000,
+    );
+
+    assert.equal(one.created.length, 1);
+    assert.equal(fifty.created.length, 50);
+    assert.equal(new Set(fifty.created.map(({ code }) => code)).size, 50);
+    assert.equal(fifty.created.every(({ code }) => /^FF1-/.test(code)), true);
+    assert.deepEqual(
+      fifty.created.map(({ invite }) => invite.label).slice(0, 2),
+      ["大型批次 #01", "大型批次 #02"],
+    );
+    const stored = JSON.stringify(
+      database
+        .prepare(
+          "SELECT hex(code_hash) AS code_hash, label FROM invites ORDER BY created_at",
+        )
+        .all(),
+    );
+    assert.equal(fifty.created.some(({ code }) => stored.includes(code)), false);
+    assert.equal(listBatches(database, 3_000).length, 2);
+    database.close();
+  });
+
+  it("rejects invalid batch counts without writes", () => {
+    const database = openDatabase(":memory:");
+    for (const count of [0, -1, 1.5, 51]) {
+      assert.throws(() =>
+        createInviteBatchIdempotent(
+          database,
+          "非法批次",
+          count,
+          `12345678-1234-4234-9234-${String(count).padStart(12, "0")}`,
+          1_000,
+        ),
+      );
+    }
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 0,
+    });
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invite_batches").get(), {
+      count: 0,
+    });
+    database.close();
+  });
+
+  it("binds batch idempotency to the normalized payload and never replays codes", () => {
+    const database = openDatabase(":memory:");
+    const key = "12345678-1234-4234-9234-123456789ab3";
+    const first = createInviteBatchIdempotent(database, "  重试批次  ", 3, key, 1_000);
+    const replay = createInviteBatchIdempotent(database, "重试批次", 3, key, 2_000);
+    assert.equal(first.replayed, false);
+    assert.equal(replay.replayed, true);
+    assert.equal(replay.created.length, 0);
+    assert.equal(replay.invites.length, 3);
+    assert.equal(replay.batch.id, first.batch.id);
+    assert.throws(
+      () => createInviteBatchIdempotent(database, "另一个批次", 3, key, 3_000),
+      BatchIdempotencyConflictError,
+    );
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 3,
+    });
+    database.close();
+  });
+
+  it("rolls back the batch, invites, and idempotency record on insert failure", () => {
+    const database = openDatabase(":memory:");
+    database.exec(`
+      CREATE TRIGGER fail_second_batch_invite
+      BEFORE INSERT ON invites
+      WHEN NEW.batch_position = 2
+      BEGIN
+        SELECT RAISE(FAIL, 'injected');
+      END
+    `);
+    assert.throws(() =>
+      createInviteBatchIdempotent(
+        database,
+        "回滚批次",
+        3,
+        "12345678-1234-4234-9234-123456789ab4",
+        1_000,
+      ),
+    );
+    for (const table of [
+      "invite_batches",
+      "invites",
+      "invite_batch_creation_requests",
+    ]) {
+      assert.deepEqual(database.prepare(`SELECT count(*) AS count FROM ${table}`).get(), {
+        count: 0,
+      });
+    }
+    database.close();
+  });
+
+  it("revokes a mixed-state batch and all of its live sessions idempotently", () => {
+    const database = openDatabase(":memory:");
+    const batch = createInviteBatchIdempotent(
+      database,
+      "撤销批次",
+      3,
+      "12345678-1234-4234-9234-123456789ab5",
+      1_000,
+    );
+    const session = redeemInvite(database, batch.created[0]!.code, 2_000);
+    revokeInvite(database, batch.created[1]!.invite.id, 2_500);
+
+    const first = revokeBatch(database, batch.batch.id, 3_000);
+    assert.deepEqual(first, {
+      batchId: batch.batch.id,
+      inviteCount: 3,
+      revokedInviteCount: 2,
+      activeSessionCount: 1,
+      revokedSessionCount: 1,
+    });
+    assert.equal(isSessionValid(database, session.token, 3_001), false);
+    assert.equal(listInvites(database, 3_001).every(({ status }) => status === "revoked"), true);
+    assert.deepEqual(revokeBatch(database, batch.batch.id, 4_000), {
+      batchId: batch.batch.id,
+      inviteCount: 3,
+      revokedInviteCount: 0,
+      activeSessionCount: 0,
+      revokedSessionCount: 0,
     });
     database.close();
   });

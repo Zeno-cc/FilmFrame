@@ -19,7 +19,7 @@ import { NonceStore } from "./nonceStore.js";
 import { createAdminRoutes } from "./routes/adminRoutes.js";
 import { createPublicRoutes } from "./routes/publicRoutes.js";
 import { readSessionCookie } from "./sessionCookie.js";
-import { isSessionValid } from "./store.js";
+import { hasInviteBatchCreationRequest, isSessionValid } from "./store.js";
 
 export interface CreateAppOptions {
   config: AccessConfig;
@@ -114,6 +114,34 @@ export function createApp(options: CreateAppOptions): express.Express {
       database: options.database,
       accessJwtVerifier: options.accessJwtVerifier,
       rateLimiter: createRateLimiter({ limit: 60, windowMs: 60_000 }),
+      batchRateLimiter: createRateLimiter({
+        limit: 100,
+        windowMs: 60_000,
+        cost: (request) => {
+          const body = request.body as unknown;
+          if (!body || typeof body !== "object" || Array.isArray(body)) return 1;
+          const values = body as Record<string, unknown>;
+          if (
+            Object.keys(values).length !== 2 ||
+            typeof values.name !== "string" ||
+            values.name.trim().length < 1 ||
+            values.name.trim().length > 64 ||
+            !Number.isSafeInteger(values.count) ||
+            (values.count as number) < 1 ||
+            (values.count as number) > 50
+          ) {
+            return 1;
+          }
+          const idempotencyKey = request.header("Idempotency-Key");
+          if (
+            idempotencyKey &&
+            hasInviteBatchCreationRequest(options.database, idempotencyKey)
+          ) {
+            return 0;
+          }
+          return values.count as number;
+        },
+      }),
       now,
     }),
   );

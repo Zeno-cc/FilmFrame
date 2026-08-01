@@ -25,6 +25,9 @@ export interface InviteSummary {
   lastRedeemedAt: number | null;
   revokedAt: number | null;
   status: InviteStatus;
+  batchId: string | null;
+  batchName: string | null;
+  batchPosition: number | null;
 }
 
 export interface CreatedInvite {
@@ -36,6 +39,35 @@ export interface IdempotentInviteResult {
   code: string | null;
   invite: InviteSummary;
   replayed: boolean;
+}
+
+export interface BatchSummary {
+  id: string;
+  name: string;
+  inviteCount: number;
+  createdAt: number;
+  revokedAt: number | null;
+  activeSessionCount: number;
+}
+
+export interface BatchInviteResult {
+  code: string;
+  invite: InviteSummary;
+}
+
+export interface IdempotentBatchResult {
+  batch: BatchSummary;
+  invites: InviteSummary[];
+  created: BatchInviteResult[];
+  replayed: boolean;
+}
+
+export interface BatchRevocationResult {
+  batchId: string;
+  inviteCount: number;
+  revokedInviteCount: number;
+  activeSessionCount: number;
+  revokedSessionCount: number;
 }
 
 export type SessionStatus = "active" | "expired" | "revoked";
@@ -60,6 +92,18 @@ interface InviteRow {
   redemption_count: number;
   last_redeemed_at: number | null;
   revoked_at: number | null;
+  batch_id: string | null;
+  batch_name: string | null;
+  batch_position: number | null;
+}
+
+interface BatchRow {
+  id: string;
+  name: string;
+  invite_count: number;
+  created_at: number;
+  revoked_at: number | null;
+  active_session_count: number;
 }
 
 interface SessionRow {
@@ -76,6 +120,15 @@ export class InviteUnavailableError extends Error {
   constructor() {
     super("Invitation unavailable");
     this.name = "InviteUnavailableError";
+  }
+}
+
+export class BatchIdempotencyConflictError extends Error {
+  readonly status = 409;
+
+  constructor() {
+    super("Idempotency key is already bound to another batch payload");
+    this.name = "BatchIdempotencyConflictError";
   }
 }
 
@@ -97,6 +150,20 @@ function toSummary(row: InviteRow, now: number): InviteSummary {
     lastRedeemedAt: row.last_redeemed_at,
     revokedAt: row.revoked_at,
     status: inviteStatus(row, now),
+    batchId: row.batch_id,
+    batchName: row.batch_name,
+    batchPosition: row.batch_position,
+  };
+}
+
+function toBatchSummary(row: BatchRow): BatchSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    inviteCount: row.invite_count,
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at,
+    activeSessionCount: row.active_session_count,
   };
 }
 
@@ -115,6 +182,21 @@ function validateIdempotencyKey(key: string): string {
   return key;
 }
 
+function validateBatchName(name: string): string {
+  const normalized = name.trim();
+  if (normalized.length < 1 || normalized.length > 64) {
+    throw new Error("Batch name must contain 1 to 64 characters");
+  }
+  return normalized;
+}
+
+function validateBatchCount(count: number): number {
+  if (!Number.isSafeInteger(count) || count < 1 || count > 50) {
+    throw new Error("Batch count must be an integer between 1 and 50");
+  }
+  return count;
+}
+
 function createSessionId(): string {
   return randomUUID();
 }
@@ -123,6 +205,7 @@ function insertInvite(
   database: AccessDatabase,
   normalizedLabel: string,
   now: number,
+  batch: { id: string; name: string; position: number } | null = null,
 ): CreatedInvite {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const id = randomUUID();
@@ -136,6 +219,9 @@ function insertInvite(
       redemption_count: 0,
       last_redeemed_at: null,
       revoked_at: null,
+      batch_id: batch?.id ?? null,
+      batch_name: batch?.name ?? null,
+      batch_position: batch?.position ?? null,
     };
 
     try {
@@ -143,8 +229,9 @@ function insertInvite(
         .prepare(
           `INSERT INTO invites (
             id, code_hash, label, created_at, redeem_by, max_redemptions,
-            redemption_count, last_redeemed_at, revoked_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            redemption_count, last_redeemed_at, revoked_at, batch_id,
+            batch_position
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           row.id,
@@ -156,6 +243,8 @@ function insertInvite(
           row.redemption_count,
           row.last_redeemed_at,
           row.revoked_at,
+          row.batch_id,
+          row.batch_position,
         );
       return { code: generated.display, invite: toSummary(row, now) };
     } catch (error) {
@@ -190,7 +279,8 @@ export function createInviteIdempotent(
     const existing = database
       .prepare(
         `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
-                i.redemption_count, i.last_redeemed_at, i.revoked_at
+                i.redemption_count, i.last_redeemed_at, i.revoked_at,
+                i.batch_id, NULL AS batch_name, i.batch_position
          FROM invite_creation_requests request
          JOIN invites i ON i.id = request.invite_id
          WHERE request.key_hash = ?`,
@@ -213,16 +303,164 @@ export function createInviteIdempotent(
   return transaction.immediate();
 }
 
+function batchRowById(
+  database: AccessDatabase,
+  batchId: string,
+  now: number,
+): BatchRow | undefined {
+  return database
+    .prepare(
+      `SELECT b.id, b.name, b.invite_count, b.created_at, b.revoked_at,
+              count(s.id) AS active_session_count
+       FROM invite_batches b
+       LEFT JOIN invites i ON i.batch_id = b.id
+       LEFT JOIN sessions s ON s.invite_id = i.id
+         AND s.revoked_at IS NULL AND s.expires_at > ?
+       WHERE b.id = ?
+       GROUP BY b.id`,
+    )
+    .get(now, batchId) as BatchRow | undefined;
+}
+
+function batchInvites(
+  database: AccessDatabase,
+  batchId: string,
+  now: number,
+): InviteSummary[] {
+  const rows = database
+    .prepare(
+      `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
+              i.redemption_count, i.last_redeemed_at, i.revoked_at,
+              i.batch_id, b.name AS batch_name, i.batch_position
+       FROM invites i
+       JOIN invite_batches b ON b.id = i.batch_id
+       WHERE i.batch_id = ?
+       ORDER BY i.batch_position ASC`,
+    )
+    .all(batchId) as InviteRow[];
+  return rows.map((row) => toSummary(row, now));
+}
+
+export function createInviteBatchIdempotent(
+  database: AccessDatabase,
+  name: string,
+  count: number,
+  idempotencyKey: string,
+  now = Date.now(),
+): IdempotentBatchResult {
+  const normalizedName = validateBatchName(name);
+  const normalizedCount = validateBatchCount(count);
+  const key = validateIdempotencyKey(idempotencyKey);
+  const keyHash = hashValue(`invite-batch-create:${key}`);
+  const payloadHash = hashValue(
+    JSON.stringify({ name: normalizedName, count: normalizedCount }),
+  );
+
+  const transaction = database.transaction(() => {
+    const existing = database
+      .prepare(
+        `SELECT payload_hash, batch_id
+         FROM invite_batch_creation_requests
+         WHERE key_hash = ?`,
+      )
+      .get(keyHash) as { payload_hash: Buffer; batch_id: string } | undefined;
+    if (existing) {
+      if (!existing.payload_hash.equals(payloadHash)) {
+        throw new BatchIdempotencyConflictError();
+      }
+      const row = batchRowById(database, existing.batch_id, now);
+      if (!row) throw new Error("Idempotent batch target is missing");
+      return {
+        batch: toBatchSummary(row),
+        invites: batchInvites(database, existing.batch_id, now),
+        created: [],
+        replayed: true,
+      };
+    }
+
+    const batchId = randomUUID();
+    database
+      .prepare(
+        `INSERT INTO invite_batches (id, name, invite_count, created_at, revoked_at)
+         VALUES (?, ?, ?, ?, NULL)`,
+      )
+      .run(batchId, normalizedName, normalizedCount, now);
+
+    const created: BatchInviteResult[] = [];
+    for (let position = 1; position <= normalizedCount; position += 1) {
+      const label = `${normalizedName} #${String(position).padStart(2, "0")}`;
+      created.push(
+        insertInvite(database, label, now, {
+          id: batchId,
+          name: normalizedName,
+          position,
+        }),
+      );
+    }
+    database
+      .prepare(
+        `INSERT INTO invite_batch_creation_requests
+          (key_hash, payload_hash, batch_id, created_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(keyHash, payloadHash, batchId, now);
+    const row = batchRowById(database, batchId, now);
+    if (!row) throw new Error("Created batch is missing");
+    return {
+      batch: toBatchSummary(row),
+      invites: created.map(({ invite }) => invite),
+      created,
+      replayed: false,
+    };
+  });
+
+  return transaction.immediate();
+}
+
+export function hasInviteBatchCreationRequest(
+  database: AccessDatabase,
+  idempotencyKey: string,
+): boolean {
+  return Boolean(
+    database
+      .prepare(
+        "SELECT 1 FROM invite_batch_creation_requests WHERE key_hash = ?",
+      )
+      .get(hashValue(`invite-batch-create:${idempotencyKey}`)),
+  );
+}
+
+export function listBatches(
+  database: AccessDatabase,
+  now = Date.now(),
+): BatchSummary[] {
+  const rows = database
+    .prepare(
+      `SELECT b.id, b.name, b.invite_count, b.created_at, b.revoked_at,
+              count(s.id) AS active_session_count
+       FROM invite_batches b
+       LEFT JOIN invites i ON i.batch_id = b.id
+       LEFT JOIN sessions s ON s.invite_id = i.id
+         AND s.revoked_at IS NULL AND s.expires_at > ?
+       GROUP BY b.id
+       ORDER BY b.created_at DESC, b.id DESC`,
+    )
+    .all(now) as BatchRow[];
+  return rows.map(toBatchSummary);
+}
+
 export function listInvites(
   database: AccessDatabase,
   now = Date.now(),
 ): InviteSummary[] {
   const rows = database
     .prepare(
-      `SELECT id, label, created_at, redeem_by, max_redemptions,
-              redemption_count, last_redeemed_at, revoked_at
-       FROM invites
-       ORDER BY created_at DESC`,
+      `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
+              i.redemption_count, i.last_redeemed_at, i.revoked_at,
+              i.batch_id, b.name AS batch_name, i.batch_position
+       FROM invites i
+       LEFT JOIN invite_batches b ON b.id = i.batch_id
+       ORDER BY i.created_at DESC, i.batch_position ASC`,
     )
     .all() as InviteRow[];
   return rows.map((row) => toSummary(row, now));
@@ -445,5 +683,53 @@ export function revokeInvite(
     return true;
   });
 
+  return transaction.immediate();
+}
+
+export function revokeBatch(
+  database: AccessDatabase,
+  batchId: string,
+  now = Date.now(),
+): BatchRevocationResult | null {
+  const transaction = database.transaction(() => {
+    const batch = database
+      .prepare("SELECT id, invite_count FROM invite_batches WHERE id = ?")
+      .get(batchId) as { id: string; invite_count: number } | undefined;
+    if (!batch) return null;
+
+    const activeSessions = database
+      .prepare(
+        `SELECT count(*) AS count
+         FROM sessions s
+         JOIN invites i ON i.id = s.invite_id
+         WHERE i.batch_id = ? AND s.revoked_at IS NULL AND s.expires_at > ?`,
+      )
+      .get(batchId, now) as { count: number };
+    const inviteUpdate = database
+      .prepare(
+        `UPDATE invites SET revoked_at = ?
+         WHERE batch_id = ? AND revoked_at IS NULL`,
+      )
+      .run(now, batchId);
+    const sessionUpdate = database
+      .prepare(
+        `UPDATE sessions SET revoked_at = ?
+         WHERE revoked_at IS NULL
+           AND invite_id IN (SELECT id FROM invites WHERE batch_id = ?)`,
+      )
+      .run(now, batchId);
+    database
+      .prepare(
+        "UPDATE invite_batches SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?",
+      )
+      .run(now, batchId);
+    return {
+      batchId,
+      inviteCount: batch.invite_count,
+      revokedInviteCount: inviteUpdate.changes,
+      activeSessionCount: activeSessions.count,
+      revokedSessionCount: sessionUpdate.changes,
+    };
+  });
   return transaction.immediate();
 }

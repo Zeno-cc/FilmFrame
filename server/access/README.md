@@ -9,8 +9,8 @@ never receives photos, EXIF data, rendered output, or browser workspace data.
 - Node.js 22 LTS
 - A writable SQLite data directory
 - OpenResty routes the public and administrator hosts to this service
-- Cloudflare Access protects the administrator host with Google identity and
-  Independent MFA
+- Cloudflare Access protects the administrator host with the exact approved
+  Google identity
 
 Required environment variables:
 
@@ -43,14 +43,31 @@ Local HTTP development must set both `NODE_ENV=development` and
 - FilmFrame host: `GET /access`, `POST /auth/redeem`, `POST /auth/refresh`
 - Internal host `access`: `GET /healthz`, `GET /internal/session-check`
 - Administrator host: `GET /`, `GET /api/invites`, `POST /api/invites`,
-  `POST /api/invites/:id/revoke`, `GET /api/sessions`, and
-  `POST /api/sessions/:id/revoke`
+  `POST /api/invites/:id/revoke`, `GET /api/invite-batches`,
+  `POST /api/invite-batches`, `POST /api/invite-batches/:id/revoke`,
+  `GET /api/sessions`, and `POST /api/sessions/:id/revoke`
 
 Internal checks accept only a loopback/private proxy address and the internal
 Host. Administrator writes require the exact administrator Origin,
 `X-FilmFrame-CSRF: 1`, and a JSON request body. Invitation creation also
 requires a UUID `Idempotency-Key`: the first response returns plaintext once,
 while a replay returns only the existing invitation metadata.
+
+Batch creation accepts a strict `{ "name": string, "count": integer }` body
+with 1–50 invitations. The whole batch is committed atomically and one
+idempotency key is bound to its normalized name and count; reusing the key with
+another payload returns `409`. The first `201` response is the only place that
+contains the ordered plaintext codes. Replays and all list endpoints return
+metadata only. Batch generation is limited to 100 codes per source IP per
+minute in addition to the ordinary administrator request limit.
+
+The administrator page keeps fresh codes only in memory and the current DOM.
+It supports copy-all and spreadsheet-safe CSV download, then clears the result
+on explicit request or page exit. Revoking a batch is transactional and also
+revokes every live device session issued by its invitations. Successful create
+and revoke operations write structured redacted audit events in production;
+these events do not include invite codes, tokens, request bodies, or email
+addresses.
 
 Device sessions use a 400-day rolling lifetime. `POST /auth/refresh` rotates
 the opaque token atomically and requires the exact public Origin plus the CSRF

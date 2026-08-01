@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 
 interface WindowState {
   count: number;
@@ -10,6 +10,7 @@ export interface RateLimitOptions {
   windowMs: number;
   now?: () => number;
   maxEntries?: number;
+  cost?: (request: Request) => number;
 }
 
 export function createRateLimiter(options: RateLimitOptions): RequestHandler {
@@ -29,7 +30,16 @@ export function createRateLimiter(options: RateLimitOptions): RequestHandler {
       const oldestKey = states.keys().next().value as string | undefined;
       if (oldestKey) states.delete(oldestKey);
     }
-    state.count += 1;
+    const candidateCost = options.cost?.(request) ?? 1;
+    const cost =
+      Number.isSafeInteger(candidateCost) && candidateCost >= 0
+        ? candidateCost
+        : 1;
+    if (cost === 0) {
+      next();
+      return;
+    }
+    state.count += cost;
     states.set(key, state);
 
     if (state.count > options.limit) {

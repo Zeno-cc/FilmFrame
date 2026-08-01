@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "07-31-harden-invite-production-readiness"
+    "07-31-harden-invite-production-readiness",
+    "08-01-upgrade-invite-management"
   ],
   "parent": null,
   "relatedFiles": [],

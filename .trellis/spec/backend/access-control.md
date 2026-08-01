@@ -22,6 +22,9 @@ GET  /healthz
 GET  /api/invites
 POST /api/invites
 POST /api/invites/:id/revoke
+GET  /api/invite-batches
+POST /api/invite-batches
+POST /api/invite-batches/:id/revoke
 GET  /api/sessions
 POST /api/sessions/:id/revoke
 ```
@@ -36,7 +39,9 @@ CREATE TABLE invites (
   max_redemptions INTEGER NOT NULL,
   redemption_count INTEGER NOT NULL,
   last_redeemed_at INTEGER,
-  revoked_at INTEGER
+  revoked_at INTEGER,
+  batch_id TEXT,
+  batch_position INTEGER
 );
 
 CREATE TABLE sessions (
@@ -52,6 +57,21 @@ CREATE TABLE sessions (
 CREATE TABLE invite_creation_requests (
   key_hash BLOB PRIMARY KEY,
   invite_id TEXT NOT NULL UNIQUE REFERENCES invites(id),
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE invite_batches (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  invite_count INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER
+);
+
+CREATE TABLE invite_batch_creation_requests (
+  key_hash BLOB PRIMARY KEY,
+  payload_hash BLOB NOT NULL,
+  batch_id TEXT NOT NULL UNIQUE REFERENCES invite_batches(id),
   created_at INTEGER NOT NULL
 );
 
@@ -86,11 +106,16 @@ SECURE_COOKIES=true
 - The admin service accepts only a cryptographically verified Cloudflare Access assertion. Pin `RS256`, exact issuer, application audience, `exp`, `nbf`, and the configured administrator email.
 - Admin writes require JSON, the exact admin Origin, and `X-FilmFrame-CSRF: 1`. Responses containing a newly generated plaintext code are `no-store`, and the code is never listed again.
 - Invitation creation also requires a UUID `Idempotency-Key`. Concurrent or repeated requests with the same key create one invitation; replayed responses return metadata without plaintext.
+- Batch creation accepts a strict name plus an integer count from 1 to 50. One immediate transaction creates the persisted batch, all hash-only invitations, and a payload-bound hashed idempotency record; a replay returns metadata without plaintext, while reuse with another normalized payload returns `409`.
+- Batch generation has a second process-local limit of 100 generated codes per source IP per minute. Valid idempotent replays cost zero even after the budget is full, invalid input costs one, and accepted fresh requests cost their requested invitation count.
+- Batch revocation is idempotent and transactional: it preserves history, revokes every non-revoked invitation in the batch, and revokes all child sessions immediately.
+- Fresh invitation plaintext exists only in the first `201` response and transient administrator-page memory/DOM. CSV export prefixes spreadsheet formula-leading cells, and page exit or explicit clear removes the transient result.
+- Successful creation and revocation writes emit structured production audit events containing request and target IDs plus affected counts, but never invitation plaintext, cookies, JWTs, request bodies, or administrator email.
 - The admin API and SSH CLI may list non-secret session metadata and revoke one session by public UUID. Revoking an invitation still revokes all of its sessions.
 - `/healthz` must prove SQLite write, read, and delete behavior in one transaction without leaving a health row behind.
 - Daily SQLite online backups are written to `/opt/filmframe/backups/access`, outside the database volume. The long-running access service never mounts this directory. A short-lived `maintenance` profile job runs with no network, opens the source database with `readonly: true` and `fileMustExist: true`, writes the snapshot, normalizes it to `journal_mode=DELETE`, and exits. The source volume remains filesystem-writable only because a live WAL database may need `-wal`/`-shm` coordination even for a read-only SQLite connection; the backup CLI must not run migrations or application writes. Each backup is integrity-checked, checksummed, mode `0600`, and retained for 30 days using a strict filename and directory boundary. Restore rehearsals always target a new named volume.
 - Restore validation opens the restored database read-only while leaving only that isolated target volume writable, because SQLite may create transient `-wal`/`-shm` coordination files during integrity checks. It must never mount or switch the production volume.
-- Cloudflare policy supplies exact-email Google authentication and Independent MFA WebAuthn as AND requirements. Google secrets remain only in Google/Cloudflare configuration.
+- Cloudflare policy supplies Google authentication restricted to the exact approved administrator email. The application does not require a separate Passkey/MFA challenge; Google secrets remain only in Google/Cloudflare configuration.
 - Both containers publish only on loopback. The access container runs as a non-root user with a read-only root filesystem, all capabilities dropped, and a persistent `/data` volume using `0700` directory and `0600` SQLite file permissions.
 
 ### 4. Validation & Error Matrix
@@ -111,6 +136,12 @@ SECURE_COOKIES=true
 | JWT missing `exp` or `nbf`, or using wrong issuer/audience/algorithm/email | Reject assertion |
 | Missing exact Origin, JSON content type, or CSRF header on a write | Reject before mutation |
 | Repeated invitation creation with the same idempotency key | One invitation; replay exposes no plaintext code |
+| Batch count outside 1-50, fractional count, unknown field, or malformed security/idempotency input | `400`; no batch, invitation, or idempotency row |
+| Repeated batch creation with the same key and normalized payload | One batch; replay exposes metadata only and remains available when generation quota is full |
+| Repeated batch creation with the same key and a different payload | `409`; no additional row |
+| Batch generation cost exceeds 100 codes for one IP in one minute | `429`; no data mutation |
+| Batch invitation insertion fails | Entire batch, invitations, and idempotency record roll back |
+| Repeated batch revocation | Existing history remains revoked; affected counts are zero on replay |
 | Single-session revocation | Only that public session ID becomes invalid; sibling sessions remain unchanged |
 | SQLite is readable but not writable | `/healthz` returns `503`; no health probe row remains |
 | Long-running access process attempts to write `/backups` | Impossible because the bind mount is absent |
@@ -130,14 +161,14 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 
 ### 6. Tests Required
 
-- Unit tests cover invitation format/normalization, hash-only persistence, seven-day and 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, creation idempotency, writable health probes, migration idempotency, and database reopen.
+- Unit tests cover invitation format/normalization, hash-only persistence, seven-day and 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, single and batch creation idempotency, batch atomic rollback/revocation, weighted limits, writable health probes, migration idempotency, and database reopen.
 - Backup tests use a real named volume in WAL mode and assert that the maintenance job has no network, the long-running service has no backup mount, the CLI opens the source without migrations or SQL writes, the output is `0600`, and the normalized snapshot passes `integrity_check` from a read-only mount.
 - Concurrency coverage sends 20 redemption attempts and asserts exactly one success.
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.
-- Route tests assert Cookie flags and 400-day `Max-Age`, generic redemption errors, refresh Origin/CSRF rules, rotated-token behavior, expired/revoked/tampered refresh rejection, idempotent creation, session listing/revocation, the absence of `/auth/logout`, body limits, Host allowlisting, and internal-route isolation.
+- Route tests assert Cookie flags and 400-day `Max-Age`, generic redemption errors, refresh Origin/CSRF rules, rotated-token behavior, expired/revoked/tampered refresh rejection, single and batch idempotent creation, batch payload conflicts and weighted limits, redacted audit events, session listing/revocation, the absence of `/auth/logout`, body limits, Host allowlisting, and internal-route isolation.
 - Browser tests assert one startup refresh request with the exact method/header contract, no visible logout command on desktop/mobile, and no interruption when renewal temporarily fails.
 - Deployment checks assert loopback port bindings, the private Compose network, persistent data, a dedicated host backup mount, resource/log limits, read-only root, dropped capabilities, protected-resource `no-store`, authenticated `/auth/refresh`, absence of `/auth/logout`, OpenResty `auth_request`, and internal route blocks.
-- Production validation additionally covers active `openresty -t`, Cloudflare cache bypass and purge, Google plus Independent MFA, direct-origin rejection, access-service outage, public port refusal, and unrelated 1Panel vhosts.
+- Production validation additionally covers active `openresty -t`, Cloudflare cache bypass and purge, exact-email Google access without a separate application Passkey challenge, direct-origin rejection, access-service outage, public port refusal, and unrelated 1Panel vhosts.
 
 ### 7. Wrong vs Correct
 

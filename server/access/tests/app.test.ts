@@ -357,6 +357,22 @@ describe("public invitation gateway", () => {
 });
 
 describe("administrator routes", () => {
+  function batchRequest(
+    app: ReturnType<typeof createApp>,
+    config: AccessConfig,
+    body: unknown,
+    key = randomUUID(),
+  ) {
+    return request(app)
+      .post("/api/invite-batches")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Idempotency-Key", key)
+      .send(body);
+  }
+
   it("requires a verified Access assertion for the page and APIs", async () => {
     const { app, config } = fixture();
     const missing = await request(app).get("/").set("Host", config.adminHost);
@@ -532,6 +548,208 @@ describe("administrator routes", () => {
     });
   });
 
+  it("creates batches at both boundaries and never exposes plaintext on replay or lists", async () => {
+    const { app, config, database } = fixture();
+    const one = await batchRequest(app, config, { name: "单个批次", count: 1 });
+    assert.equal(one.status, 201);
+    assert.equal(one.body.codes.length, 1);
+    const key = randomUUID();
+    const fifty = await batchRequest(app, config, { name: "大型批次", count: 50 }, key);
+    assert.equal(fifty.status, 201);
+    assert.equal(fifty.body.codes.length, 50);
+    assert.equal(
+      new Set(fifty.body.codes.map((entry: { code: string }) => entry.code)).size,
+      50,
+    );
+    const plaintext = fifty.body.codes[0].code as string;
+    const replay = await batchRequest(app, config, { name: "大型批次", count: 50 }, key);
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal("codes" in replay.body, false);
+    assert.equal(JSON.stringify(replay.body).includes(plaintext), false);
+
+    const batches = await request(app)
+      .get("/api/invite-batches")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    const invites = await request(app)
+      .get("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(batches.body.batches.length, 2);
+    assert.equal(invites.body.invites.length, 51);
+    assert.equal(JSON.stringify({ batches: batches.body, invites: invites.body }).includes(plaintext), false);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invite_batches").get(), {
+      count: 2,
+    });
+  });
+
+  it("rejects invalid batch payloads with zero writes", async () => {
+    for (const body of [
+      { name: "非法", count: 0 },
+      { name: "非法", count: -1 },
+      { name: "非法", count: 1.5 },
+      { name: "非法", count: 51 },
+      { name: "非法", count: 1, unknown: true },
+      { name: "x".repeat(65), count: 1 },
+    ]) {
+      const { app, config, database } = fixture();
+      const response = await batchRequest(app, config, body);
+      assert.equal(response.status, 400);
+      assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+        count: 0,
+      });
+      assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invite_batches").get(), {
+        count: 0,
+      });
+    }
+  });
+
+  it("rolls back every batch table when an API insert fails", async () => {
+    const { app, config, database } = fixture();
+    database.exec(`
+      CREATE TRIGGER fail_api_batch_insert
+      BEFORE INSERT ON invites
+      WHEN NEW.batch_position = 2
+      BEGIN
+        SELECT RAISE(FAIL, 'injected');
+      END
+    `);
+    const response = await batchRequest(app, config, {
+      name: "接口回滚",
+      count: 3,
+    });
+    assert.equal(response.status, 500);
+    for (const table of [
+      "invite_batches",
+      "invites",
+      "invite_batch_creation_requests",
+    ]) {
+      assert.deepEqual(database.prepare(`SELECT count(*) AS count FROM ${table}`).get(), {
+        count: 0,
+      });
+    }
+  });
+
+  it("creates one batch for concurrent retries and rejects key payload conflicts", async () => {
+    const { app, config, database } = fixture();
+    const key = randomUUID();
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        batchRequest(app, config, { name: "并发批次", count: 3 }, key),
+      ),
+    );
+    assert.equal(responses.filter(({ status }) => status === 201).length, 1);
+    assert.equal(responses.filter(({ status }) => status === 200).length, 19);
+    assert.equal(responses.filter(({ body }) => Array.isArray(body.codes)).length, 1);
+    assert.equal(new Set(responses.map(({ body }) => body.batch.id)).size, 1);
+    const conflict = await batchRequest(
+      app,
+      config,
+      { name: "不同批次", count: 3 },
+      key,
+    );
+    assert.equal(conflict.status, 409);
+    assert.equal(conflict.body.error, "idempotency_conflict");
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 3,
+    });
+  });
+
+  it("limits batch creation by generated code count", async () => {
+    const { app, config, database } = fixture();
+    assert.equal(
+      (await batchRequest(app, config, { name: "额度一", count: 50 })).status,
+      201,
+    );
+    assert.equal(
+      (await batchRequest(app, config, { name: "额度二", count: 50 })).status,
+      201,
+    );
+    const limited = await batchRequest(app, config, { name: "超出额度", count: 1 });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers["retry-after"], "60");
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 100,
+    });
+  });
+
+  it("charges invalid retries while always allowing an existing batch replay", async () => {
+    const { app, config, database } = fixture();
+    const key = randomUUID();
+    assert.equal(
+      (await batchRequest(app, config, { name: "原始批次", count: 50 }, key)).status,
+      201,
+    );
+    assert.equal(
+      (await batchRequest(app, config, { name: "无效重试", count: 0 }, key)).status,
+      400,
+    );
+    assert.equal(
+      (await batchRequest(app, config, { name: "触及额度", count: 50 })).status,
+      429,
+    );
+    const replay = await batchRequest(
+      app,
+      config,
+      { name: "原始批次", count: 50 },
+      key,
+    );
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal("codes" in replay.body, false);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 50,
+    });
+  });
+
+  it("revokes a whole batch with sessions and emits redacted production audit events", async () => {
+    const { app, config, database, now } = fixture(1_000_000, {
+      nodeEnv: "production",
+    });
+    const messages: string[] = [];
+    const originalInfo = console.info;
+    console.info = (message?: unknown) => messages.push(String(message));
+    try {
+      const created = await batchRequest(app, config, { name: "审计批次", count: 2 });
+      assert.equal(created.status, 201);
+      const code = created.body.codes[0].code as string;
+      const session = redeemInvite(database, code, now);
+      const revoked = await request(app)
+        .post(`/api/invite-batches/${created.body.batch.id}/revoke`)
+        .set("Host", config.adminHost)
+        .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+        .set("Origin", config.adminOrigin)
+        .set("X-FilmFrame-CSRF", "1")
+        .send({});
+      assert.equal(revoked.status, 200);
+      assert.equal(revoked.body.revokedInviteCount, 2);
+      assert.equal(revoked.body.revokedSessionCount, 1);
+      assert.equal(isSessionValid(database, session.token, now + 1), false);
+      const replay = await request(app)
+        .post(`/api/invite-batches/${created.body.batch.id}/revoke`)
+        .set("Host", config.adminHost)
+        .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+        .set("Origin", config.adminOrigin)
+        .set("X-FilmFrame-CSRF", "1")
+        .send({});
+      assert.equal(replay.status, 200);
+      assert.equal(replay.body.revokedInviteCount, 0);
+      assert.equal(replay.body.revokedSessionCount, 0);
+      assert.equal(messages.length, 3);
+      assert.equal(messages.some((message) => message.includes(code)), false);
+      assert.equal(messages.some((message) => message.includes(config.adminEmail)), false);
+      for (const message of messages) {
+        const event = JSON.parse(message) as Record<string, unknown>;
+        assert.equal(event.event, "admin_audit");
+        assert.equal(typeof event.requestId, "string");
+        assert.equal("requestBody" in event, false);
+      }
+    } finally {
+      console.info = originalInfo;
+    }
+  });
+
   it("lists session metadata and revokes only the selected session", async () => {
     const { app, config, database, now } = fixture();
     const firstInvite = createInvite(database, "第一台设备", now);
@@ -581,6 +799,15 @@ describe("administrator routes", () => {
     assert.match(response.text, /createButton\.disabled=true/);
     assert.match(response.text, /设备会话/);
     assert.match(response.text, /撤销会话/);
+    assert.match(response.text, /批量/);
+    assert.match(response.text, /复制全部/);
+    assert.match(response.text, /下载 CSV/);
+    assert.match(response.text, /clearCreatedCodes/);
+    assert.match(response.text, /pagehide/);
+    assert.match(response.text, /invite-search/);
+    assert.match(response.text, /revoke-batch/);
+    assert.match(response.text, /\^\[=\+\\-@\]/);
+    assert.doesNotMatch(response.text, /localStorage|sessionStorage/);
     assert.match(response.text, /data-label="会话 ID"/);
     assert.match(response.text, /content:attr\(data-label\)/);
     assert.match(response.text, /\[hidden\]\{display:none!important\}/);
