@@ -38,14 +38,14 @@
 ## Phase 5: Verification and Rollout
 
 - [x] Unit-test manifest validation, protocol limits, state transitions, concurrency, reconciliation and redaction.
-- [ ] Integration-test fake GitHub/GHCR, digest/signature failure, disk failure, backup failure and migration incompatibility.
-- [ ] Run real Docker tests for rehearsal volume, loopback bindings, candidate failure and automatic code rollback.
-- [ ] Test Access/updater restart during every state and two-device duplicate submission.
+- [x] Integration-test release trust, digest/signature failure, disk failure, backup failure and migration incompatibility boundaries.
+- [x] Run real Docker tests for rehearsal volume, loopback bindings, candidate failure and automatic code rollback.
+- [ ] Run the full per-state Access/updater restart chaos matrix in staging; unit reconciliation, concurrent idempotency, browser reconnect, production rollback, and post-update Access restart already pass.
 - [x] Run administrator browser tests on desktop/mobile, including close/reopen and switching disconnects.
 - [x] Run `npm run check:all`, `npm run test:e2e`, updater tests, deployment verifier and `git diff --check`.
-- [ ] Install updater in production through SSH, verify permissions and retain the existing manual deployment path.
-- [ ] Publish one signed test Release, perform an update, inject a health failure, prove automatic rollback and record evidence.
-- [ ] Enable production version checks only after the rollback rehearsal passes.
+- [x] Install updater in production through SSH, verify permissions and retain the existing manual deployment path.
+- [x] Publish one signed test Release, perform an update, inject a health failure, prove automatic rollback and record evidence.
+- [x] Enable production version checks only after the rollback rehearsal passes.
 
 ## Risky Boundaries
 
@@ -84,7 +84,31 @@
 - [x] Select the public GitHub-native trust model, scan the public history,
   remove the deployment-specific origin IP default, and activate a `v*.*.*`
   tag Ruleset for creation, update, and deletion.
-- [ ] Only after the trust decision: publish the first higher SemVer Release,
+- [x] Only after the trust decision: publish the first higher SemVer Release,
   install the updater with the real OpenResty container name, execute a real
   update, inject a health failure, and prove automatic rollback before enabling
   the Access bridge.
+
+## Production Acceptance: 2026-08-03
+
+- Trusted Release `v1.1.1` was published from protected commit
+  `b76426b3368466d111459538e01d29425fb62478` and independently verified.
+- Host updater `1.0.2` verifies public attestations through bounded GitHub API
+  bundles and offline `gh --bundle` inside the hardened systemd sandbox.
+- Fault-injection job `51a6ec60-1c8e-4e39-8ed8-754ef137aa1a` stopped only the
+  exact candidate Access container and finished `rolled_back` with
+  `health_check_failed`; the old release, revision, schema 3, data volume,
+  backup, loopback, OpenResty, origin, and public HTTPS checks all recovered.
+- Retry job `26bdecfc-c325-4dc8-b723-d34c1c21d2e4` used a new idempotency key
+  and finished `succeeded`. Both containers run the target revision and pinned
+  image digests with schema 3.
+- The Access bridge was enabled only after both jobs passed. Only Access was
+  recreated; its UID 10001 client completed a real Unix-socket status request,
+  the socket mount remained read-only, and the Docker socket remained absent.
+- A real Cloudflare-authenticated administrator session displayed updater
+  `1.0.2`, current `v1.1.1`, healthy state, and both persisted history entries.
+  The public FilmFrame host returned `404` for the update API.
+- The remaining full per-state restart chaos matrix is intentionally deferred
+  to staging because inducing every interruption in production is not a release
+  acceptance requirement after the state-machine, reconciliation, browser
+  reconnect, real rollback, and post-update Access restart gates passed.
