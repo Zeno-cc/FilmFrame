@@ -83,6 +83,12 @@ The six-hour timer invokes the fixed Unix-socket `check` action. It does not
 install anything. Installation always requires the authenticated administrator
 to create a job.
 
+The long-running service keeps `ProtectSystem=strict`. systemd creates the
+private `/var/cache/filmframe-updater` directory with mode `0700` and exposes it
+to `gh` through `XDG_CACHE_HOME`; this is only a cache for Sigstore verification
+metadata, not release state or credentials. Do not add this directory to
+`ReadWritePaths` or replace it with a broad writable home directory.
+
 ## GitHub attestation authentication
 
 The updater downloads only the fixed `Zeno-cc/FilmFrame` stable Release. For

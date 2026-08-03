@@ -296,6 +296,16 @@ sudo ops/updater/install.sh --origin-ip <IPv4>
 The argument is required, validated before filesystem or systemd mutation, and
 stored only in the root-owned `/etc/filmframe-updater/config.json`.
 
+The updater service keeps the host filesystem read-only and gives external
+verification tools one systemd-managed cache boundary:
+
+```ini
+ProtectSystem=strict
+CacheDirectory=filmframe-updater
+CacheDirectoryMode=0700
+Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater
+```
+
 Public releases verify without giving credentials to the GitHub CLI. The
 updater fetches attestations from the fixed repository API, writes only the
 returned Sigstore v0.3 `bundle` objects to a mode `0600` JSONL file, and runs
@@ -362,6 +372,11 @@ The host updater owns `/var/lib/filmframe-updater`,
   Compose config whose public ports remain loopback-only.
 - Bootstrap installation must prove that the installed GitHub CLI supports
   `gh attestation verify`; finding a `gh` executable alone is insufficient.
+- Run real `gh` verification inside the installed systemd sandbox.
+  `ProtectSystem=strict` remains enabled, while `CacheDirectory` supplies the
+  only writable Sigstore cache and `XDG_CACHE_HOME` prevents fallback to the
+  protected `/root/.cache` path. Do not add `/root` or broad system paths to
+  `ReadWritePaths`.
 - `install.sh` requires an explicit `--origin-ip <IPv4>` value before making
   host changes. The repository contains no deployment-specific origin default;
   missing config, missing `originIp`, IPv6, and malformed values fail closed.
@@ -409,6 +424,7 @@ The host updater owns `/var/lib/filmframe-updater`,
 | Extra service, Docker/deployment bind mount, public port, Access/backup volume mismatch, or unpinned Compose project | `preflight_failed` |
 | Candidate missing updater socket/group, or managed current with a partial updater mount | `preflight_failed`; only the exact data-only legacy current shape is accepted |
 | Installed `gh` lacks `attestation verify` | Installer exits before writing updater files or enabling units |
+| Missing/unwritable updater cache under `ProtectSystem=strict` | Offline `gh` verification fails closed as `release_untrusted`; no staging or switch |
 | Failure before `switching` | `failed_pre_switch`; current release remains unchanged |
 | Failure after `switching` and successful application rollback | `rolled_back`; forward-expanded SQLite remains in place |
 | Failed rollback or unverifiable host truth after restart | `recovery_required`; retain the active lock |
@@ -430,6 +446,9 @@ The host updater owns `/var/lib/filmframe-updater`,
 - Good: the updater downloads bounded attestation bundles for the exact subject
   digest and asks `gh` to verify the local JSONL bundle with the pinned
   repository, workflow, tag ref, source commit, issuer, and runner policy.
+- Good: systemd creates a mode `0700` updater cache and `gh` succeeds with the
+  same `ProtectSystem=strict`, `ProtectHome`, and `PrivateTmp` boundaries used
+  by production.
 - Good: deployment inventory supplies `--origin-ip`; the installer validates it
   before mutation and writes it only to the root-owned host config.
 - Base: the public Release requires no token and the updater flag remains off
@@ -443,6 +462,8 @@ The host updater owns `/var/lib/filmframe-updater`,
   supplied URL, lets `gh` fetch attestations with an authenticated session, or
   treats a legacy current Compose shape as permission to weaken candidate
   validation.
+- Bad: make `/root`, `/usr`, `/etc`, or `/opt` writable so a third-party CLI can
+  create its default cache.
 - Bad: the page installs `latest`, follows `main`, accepts a request-provided
   manifest URL, or treats a network disconnect as update failure.
 - Bad: rollback replaces the production SQLite database automatically.
@@ -470,7 +491,10 @@ The host updater owns `/var/lib/filmframe-updater`,
   offline `gh --bundle` arguments, and subprocess token removal. Deployment
   tests separately prove a data-only legacy current release is accepted while
   the same candidate is rejected. Installer tests require the
-  attestation-capability probe.
+  attestation-capability probe and assert the service keeps
+  `ProtectSystem=strict` while declaring a mode `0700` `CacheDirectory` and
+  matching `XDG_CACHE_HOME`. Production acceptance runs a real signed subject
+  verification through the active systemd service.
 - Config tests reject missing files, missing/invalid `originIp`, and IPv6;
   installer layout tests reject embedded IPv4 defaults and invalid CLI input.
 - Access tests cover authentication on every route, Origin/CSRF/JSON and UUID
@@ -565,4 +589,15 @@ runner.run(
     ["gh", "attestation", "verify", subject, "--bundle", bundle_path, ...],
     environment={"GH_TOKEN": None, "GITHUB_TOKEN": None},
 )
+```
+
+```ini
+# Wrong: broad filesystem write access hides a CLI cache dependency.
+ReadWritePaths=/root /usr /etc /opt
+
+# Correct: preserve the read-only host and expose one private cache directory.
+ProtectSystem=strict
+CacheDirectory=filmframe-updater
+CacheDirectoryMode=0700
+Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater
 ```

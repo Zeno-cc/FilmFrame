@@ -40,6 +40,7 @@ For each arrow, ask:
 | Service ↔ Database    | Format conversions, null handling |
 | Backend ↔ Frontend    | Serialization, date formats       |
 | Component ↔ Component | Props shape changes               |
+| Host service ↔ sandbox | External tools need explicit cache/write paths |
 
 ### Step 3: Define Contracts
 
@@ -120,6 +121,10 @@ After implementation:
       casting payload fields locally
 - [ ] Checked that derived state points back to the source event identifier
       (`seq`, `id`, `version`) instead of inventing a second cursor
+- [ ] Ran every external executable inside the production service sandbox, not
+      only from an interactive shell
+- [ ] Declared cache/state directories explicitly and verified the tool does
+      not fall back to a protected home directory
 
 ---
 

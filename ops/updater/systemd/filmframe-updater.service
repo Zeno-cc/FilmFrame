@@ -10,10 +10,13 @@ User=root
 Group=root
 Environment=PYTHONPATH=/usr/lib/filmframe-updater
 EnvironmentFile=-/etc/filmframe-updater/environment
+Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater
 ExecStart=/usr/bin/python3 -m filmframe_updater serve
 Restart=on-failure
 RestartSec=5s
 UMask=0077
+CacheDirectory=filmframe-updater
+CacheDirectoryMode=0700
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

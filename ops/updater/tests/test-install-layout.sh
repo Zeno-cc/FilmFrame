@@ -9,6 +9,13 @@ readonly lib_root=$temporary/usr/lib/filmframe-updater
 bash -n "$updater_root/install.sh"
 grep -Fq '"$LIB_ROOT/filmframe_updater"' "$updater_root/install.sh"
 grep -Fq '/usr/bin/gh attestation verify --help' "$updater_root/install.sh"
+grep -Fxq 'Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater' \
+  "$updater_root/systemd/filmframe-updater.service"
+grep -Fxq 'CacheDirectory=filmframe-updater' \
+  "$updater_root/systemd/filmframe-updater.service"
+grep -Fxq 'CacheDirectoryMode=0700' \
+  "$updater_root/systemd/filmframe-updater.service"
+grep -Fq 'ProtectSystem=strict' "$updater_root/systemd/filmframe-updater.service"
 grep -Fq -- '--origin-ip <IPv4 address>' "$updater_root/install.sh"
 grep -Fq '"originIp": "$ORIGIN_IP"' "$updater_root/install.sh"
 if grep -Eq '"originIp": "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"' "$updater_root/install.sh"; then
@@ -26,6 +33,6 @@ find "$updater_root/filmframe_updater" -maxdepth 1 -type f -name '*.py' \
   -exec install -m 0644 '{}' "$lib_root/filmframe_updater/" ';'
 
 PYTHONPATH="$lib_root" python3 -c \
-  'import filmframe_updater; import filmframe_updater.__main__; assert filmframe_updater.UPDATER_VERSION == "1.0.1"'
+  'import filmframe_updater; import filmframe_updater.__main__; assert filmframe_updater.UPDATER_VERSION == "1.0.2"'
 
 echo "updater install layout is importable"
