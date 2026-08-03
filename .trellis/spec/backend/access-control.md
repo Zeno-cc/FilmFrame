@@ -313,6 +313,11 @@ The host updater owns `/var/lib/filmframe-updater`,
 
 - Publish only protected stable tags. Never install from `main`, a prerelease,
   a mutable image tag, or `latest`.
+- Every service started by the Release proxy integration stack must expose an
+  enabled healthcheck because the workflow uses `docker compose up --wait`.
+  Probe servers must check their local HTTP listener, and utility clients must
+  prove the fixed proxy target is reachable; `healthcheck.disable: true` is not
+  an accepted placeholder.
 - The public repository uses an active Ruleset that restricts creation,
   update, and deletion of `v*.*.*` tags. Artifact attestations remain mandatory.
 - Release metadata and binaries are fetched through the fixed
@@ -379,6 +384,7 @@ The host updater owns `/var/lib/filmframe-updater`,
 | Condition | Required result |
 | --- | --- |
 | Mutable image tag, wrong repository/workflow/ref, bad attestation/checksum, or unsafe redirect | `release_untrusted`; no staging or switch |
+| Proxy integration service has no enabled healthcheck | Release quality gate fails during `docker compose up --wait`; no image or Release is published |
 | Missing/untrusted updater config, absent `originIp`, malformed input, or IPv6 | Installer/config load fails closed; no deployment-specific fallback is used |
 | Private Release request without a valid read-only token | `updater_unavailable`; cached status may remain visible, no staging or switch |
 | Duplicate/mismatched asset, non-API asset path, or credential-bearing CDN redirect | `release_untrusted`; no token leaves `api.github.com` |
@@ -402,6 +408,8 @@ The host updater owns `/var/lib/filmframe-updater`,
 - Good: an authenticated administrator confirms one stable signed Release; the
   updater rehearses migration, backs up, switches by digest, proves every gate,
   and the page recovers the persisted success after an Access restart.
+- Good: every proxy-test service becomes healthy under `docker compose up
+  --wait`, including probe and utility containers with explicit Node checks.
 - Base: the updater is installed but the application flag remains disabled;
   the existing SSH deployment and restore procedures remain available.
 - Good: a private Release token is read only by the host service, authenticates
@@ -411,6 +419,8 @@ The host updater owns `/var/lib/filmframe-updater`,
 - Base: the public Release requires no token and the updater flag remains off
   until production rollback rehearsal succeeds.
 - Bad: Access mounts the Docker socket and runs `docker compose` itself.
+- Bad: a helper container disables its healthcheck while the Release workflow
+  waits for the whole Compose project to become healthy.
 - Bad: source code, an installer template, or a dataclass default contains the
   production origin IP, or missing config silently falls back to one.
 - Bad: the updater sends `GH_TOKEN` to `github.com`, a CDN host, or a manifest-
@@ -424,6 +434,9 @@ The host updater owns `/var/lib/filmframe-updater`,
 
 - Release contract tests reject mutable tags, wrong identity, malformed notes,
   unsafe asset URLs, mismatched schema metadata, and non-deterministic bundles.
+- Proxy integration tests must start with `docker compose up --wait`, assert
+  every helper reaches `healthy`, exercise the real auth-request path, and
+  remove containers, networks, and volumes in cleanup.
 - Protocol tests cover exact fields, duplicate JSON keys, 16/64 KiB bounds,
   UUID matching, fixed actions, UID authorization, and GID-only rejection.
 - Store/application tests cover one active task, payload-bound idempotency,
@@ -450,6 +463,24 @@ The host updater owns `/var/lib/filmframe-updater`,
   and injected health failure proving automatic application rollback.
 
 ### 7. Wrong vs Correct
+
+#### Wrong
+
+```yaml
+proxy-client:
+  command: ["sleep", "infinity"]
+  healthcheck:
+    disable: true
+```
+
+#### Correct
+
+```yaml
+proxy-client:
+  command: ["sleep", "infinity"]
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://proxy-trusted/access',{headers:{Host:'filmframe.test'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+```
 
 #### Wrong
 

@@ -60,7 +60,14 @@ services:
       access:
         condition: service_healthy
     healthcheck:
-      disable: true
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 2s
+      timeout: 2s
+      retries: 20
 
   proxy:
     image: nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
@@ -78,7 +85,7 @@ services:
       filmframe:
         condition: service_started
       cookie-probe:
-        condition: service_started
+        condition: service_healthy
 
   proxy-trusted:
     image: nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
@@ -95,7 +102,7 @@ services:
       filmframe:
         condition: service_started
       cookie-probe:
-        condition: service_started
+        condition: service_healthy
 
   proxy-client:
     image: filmframe-access-proxy-test:local
@@ -108,7 +115,14 @@ services:
       proxy-trusted:
         condition: service_started
     healthcheck:
-      disable: true
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://proxy-trusted/access',{headers:{Host:'filmframe.test'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 2s
+      timeout: 2s
+      retries: 20
 
 networks:
   private:
