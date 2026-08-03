@@ -6,7 +6,7 @@
 
 | Guide | Description | Status |
 | --- | --- | --- |
-| [Access Control](./access-control.md) | Invitation, session, admin JWT, SQLite, and reverse-proxy boundaries | Current |
+| [Access Control](./access-control.md) | Invitation, session, admin JWT, SQLite, reverse-proxy, and trusted host-update boundaries | Current |
 
 ## Pre-Development Checklist
 

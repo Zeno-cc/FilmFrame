@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Preserve administrator authentication, SQLite, backup, container hardening and production verification boundaries."}
+{"file":".trellis/tasks/08-02-seamless-version-updates/research/codex2api-update.md","reason":"Reuse the reference project's proven UX and supply-chain ideas without copying its incompatible binary replacement model."}
+{"file":".trellis/tasks/08-02-seamless-version-updates/research/production-update-architecture.md","reason":"Implement the approved host updater boundary, state machine, trusted artifact model and rollback constraints."}
+{"file":".trellis/tasks/08-02-seamless-version-updates/research/update-ux-product.md","reason":"Implement the administrator update flow, persistent progress, mobile behavior and safe failure states."}

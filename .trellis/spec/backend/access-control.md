@@ -233,3 +233,271 @@ access-backup:
     - filmframe_access_data:/data # WAL/SHM coordination; SQLite opens read-only
     - /opt/filmframe/backups/access:/backups
 ```
+
+## Scenario: Trusted Host Updates
+
+### 1. Scope / Trigger
+
+Apply this contract whenever code changes the GitHub Release workflow, release
+manifest, `ops/updater`, administrator update APIs/UI, updater socket mount, or
+FilmFrame deployment/backup Compose behavior.
+
+The updater is a root-capable host control plane. The Access service is only an
+authenticated, schema-validating bridge: it never receives the Docker socket,
+SSH credentials, release directories, arbitrary commands, paths, image names,
+URLs, environment keys, or raw updater logs.
+
+### 2. Signatures
+
+Stable Release manifests use `manifestVersion: 1` and bind a semantic version,
+40-character commit, two GHCR image digests, one checksummed deploy bundle,
+updater compatibility, database compatibility, Chinese release notes, and the
+exact GitHub repository/workflow identity.
+
+The Unix socket protocol accepts only these actions:
+
+```text
+check({ force?: boolean }) -> SystemUpdate
+create_job({ version, idempotencyKey, actorHash }) -> UpdateJob
+get_job({ jobId }) -> UpdateJob
+get_active_job({}) -> UpdateJob | null
+list_history({ limit?: 1..50 }) -> { jobs: UpdateJob[] }
+```
+
+Access exposes the corresponding administrator-only HTTP surface:
+
+```http
+GET  /api/system-update
+POST /api/system-update/check
+POST /api/system-update/jobs
+GET  /api/system-update/jobs/:id
+GET  /api/system-update/history?limit=20
+```
+
+`POST /jobs` and `GET /jobs/:id` wrap the validated socket result as `{ job }`.
+The socket result itself is the direct `UpdateJob` or `null`, without another
+`{ job }` envelope.
+
+Required application wiring:
+
+```text
+FILMFRAME_UPDATER_ENABLED=false
+FILMFRAME_UPDATER_GID=<host filmframe-updater-client GID>
+FILMFRAME_UPDATER_TIMEOUT_MS=3000
+FILMFRAME_UPDATER_SOCKET=/run/filmframe-updater/updater.sock
+```
+
+The host bootstrap command is intentionally deployment-specific:
+
+```bash
+sudo ops/updater/install.sh --origin-ip <IPv4>
+```
+
+The argument is required, validated before filesystem or systemd mutation, and
+stored only in the root-owned `/etc/filmframe-updater/config.json`.
+
+Public releases normally verify without a token. If GitHub rate limits the
+host, the service may load a repository-scoped read-only token from its
+root-owned environment file:
+
+```text
+GH_TOKEN=<contents:read token for Zeno-cc/FilmFrame only>
+```
+
+The host updater owns `/var/lib/filmframe-updater`,
+`/run/filmframe-updater/updater.sock`, `/opt/filmframe/releases`, and the
+`/opt/filmframe/current` symlink. It uses the fixed Compose project name
+`filmframe` for every Compose command and backup helper invocation.
+
+### 3. Contracts
+
+- Publish only protected stable tags. Never install from `main`, a prerelease,
+  a mutable image tag, or `latest`.
+- The public repository uses an active Ruleset that restricts creation,
+  update, and deletion of `v*.*.*` tags. Artifact attestations remain mandatory.
+- Release metadata and binaries are fetched through the fixed
+  `api.github.com/repos/Zeno-cc/FilmFrame` endpoints. The updater sends
+  `GH_TOKEN` only to `api.github.com`, resolves each expected asset by its exact
+  name and browser URL, validates the fixed asset API path, and strips
+  `Authorization` before every cross-host redirect to GitHub's asset CDN.
+- Verify the canonical manifest, bundle checksum, immutable image digests, OCI
+  revision labels, GitHub OIDC artifact attestations, repository, workflow, and
+  release URL before staging.
+- The socket request is at most 16 KiB and the response is at most 64 KiB. Both
+  envelopes reject duplicate or unknown fields and require matching UUIDs.
+- Socket filesystem access uses the `filmframe-updater-client` group, but peer
+  identity authorization uses Linux `SO_PEERCRED` UID only. A matching primary
+  or supplementary GID never authorizes a caller.
+- Access mounts only the writable `/data` named volume and the read-only
+  `/run/filmframe-updater` directory. It never mounts `/var/run/docker.sock`,
+  `/opt/filmframe`, backup storage, or SSH data.
+- Admin reads and writes retain Cloudflare JWT and exact-email verification.
+  Writes additionally require exact Origin, JSON, CSRF, bounded rate limits,
+  and UUID idempotency. Responses are `no-store`; audit events contain only
+  safe IDs, stages, versions, counts, and fixed errors.
+- `create_job` replays an existing idempotency-key result or same-target active
+  job before resolving the current release. This remains correct after a
+  successful switch makes the requested version current.
+- The updater persists jobs and events in SQLite, enforces one active task, and
+  serializes deployment with `flock`. `recovery_required` remains active and
+  blocks new jobs until an operator repairs the host.
+- Preflight requires Docker, `/usr/bin/curl`, valid OpenResty configuration,
+  at least 2 GiB free space, healthy current services, compatible schema, and a
+  Compose config whose public ports remain loopback-only.
+- Bootstrap installation must prove that the installed GitHub CLI supports
+  `gh attestation verify`; finding a `gh` executable alone is insufficient.
+- `install.sh` requires an explicit `--origin-ip <IPv4>` value before making
+  host changes. The repository contains no deployment-specific origin default;
+  missing config, missing `originIp`, IPv6, and malformed values fail closed.
+- The first managed update may accept a safe legacy current Access service
+  that mounts only `/data` and has no updater group. Every candidate release,
+  and every already managed current release, must have the exact read-only
+  updater socket mount and the configured dynamic updater group. All other
+  Compose hardening, service, port, and data-volume checks remain identical.
+- The `filmframe`, `access`, and `access-backup` services are the only accepted
+  release services. `access` and `access-backup` must resolve to the same data
+  volume, but the volume name is not hardcoded because a validated restore may
+  switch both services to `filmframe_access_restore_*`.
+- Migration rehearsal restores a verified backup into a fresh volume, starts
+  the candidate Access image with no network and a read-only root filesystem,
+  waits for health, verifies the expected schema, and always removes its
+  temporary container and volume.
+- Cutover takes a fresh verified backup, atomically switches `current`, then
+  validates container identity, schema, loopback, origin, and public HTTPS.
+- Post-switch failure automatically restores the previous application release
+  and reruns all gates. It never restores SQLite automatically. A failed
+  rollback becomes `recovery_required`.
+- Startup reconciliation trusts the actual `current` symlink, container
+  revision, health, and persisted staged release together. Matching revision
+  alone is insufficient to resume verification.
+- Keep `FILMFRAME_UPDATER_ENABLED=false` until the updater is installed and a
+  real signed test Release plus injected-health-failure rollback rehearsal has
+  passed on the production host.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Mutable image tag, wrong repository/workflow/ref, bad attestation/checksum, or unsafe redirect | `release_untrusted`; no staging or switch |
+| Missing/untrusted updater config, absent `originIp`, malformed input, or IPv6 | Installer/config load fails closed; no deployment-specific fallback is used |
+| Private Release request without a valid read-only token | `updater_unavailable`; cached status may remain visible, no staging or switch |
+| Duplicate/mismatched asset, non-API asset path, or credential-bearing CDN redirect | `release_untrusted`; no token leaves `api.github.com` |
+| Unknown, same, or lower version | `release_not_found`; no job |
+| Existing idempotency key or same-target active task | Return the persisted job before current-version checks |
+| Different target while another task is active | `update_busy`; no second job |
+| Updater version below `minUpdaterVersion` | `updater_upgrade_required`; manual host maintenance only |
+| Schema mismatch, destructive migration, or incompatible rollback floor | `migration_incompatible`; no switch |
+| Caller has only the socket group GID but not an allowed UID | `peer_forbidden` |
+| Extra service, Docker/deployment bind mount, public port, Access/backup volume mismatch, or unpinned Compose project | `preflight_failed` |
+| Candidate missing updater socket/group, or managed current with a partial updater mount | `preflight_failed`; only the exact data-only legacy current shape is accepted |
+| Installed `gh` lacks `attestation verify` | Installer exits before writing updater files or enabling units |
+| Failure before `switching` | `failed_pre_switch`; current release remains unchanged |
+| Failure after `switching` and successful application rollback | `rolled_back`; forward-expanded SQLite remains in place |
+| Failed rollback or unverifiable host truth after restart | `recovery_required`; retain the active lock |
+| Browser disconnect during switching | Continue the host job; polling later recovers persisted state |
+| Updater unavailable or malformed/oversized response | Fixed redacted HTTP error; no raw socket text reaches the browser |
+
+### 5. Good / Base / Bad Cases
+
+- Good: an authenticated administrator confirms one stable signed Release; the
+  updater rehearses migration, backs up, switches by digest, proves every gate,
+  and the page recovers the persisted success after an Access restart.
+- Base: the updater is installed but the application flag remains disabled;
+  the existing SSH deployment and restore procedures remain available.
+- Good: a private Release token is read only by the host service, authenticates
+  the fixed GitHub API, and is removed before following the signed asset URL.
+- Good: deployment inventory supplies `--origin-ip`; the installer validates it
+  before mutation and writes it only to the root-owned host config.
+- Base: the public Release requires no token and the updater flag remains off
+  until production rollback rehearsal succeeds.
+- Bad: Access mounts the Docker socket and runs `docker compose` itself.
+- Bad: source code, an installer template, or a dataclass default contains the
+  production origin IP, or missing config silently falls back to one.
+- Bad: the updater sends `GH_TOKEN` to `github.com`, a CDN host, or a manifest-
+  supplied URL, or treats a legacy current Compose shape as permission to
+  weaken candidate validation.
+- Bad: the page installs `latest`, follows `main`, accepts a request-provided
+  manifest URL, or treats a network disconnect as update failure.
+- Bad: rollback replaces the production SQLite database automatically.
+
+### 6. Tests Required
+
+- Release contract tests reject mutable tags, wrong identity, malformed notes,
+  unsafe asset URLs, mismatched schema metadata, and non-deterministic bundles.
+- Protocol tests cover exact fields, duplicate JSON keys, 16/64 KiB bounds,
+  UUID matching, fixed actions, UID authorization, and GID-only rejection.
+- Store/application tests cover one active task, payload-bound idempotency,
+  same-target replay after cutover, monotonic states, restart reconciliation,
+  cleanup, pre/post-switch failure, rollback, and recovery lock retention.
+- Deployment tests assert fixed Compose project name, dynamic-but-consistent
+  Access/backup volume sources, loopback ports, no Docker/deployment mounts,
+  candidate migration health/schema checks, safe `.env` carry-forward, bundle
+  path allowlisting, and trust-error preservation.
+- Release tests assert API-only token attachment, credential removal on
+  cross-host redirects, exact matching of private asset metadata, duplicate/mismatch
+  rejection, and redacted HTTP failures. Deployment tests separately prove a
+  data-only legacy current release is accepted while the same candidate is
+  rejected. Installer tests require the attestation-capability probe.
+- Config tests reject missing files, missing/invalid `originIp`, and IPv6;
+  installer layout tests reject embedded IPv4 defaults and invalid CLI input.
+- Access tests cover authentication on every route, Origin/CSRF/JSON and UUID
+  gates, fixed error mapping, response schema limits, timeouts, no-store headers,
+  redacted audit events, polling recovery, and no public update surface.
+- Browser checks cover desktop/mobile candidate, confirmation, active timeline,
+  disconnect/reconnect, rolled-back, recovery-required, and history states.
+- Production acceptance additionally requires systemd unit verification,
+  Linux `SO_PEERCRED`, active OpenResty configuration, a signed Release update,
+  and injected health failure proving automatic application rollback.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```yaml
+access:
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /opt/filmframe:/opt/filmframe
+```
+
+```python
+# A group grants filesystem access; it is not caller identity.
+if peer_uid in allowed_uids or peer_gid in socket_group_gids:
+    authorize()
+```
+
+#### Correct
+
+```yaml
+access:
+  group_add:
+    - "${FILMFRAME_UPDATER_GID}"
+  volumes:
+    - filmframe_access_data:/data
+    - /run/filmframe-updater:/run/filmframe-updater:ro
+```
+
+```python
+_pid, peer_uid, _peer_gid = peer_credentials(connection)
+if peer_uid not in allowed_uids:
+    raise UpdaterError("peer_forbidden")
+```
+
+```python
+# Always operate the same Compose project, even through a release symlink.
+runner.run([
+    "/usr/bin/docker", "compose", "--project-name", "filmframe",
+    "--project-directory", str(release), "-f", str(release / "compose.yaml"),
+    "config", "--quiet",
+])
+```
+
+```python
+# Wrong: private browser download URLs are not the authenticated REST asset API.
+client.get(manifest.bundle_url, token=os.environ["GH_TOKEN"])
+
+# Correct: resolve the exact asset API URL from fixed-repository metadata,
+# authenticate only api.github.com, then strip the header on CDN redirects.
+asset_url = trusted_asset_api_url(release, expected_name, manifest.bundle_url)
+client.get(asset_url, token=os.environ.get("GH_TOKEN"))
+```
