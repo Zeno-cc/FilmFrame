@@ -26,6 +26,6 @@ find "$updater_root/filmframe_updater" -maxdepth 1 -type f -name '*.py' \
   -exec install -m 0644 '{}' "$lib_root/filmframe_updater/" ';'
 
 PYTHONPATH="$lib_root" python3 -c \
-  'import filmframe_updater; import filmframe_updater.__main__; assert filmframe_updater.UPDATER_VERSION == "1.0.0"'
+  'import filmframe_updater; import filmframe_updater.__main__; assert filmframe_updater.UPDATER_VERSION == "1.0.1"'
 
 echo "updater install layout is importable"

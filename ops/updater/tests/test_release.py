@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import unittest
 import urllib.error
@@ -13,14 +14,19 @@ from unittest.mock import patch
 
 from filmframe_updater.errors import UpdaterError
 from filmframe_updater.release import (
+    GITHUB_ATTESTATIONS_URL,
     GITHUB_API_URL,
     GITHUB_RELEASE_BY_TAG_URL,
+    MAX_ATTESTATION_BUNDLES,
+    MAX_ATTESTATION_RESPONSE_BYTES,
     CachedReleaseService,
+    GitHubAttestationVerifier,
     GitHubReleaseSource,
     SafeHttpClient,
     _SafeRedirectHandler,
 )
 from filmframe_updater.store import StateStore
+from filmframe_updater.system import CommandFailed, CommandRunner
 from tests.helpers import manifest
 
 
@@ -91,7 +97,217 @@ class RecordingVerifier:
         self.subjects.append(subject)
 
 
+def sigstore_bundle(marker: str = "a") -> dict:
+    return {
+        "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+        "verificationMaterial": {
+            "certificate": {"rawBytes": marker},
+            "tlogEntries": [],
+            "timestampVerificationData": {},
+        },
+        "dsseEnvelope": {
+            "payload": marker,
+            "payloadType": "application/vnd.in-toto+json",
+            "signatures": [{"sig": marker}],
+        },
+    }
+
+
+def attestation_response(*bundles: dict) -> bytes:
+    return json.dumps(
+        {
+            "attestations": [
+                {
+                    "repository_id": 1118797507,
+                    "bundle_url": (
+                        "https://tmaproduction.blob.core.windows.net/"
+                        f"attestations/{index + 1}.json?sig=test"
+                    ),
+                    "initiator": "Zeno-cc",
+                    "bundle": bundle,
+                }
+                for index, bundle in enumerate(bundles)
+            ]
+        }
+    ).encode()
+
+
+class AttestationHttpClient:
+    def __init__(self, data: bytes, *, final_url: str | None = None) -> None:
+        self.data = data
+        self.final_url = final_url
+        self.calls: list[tuple[str, int, str]] = []
+
+    def get(self, url: str, *, maximum: int, accept: str) -> tuple[bytes, str]:
+        self.calls.append((url, maximum, accept))
+        return self.data, self.final_url or url
+
+
+class AttestationRunner:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.arguments: list[str] = []
+        self.options: dict = {}
+        self.bundle_mode = 0
+        self.bundle_data = b""
+
+    def run(self, arguments, **options):
+        self.arguments = list(arguments)
+        self.options = options
+        bundle_path = Path(self.arguments[self.arguments.index("--bundle") + 1])
+        self.bundle_mode = stat.S_IMODE(bundle_path.stat().st_mode)
+        self.bundle_data = bundle_path.read_bytes()
+        if self.fail:
+            raise CommandFailed("verification failed")
+
+
 class ReleaseServiceTests(unittest.TestCase):
+    def test_file_attestation_uses_local_digest_fixed_api_and_bundle(self) -> None:
+        release = manifest()
+        bundle = sigstore_bundle()
+        with tempfile.TemporaryDirectory() as directory:
+            subject = Path(directory) / "artifact.tar.gz"
+            subject.write_bytes(b"artifact bytes")
+            digest = "sha256:" + hashlib.sha256(subject.read_bytes()).hexdigest()
+            url = GITHUB_ATTESTATIONS_URL.format(digest)
+            client = AttestationHttpClient(attestation_response(bundle))
+            runner = AttestationRunner()
+
+            GitHubAttestationVerifier(runner, client).verify(str(subject), release)  # type: ignore[arg-type]
+
+        self.assertEqual(
+            client.calls,
+            [(url, MAX_ATTESTATION_RESPONSE_BYTES, "application/vnd.github+json")],
+        )
+        self.assertEqual(runner.bundle_mode, 0o600)
+        self.assertEqual(
+            runner.bundle_data,
+            json.dumps(bundle, separators=(",", ":"), sort_keys=True).encode() + b"\n",
+        )
+        self.assertNotIn("--bundle-from-oci", runner.arguments)
+        self.assertEqual(runner.options["environment"], {"GH_TOKEN": None, "GITHUB_TOKEN": None})
+        for expected in (
+            "--repo",
+            "--signer-workflow",
+            "--source-ref",
+            "--source-digest",
+            "--cert-oidc-issuer",
+            "--deny-self-hosted-runners",
+        ):
+            self.assertIn(expected, runner.arguments)
+
+    def test_oci_attestation_uses_manifest_digest_and_public_subject(self) -> None:
+        release = manifest()
+        subject = f"oci://{release.filmframe_image}"
+        digest = release.filmframe_image.rsplit("@", 1)[1]
+        client = AttestationHttpClient(attestation_response(sigstore_bundle()))
+        runner = AttestationRunner()
+
+        GitHubAttestationVerifier(runner, client).verify(  # type: ignore[arg-type]
+            subject, release, from_oci=True
+        )
+
+        self.assertEqual(client.calls[0][0], GITHUB_ATTESTATIONS_URL.format(digest))
+        self.assertEqual(runner.arguments[3], subject)
+        self.assertIn("--bundle", runner.arguments)
+        self.assertNotIn("--bundle-from-oci", runner.arguments)
+
+    def test_attestation_response_rejects_malformed_empty_and_excess_bundles(self) -> None:
+        valid_item = json.loads(attestation_response(sigstore_bundle()))["attestations"][0]
+        cases = {
+            "malformed": b"not json",
+            "unknown response field": json.dumps(
+                {"attestations": [valid_item], "extra": True}
+            ).encode(),
+            "empty": attestation_response(),
+            "too many": attestation_response(
+                *(sigstore_bundle(str(index)) for index in range(MAX_ATTESTATION_BUNDLES + 1))
+            ),
+            "missing item field": json.dumps(
+                {"attestations": [{key: value for key, value in valid_item.items() if key != "initiator"}]}
+            ).encode(),
+            "invalid bundle URL": json.dumps(
+                {
+                    "attestations": [
+                        {**valid_item, "bundle_url": "https://example.test:invalid/bundle"}
+                    ]
+                }
+            ).encode(),
+            "unknown bundle field": attestation_response(
+                {**sigstore_bundle(), "unexpected": True}
+            ),
+            "wrong media type": attestation_response(
+                {**sigstore_bundle(), "mediaType": "application/json"}
+            ),
+            "duplicate bundle": attestation_response(sigstore_bundle(), sigstore_bundle()),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            subject = Path(directory) / "artifact"
+            subject.write_bytes(b"artifact")
+            for label, response in cases.items():
+                with self.subTest(label=label), self.assertRaises(UpdaterError) as raised:
+                    GitHubAttestationVerifier(
+                        AttestationRunner(), AttestationHttpClient(response)  # type: ignore[arg-type]
+                    ).verify(str(subject), manifest())
+                self.assertEqual(raised.exception.code, "release_untrusted")
+
+    def test_attestation_response_size_and_final_url_are_bounded(self) -> None:
+        release = manifest()
+        with tempfile.TemporaryDirectory() as directory:
+            subject = Path(directory) / "artifact"
+            subject.write_bytes(b"artifact")
+            digest = "sha256:" + hashlib.sha256(subject.read_bytes()).hexdigest()
+            url = GITHUB_ATTESTATIONS_URL.format(digest)
+            opener = RecordingOpener(
+                FakeResponse(url, b"x" * (MAX_ATTESTATION_RESPONSE_BYTES + 1))
+            )
+            with patch(
+                "filmframe_updater.release.urllib.request.build_opener", return_value=opener
+            ), self.assertRaises(UpdaterError) as oversized:
+                GitHubAttestationVerifier(
+                    AttestationRunner(), SafeHttpClient(token="")  # type: ignore[arg-type]
+                ).verify(str(subject), release)
+            self.assertEqual(oversized.exception.code, "release_untrusted")
+
+            redirected = AttestationHttpClient(
+                attestation_response(sigstore_bundle()),
+                final_url="https://api.github.com/repos/Zeno-cc/FilmFrame/attestations/other",
+            )
+            with self.assertRaises(UpdaterError) as mismatched:
+                GitHubAttestationVerifier(
+                    AttestationRunner(), redirected  # type: ignore[arg-type]
+                ).verify(str(subject), release)
+            self.assertEqual(mismatched.exception.code, "release_untrusted")
+
+    def test_attestation_command_failure_is_untrusted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            subject = Path(directory) / "artifact"
+            subject.write_bytes(b"artifact")
+            with self.assertRaises(UpdaterError) as raised:
+                GitHubAttestationVerifier(
+                    AttestationRunner(fail=True),  # type: ignore[arg-type]
+                    AttestationHttpClient(attestation_response(sigstore_bundle())),  # type: ignore[arg-type]
+                ).verify(str(subject), manifest())
+        self.assertEqual(raised.exception.code, "release_untrusted")
+
+    def test_subprocesses_never_inherit_github_tokens(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"GH_TOKEN": "secret-gh-token", "GITHUB_TOKEN": "secret-actions-token"},
+        ):
+            result = CommandRunner().run(
+                ["/usr/bin/env"],
+                environment={
+                    "GH_TOKEN": "attempted-override",
+                    "GITHUB_TOKEN": "attempted-override",
+                },
+            )
+        environment = result.text()
+        self.assertNotIn("secret-gh-token", environment)
+        self.assertNotIn("secret-actions-token", environment)
+        self.assertNotIn("GH_TOKEN=", environment)
+        self.assertNotIn("GITHUB_TOKEN=", environment)
+
     def test_http_client_loads_token_and_authenticates_fixed_github_hosts(self) -> None:
         opener = RecordingOpener(FakeResponse("https://api.github.com/repos/Zeno-cc/FilmFrame"))
         with patch.dict(os.environ, {"GH_TOKEN": "github-secret-token"}), patch(

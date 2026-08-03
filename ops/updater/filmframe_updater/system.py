@@ -29,15 +29,20 @@ class CommandRunner:
         arguments: Sequence[str],
         *,
         cwd: Optional[Path] = None,
-        environment: Optional[Mapping[str, str]] = None,
+        environment: Optional[Mapping[str, Optional[str]]] = None,
         timeout: int = 300,
     ) -> CommandResult:
         if not arguments or not all(isinstance(value, str) and value for value in arguments):
             raise ValueError("command arguments must be non-empty strings")
-        env = None
+        env = dict(os.environ)
         if environment is not None:
-            env = dict(os.environ)
-            env.update(environment)
+            for key, value in environment.items():
+                if value is None:
+                    env.pop(key, None)
+                else:
+                    env[key] = value
+        env.pop("GH_TOKEN", None)
+        env.pop("GITHUB_TOKEN", None)
         try:
             process = subprocess.run(
                 list(arguments),

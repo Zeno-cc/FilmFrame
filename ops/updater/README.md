@@ -85,15 +85,21 @@ to create a job.
 
 ## GitHub attestation authentication
 
-The updater downloads only the fixed `Zeno-cc/FilmFrame` stable Release and
-verifies the manifest, bundle, and both GHCR image digests with
-`gh attestation verify`. It pins the GitHub OIDC issuer, repository, workflow,
-tag ref, and commit. Do not use interactive `gh auth login` for the systemd
-service. Public artifacts normally verify anonymously. If GitHub rate limits
-the server, put `GH_TOKEN=...` in `/etc/filmframe-updater/environment` (mode
-`0600`, root only) using a fine-grained token with read-only repository
-contents, attestations, and packages permissions. Never grant write or admin
-permissions.
+The updater downloads only the fixed `Zeno-cc/FilmFrame` stable Release. For
+the manifest, deploy bundle, and both GHCR image digests, it computes or reads
+the pinned SHA-256 and fetches Sigstore bundles from the fixed public GitHub
+Attestations API. It writes those bundles to a temporary mode `0600` JSONL file
+and runs `gh attestation verify --bundle`; the CLI never performs its own
+network lookup and never inherits `GH_TOKEN` or `GITHUB_TOKEN`. Verification
+still pins the GitHub OIDC issuer, repository, workflow, tag ref, commit, and
+hosted-runner policy.
+
+Do not use interactive `gh auth login` for the systemd service. Public artifacts
+normally verify anonymously. If GitHub rate limits the server, put
+`GH_TOKEN=...` in `/etc/filmframe-updater/environment` (mode `0600`, root only)
+using a fine-grained token with read-only repository contents and attestations
+permissions. The token is used only by the fixed-host HTTP client. Never grant
+write or admin permissions.
 
 ## Recovery and removal
 

@@ -296,9 +296,13 @@ sudo ops/updater/install.sh --origin-ip <IPv4>
 The argument is required, validated before filesystem or systemd mutation, and
 stored only in the root-owned `/etc/filmframe-updater/config.json`.
 
-Public releases normally verify without a token. If GitHub rate limits the
-host, the service may load a repository-scoped read-only token from its
-root-owned environment file:
+Public releases verify without giving credentials to the GitHub CLI. The
+updater fetches attestations from the fixed repository API, writes only the
+returned Sigstore v0.3 `bundle` objects to a mode `0600` JSONL file, and runs
+`gh attestation verify --bundle <file>` with `GH_TOKEN` and `GITHUB_TOKEN`
+removed from the subprocess environment. If GitHub rate limits the host, the
+HTTP client may load a repository-scoped read-only token from its root-owned
+environment file:
 
 ```text
 GH_TOKEN=<contents:read token for Zeno-cc/FilmFrame only>
@@ -325,6 +329,13 @@ The host updater owns `/var/lib/filmframe-updater`,
   `GH_TOKEN` only to `api.github.com`, resolves each expected asset by its exact
   name and browser URL, validates the fixed asset API path, and strips
   `Authorization` before every cross-host redirect to GitHub's asset CDN.
+- Attestations are fetched only from
+  `GET /repos/Zeno-cc/FilmFrame/attestations/sha256:<digest>`. File subjects use
+  their locally computed SHA-256; OCI subjects must exactly match one of the
+  two manifest-pinned `oci://...@sha256:<digest>` values. The response is
+  bounded to 4 MiB and 1..8 unique Sigstore v0.3 bundles, rejects redirects and
+  unknown fields, and is passed to `gh` only through a mode `0600` JSONL file.
+  `gh` must never fetch attestations itself or inherit GitHub credentials.
 - Verify the canonical manifest, bundle checksum, immutable image digests, OCI
   revision labels, GitHub OIDC artifact attestations, repository, workflow, and
   release URL before staging.
@@ -387,6 +398,7 @@ The host updater owns `/var/lib/filmframe-updater`,
 | Proxy integration service has no enabled healthcheck | Release quality gate fails during `docker compose up --wait`; no image or Release is published |
 | Missing/untrusted updater config, absent `originIp`, malformed input, or IPv6 | Installer/config load fails closed; no deployment-specific fallback is used |
 | Private Release request without a valid read-only token | `updater_unavailable`; cached status may remain visible, no staging or switch |
+| Attestation API redirect, malformed/oversized response, zero or excess bundles, duplicate bundle, wrong media type, subject digest mismatch, or failed offline verification | `release_untrusted`; no staging or switch |
 | Duplicate/mismatched asset, non-API asset path, or credential-bearing CDN redirect | `release_untrusted`; no token leaves `api.github.com` |
 | Unknown, same, or lower version | `release_not_found`; no job |
 | Existing idempotency key or same-target active task | Return the persisted job before current-version checks |
@@ -413,7 +425,11 @@ The host updater owns `/var/lib/filmframe-updater`,
 - Base: the updater is installed but the application flag remains disabled;
   the existing SSH deployment and restore procedures remain available.
 - Good: a private Release token is read only by the host service, authenticates
-  the fixed GitHub API, and is removed before following the signed asset URL.
+  the fixed GitHub API, and is removed before following the signed asset URL or
+  starting any subprocess.
+- Good: the updater downloads bounded attestation bundles for the exact subject
+  digest and asks `gh` to verify the local JSONL bundle with the pinned
+  repository, workflow, tag ref, source commit, issuer, and runner policy.
 - Good: deployment inventory supplies `--origin-ip`; the installer validates it
   before mutation and writes it only to the root-owned host config.
 - Base: the public Release requires no token and the updater flag remains off
@@ -424,8 +440,9 @@ The host updater owns `/var/lib/filmframe-updater`,
 - Bad: source code, an installer template, or a dataclass default contains the
   production origin IP, or missing config silently falls back to one.
 - Bad: the updater sends `GH_TOKEN` to `github.com`, a CDN host, or a manifest-
-  supplied URL, or treats a legacy current Compose shape as permission to
-  weaken candidate validation.
+  supplied URL, lets `gh` fetch attestations with an authenticated session, or
+  treats a legacy current Compose shape as permission to weaken candidate
+  validation.
 - Bad: the page installs `latest`, follows `main`, accepts a request-provided
   manifest URL, or treats a network disconnect as update failure.
 - Bad: rollback replaces the production SQLite database automatically.
@@ -448,9 +465,12 @@ The host updater owns `/var/lib/filmframe-updater`,
   path allowlisting, and trust-error preservation.
 - Release tests assert API-only token attachment, credential removal on
   cross-host redirects, exact matching of private asset metadata, duplicate/mismatch
-  rejection, and redacted HTTP failures. Deployment tests separately prove a
-  data-only legacy current release is accepted while the same candidate is
-  rejected. Installer tests require the attestation-capability probe.
+  rejection, redacted HTTP failures, local file/OCI digest selection, the fixed
+  attestation API URL, response and bundle limits, mode `0600` JSONL output,
+  offline `gh --bundle` arguments, and subprocess token removal. Deployment
+  tests separately prove a data-only legacy current release is accepted while
+  the same candidate is rejected. Installer tests require the
+  attestation-capability probe.
 - Config tests reject missing files, missing/invalid `originIp`, and IPv6;
   installer layout tests reject embedded IPv4 defaults and invalid CLI input.
 - Access tests cover authentication on every route, Origin/CSRF/JSON and UUID
@@ -531,4 +551,18 @@ client.get(manifest.bundle_url, token=os.environ["GH_TOKEN"])
 # authenticate only api.github.com, then strip the header on CDN redirects.
 asset_url = trusted_asset_api_url(release, expected_name, manifest.bundle_url)
 client.get(asset_url, token=os.environ.get("GH_TOKEN"))
+```
+
+```python
+# Wrong: gh performs its own authenticated attestation lookup.
+runner.run(["gh", "attestation", "verify", subject, "--bundle-from-oci"])
+
+# Correct: fetch the fixed digest endpoint, persist only bounded bundle objects,
+# then verify offline without passing GitHub credentials to the subprocess.
+bundles = client.get(fixed_attestations_url(subject_sha256))
+bundle_path = write_mode_0600_jsonl(bundles)
+runner.run(
+    ["gh", "attestation", "verify", subject, "--bundle", bundle_path, ...],
+    environment={"GH_TOKEN": None, "GITHUB_TOKEN": None},
+)
 ```
