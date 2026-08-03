@@ -390,3 +390,30 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: 上线可信版本更新系统
+
+**Date**: 2026-08-03
+**Task**: 上线可信版本更新系统
+**Branch**: `main`
+
+### Summary
+
+完成受 Cloudflare Access 保护的版本更新 UI、宿主 updater、可信 Release 流水线与生产部署；修复匿名证明和 systemd Sigstore 缓存边界，真实演练候选健康失败自动回滚后再次成功升级至 v1.1.1，并在完整门禁通过后启用 Access 更新桥。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `40d9fae` | (see git log) |
+| `2b5ba73` | (see git log) |
+| `ebe5dcb` | (see git log) |
+| `ea5f373` | (see git log) |
+| `b76426b` | (see git log) |
+| `0958dc7` | (see git log) |
+| `554186f` | (see git log) |
+
+### Status
+
+[OK] **Completed**
