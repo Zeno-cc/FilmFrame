@@ -20,6 +20,9 @@ export function testConfig(overrides: Partial<AccessConfig> = {}): AccessConfig 
     devAdminToken: null,
     secureCookies: true,
     sessionCookieName: "__Host-filmframe_session",
+    updaterEnabled: false,
+    updaterSocketPath: "/run/filmframe-updater/updater.sock",
+    updaterTimeoutMs: 3_000,
     ...overrides,
   };
 }

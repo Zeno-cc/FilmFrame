@@ -20,11 +20,13 @@ import { createAdminRoutes } from "./routes/adminRoutes.js";
 import { createPublicRoutes } from "./routes/publicRoutes.js";
 import { readSessionCookie } from "./sessionCookie.js";
 import { hasInviteBatchCreationRequest, isSessionValid } from "./store.js";
+import { UnixUpdaterClient, type UpdaterClient } from "./updaterClient.js";
 
 export interface CreateAppOptions {
   config: AccessConfig;
   database: AccessDatabase;
   accessJwtVerifier: AccessJwtVerifier;
+  updaterClient?: UpdaterClient | null;
   now?: () => number;
 }
 
@@ -41,6 +43,14 @@ export function createApp(options: CreateAppOptions): express.Express {
   const app = express();
   const now = options.now ?? Date.now;
   const nonceStore = new NonceStore(now);
+  const updaterClient =
+    options.updaterClient ??
+    (options.config.updaterEnabled
+      ? new UnixUpdaterClient({
+          socketPath: options.config.updaterSocketPath,
+          timeoutMs: options.config.updaterTimeoutMs,
+        })
+      : null);
 
   app.disable("x-powered-by");
   app.set("trust proxy", (address: string) => isTrustedProxyAddress(address));
@@ -142,6 +152,8 @@ export function createApp(options: CreateAppOptions): express.Express {
           return values.count as number;
         },
       }),
+      updateRateLimiter: createRateLimiter({ limit: 12, windowMs: 60_000 }),
+      updaterClient,
       now,
     }),
   );

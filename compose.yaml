@@ -55,6 +55,10 @@ services:
         FILMFRAME_REVISION: "${FILMFRAME_REVISION:-uncommitted}"
     restart: unless-stopped
     init: true
+    # The supplementary host group grants filesystem access to the socket;
+    # the updater separately pins the Access peer UID through SO_PEERCRED.
+    group_add:
+      - "${FILMFRAME_UPDATER_GID:-10001}"
     labels:
       org.opencontainers.image.revision: "${FILMFRAME_REVISION:-uncommitted}"
     environment:
@@ -68,10 +72,14 @@ services:
       CF_ACCESS_TEAM_DOMAIN: "${CF_ACCESS_TEAM_DOMAIN:-}"
       CF_ACCESS_AUDIENCE: "${CF_ACCESS_AUDIENCE:-}"
       CF_ACCESS_ADMIN_EMAIL: "${CF_ACCESS_ADMIN_EMAIL:-}"
+      FILMFRAME_UPDATER_ENABLED: "${FILMFRAME_UPDATER_ENABLED:-false}"
+      FILMFRAME_UPDATER_SOCKET: /run/filmframe-updater/updater.sock
+      FILMFRAME_UPDATER_TIMEOUT_MS: "${FILMFRAME_UPDATER_TIMEOUT_MS:-3000}"
     ports:
       - "127.0.0.1:${FILMFRAME_ACCESS_PORT:-18083}:3000"
     volumes:
       - filmframe_access_data:/data
+      - /run/filmframe-updater:/run/filmframe-updater:ro
     networks:
       - filmframe_private
     read_only: true

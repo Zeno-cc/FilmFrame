@@ -42,6 +42,19 @@ const environmentSchema = z.object({
   CF_ACCESS_ADMIN_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
   DEV_ADMIN_TOKEN: z.string().min(32).max(512).optional(),
   SECURE_COOKIES: booleanSchema.default(true),
+  FILMFRAME_UPDATER_ENABLED: booleanSchema.default(false),
+  FILMFRAME_UPDATER_SOCKET: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .default("/run/filmframe-updater/updater.sock"),
+  FILMFRAME_UPDATER_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(10_000)
+    .default(3_000),
 });
 
 export interface AccessConfig {
@@ -61,6 +74,9 @@ export interface AccessConfig {
   devAdminToken: string | null;
   secureCookies: boolean;
   sessionCookieName: string;
+  updaterEnabled: boolean;
+  updaterSocketPath: string;
+  updaterTimeoutMs: number;
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AccessConfig {
@@ -79,6 +95,16 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Access
   }
   if (value.FILMFRAME_HOST === value.ADMIN_HOST) {
     throw new Error("FILMFRAME_HOST and ADMIN_HOST must be different");
+  }
+  if (!value.FILMFRAME_UPDATER_SOCKET.startsWith("/")) {
+    throw new Error("FILMFRAME_UPDATER_SOCKET must be an absolute path");
+  }
+  if (
+    value.NODE_ENV === "production" &&
+    value.FILMFRAME_UPDATER_ENABLED &&
+    value.FILMFRAME_UPDATER_SOCKET !== "/run/filmframe-updater/updater.sock"
+  ) {
+    throw new Error("FILMFRAME_UPDATER_SOCKET must use the production socket path");
   }
 
   const internalHosts = new Set(
@@ -107,5 +133,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Access
     sessionCookieName: value.SECURE_COOKIES
       ? PRODUCTION_SESSION_COOKIE
       : DEVELOPMENT_SESSION_COOKIE,
+    updaterEnabled: value.FILMFRAME_UPDATER_ENABLED,
+    updaterSocketPath: value.FILMFRAME_UPDATER_SOCKET,
+    updaterTimeoutMs: value.FILMFRAME_UPDATER_TIMEOUT_MS,
   };
 }

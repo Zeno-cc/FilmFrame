@@ -110,6 +110,37 @@ async function verifyCompose() {
     !accessMounts.some((mount) => mount.target === "/backups"),
     "long-running access service cannot modify host backups",
   );
+  const updaterSocketMount = accessMounts.find(
+    (mount) => mount.target === "/run/filmframe-updater",
+  );
+  const accessBindMounts = accessMounts.filter((mount) => mount.type === "bind");
+  check(
+    accessBindMounts.length === 1 &&
+    updaterSocketMount?.type === "bind" &&
+      path.resolve(updaterSocketMount.source) === "/run/filmframe-updater" &&
+      updaterSocketMount.read_only === true,
+    "access service mounts only the updater socket directory read-only",
+  );
+  check(
+    !accessMounts.some(
+      (mount) =>
+        mount.target === "/var/run/docker.sock" ||
+        mount.source === "/var/run/docker.sock" ||
+        mount.target === "/opt/filmframe" ||
+        String(mount.target ?? "").startsWith("/opt/filmframe/"),
+    ),
+    "access service has no Docker socket or host deployment tree mount",
+  );
+  check(
+    config.services?.access?.environment?.FILMFRAME_UPDATER_SOCKET ===
+      "/run/filmframe-updater/updater.sock",
+    "access service pins the updater Unix socket path",
+  );
+  check(
+    Array.isArray(config.services?.access?.group_add) &&
+      config.services.access.group_add.length === 1,
+    "access service receives one explicit updater client group",
+  );
 
   const backupService = config.services?.["access-backup"] ?? {};
   const backupMounts = backupService.volumes ?? [];

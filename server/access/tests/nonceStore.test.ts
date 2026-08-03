@@ -10,7 +10,8 @@ describe("form nonce", () => {
     const nonce = nonces.issue();
 
     assert.equal(nonces.verify(nonce), true);
-    assert.equal(nonces.verify(`${nonce.slice(0, -1)}x`), false);
+    const replacement = nonce.endsWith("x") ? "y" : "x";
+    assert.equal(nonces.verify(`${nonce.slice(0, -1)}${replacement}`), false);
     now += 9_999;
     assert.equal(nonces.verify(nonce), true);
     now += 1;

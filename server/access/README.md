@@ -27,6 +27,13 @@ Common optional variables are `HOST` (default `127.0.0.1`), `PORT` (default
 (default `access,localhost,127.0.0.1`), and `SECURE_COOKIES` (default `true` and
 mandatory in production).
 
+`FILMFRAME_UPDATER_ENABLED` remains `false` until the separately installed host
+updater passes its rollback rehearsal. When enabled in production, Access is
+pinned to `/run/filmframe-updater/updater.sock` with a bounded request timeout.
+The container receives only that read-only Unix socket directory. It does not
+mount the Docker socket, SSH credentials, the release tree, or a host-writable
+deployment directory.
+
 ## Local Checks
 
 ```bash
@@ -45,7 +52,10 @@ Local HTTP development must set both `NODE_ENV=development` and
 - Administrator host: `GET /`, `GET /api/invites`, `POST /api/invites`,
   `POST /api/invites/:id/revoke`, `GET /api/invite-batches`,
   `POST /api/invite-batches`, `POST /api/invite-batches/:id/revoke`,
-  `GET /api/sessions`, and `POST /api/sessions/:id/revoke`
+  `GET /api/sessions`, `POST /api/sessions/:id/revoke`,
+  `GET /api/system-update`, `POST /api/system-update/check`,
+  `POST /api/system-update/jobs`, `GET /api/system-update/jobs/:id`, and
+  `GET /api/system-update/history`
 
 Internal checks accept only a loopback/private proxy address and the internal
 Host. Administrator writes require the exact administrator Origin,
@@ -68,6 +78,13 @@ revokes every live device session issued by its invitations. Successful create
 and revoke operations write structured redacted audit events in production;
 these events do not include invite codes, tokens, request bodies, or email
 addresses.
+
+The system-update routes forward only schema-validated, bounded messages to the
+host updater. Update writes retain administrator authentication, exact Origin,
+CSRF, JSON, rate-limit, and UUID idempotency gates. The browser receives only
+allowlisted release, stage, history, and fixed error fields; raw updater logs,
+commands, paths, environment values, and authentication assertions never cross
+the socket bridge.
 
 Device sessions use a 400-day rolling lifetime. `POST /auth/refresh` rotates
 the opaque token atomically and requires the exact public Origin plus the CSRF
