@@ -1,0 +1,14 @@
+[Unit]
+Description=FilmFrame updater local RPC socket
+
+[Socket]
+ListenStream=/run/filmframe-updater/updater.sock
+SocketUser=root
+SocketGroup=filmframe-updater-client
+SocketMode=0660
+DirectoryMode=0750
+RemoveOnStop=true
+Service=filmframe-updater.service
+
+[Install]
+WantedBy=sockets.target

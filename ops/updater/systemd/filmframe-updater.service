@@ -1,0 +1,36 @@
+[Unit]
+Description=FilmFrame host update controller
+Requires=docker.service filmframe-updater.socket
+After=docker.service network-online.target filmframe-updater.socket
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment=PYTHONPATH=/usr/lib/filmframe-updater
+EnvironmentFile=-/etc/filmframe-updater/environment
+ExecStart=/usr/bin/python3 -m filmframe_updater serve
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/filmframe /var/lib/filmframe-updater /run/filmframe-updater /run/lock
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

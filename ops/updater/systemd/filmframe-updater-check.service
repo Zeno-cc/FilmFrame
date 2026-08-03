@@ -1,0 +1,16 @@
+[Unit]
+Description=Check for a trusted FilmFrame stable release
+Requires=filmframe-updater.socket
+After=filmframe-updater.socket
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment=PYTHONPATH=/usr/lib/filmframe-updater
+ExecStart=/usr/bin/python3 -m filmframe_updater check
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX

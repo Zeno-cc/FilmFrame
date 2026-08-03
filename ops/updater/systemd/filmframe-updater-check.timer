@@ -1,0 +1,12 @@
+[Unit]
+Description=Check FilmFrame releases every six hours
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=6h
+RandomizedDelaySec=10m
+Persistent=true
+Unit=filmframe-updater-check.service
+
+[Install]
+WantedBy=timers.target

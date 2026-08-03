@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://filmframe.astrocean.space/schemas/updater-protocol-v1.json",
+  "title": "FilmFrame updater Unix socket protocol v1",
+  "oneOf": [
+    { "$ref": "#/$defs/check" },
+    { "$ref": "#/$defs/createJob" },
+    { "$ref": "#/$defs/getJob" },
+    { "$ref": "#/$defs/getActiveJob" },
+    { "$ref": "#/$defs/listHistory" }
+  ],
+  "$defs": {
+    "requestBase": {
+      "type": "object",
+      "required": ["protocolVersion", "requestId", "action", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "requestId": { "type": "string", "format": "uuid" },
+        "action": { "type": "string" },
+        "params": { "type": "object" }
+      }
+    },
+    "check": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        {
+          "properties": {
+            "action": { "const": "check" },
+            "params": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "force": { "type": "boolean" } }
+            }
+          }
+        }
+      ]
+    },
+    "createJob": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        {
+          "properties": {
+            "action": { "const": "create_job" },
+            "params": {
+              "type": "object",
+              "required": ["version", "idempotencyKey", "actorHash"],
+              "additionalProperties": false,
+              "properties": {
+                "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+                "idempotencyKey": { "type": "string", "format": "uuid" },
+                "actorHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "getJob": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        { "properties": { "action": { "const": "get_job" }, "params": { "type": "object", "required": ["jobId"], "additionalProperties": false, "properties": { "jobId": { "type": "string", "format": "uuid" } } } } }
+      ]
+    },
+    "getActiveJob": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        { "properties": { "action": { "const": "get_active_job" }, "params": { "type": "object", "maxProperties": 0 } } }
+      ]
+    },
+    "listHistory": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        { "properties": { "action": { "const": "list_history" }, "params": { "type": "object", "additionalProperties": false, "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 50 } } } } }
+      ]
+    }
+  }
+}
