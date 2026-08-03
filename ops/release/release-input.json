@@ -1,0 +1,20 @@
+{
+  "version": "1.1.0",
+  "minUpdaterVersion": "1.0.0",
+  "database": {
+    "schemaFrom": 3,
+    "schemaTo": 3,
+    "rollbackFloor": "1.0.0",
+    "backwardCompatible": true
+  },
+  "summaryZh": [
+    {
+      "kind": "feature",
+      "text": "新增受信任的版本清单与管理员手动更新基础能力"
+    },
+    {
+      "kind": "security",
+      "text": "发布镜像固定到不可变摘要并附带来源证明"
+    }
+  ]
+}

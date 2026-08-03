@@ -3,6 +3,7 @@ ARG ACCESS_NODE_IMAGE=node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac966
 FROM ${ACCESS_NODE_IMAGE} AS build
 
 ARG FILMFRAME_REVISION=uncommitted
+ARG FILMFRAME_VERSION=0.0.0-dev
 
 WORKDIR /app
 RUN apt-get update \
@@ -18,8 +19,11 @@ RUN npm run build && npm prune --omit=dev
 FROM ${ACCESS_NODE_IMAGE} AS runtime
 
 ARG FILMFRAME_REVISION=uncommitted
+ARG FILMFRAME_VERSION=0.0.0-dev
 
 LABEL org.opencontainers.image.title="FilmFrame access service" \
+      org.opencontainers.image.source="https://github.com/Zeno-cc/FilmFrame" \
+      org.opencontainers.image.version="${FILMFRAME_VERSION}" \
       org.opencontainers.image.revision="${FILMFRAME_REVISION}"
 
 ENV NODE_ENV=production \

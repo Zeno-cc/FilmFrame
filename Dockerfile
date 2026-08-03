@@ -4,6 +4,7 @@ ARG NGINX_RUNTIME_IMAGE=nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a
 FROM ${NODE_BUILD_IMAGE} AS build
 
 ARG FILMFRAME_REVISION=uncommitted
+ARG FILMFRAME_VERSION=0.0.0-dev
 
 WORKDIR /app
 
@@ -16,8 +17,11 @@ RUN npm run build
 FROM ${NGINX_RUNTIME_IMAGE}
 
 ARG FILMFRAME_REVISION=uncommitted
+ARG FILMFRAME_VERSION=0.0.0-dev
 
 LABEL org.opencontainers.image.title="FilmFrame static application" \
+      org.opencontainers.image.source="https://github.com/Zeno-cc/FilmFrame" \
+      org.opencontainers.image.version="${FILMFRAME_VERSION}" \
       org.opencontainers.image.revision="${FILMFRAME_REVISION}"
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf

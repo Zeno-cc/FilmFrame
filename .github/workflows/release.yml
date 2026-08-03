@@ -1,0 +1,207 @@
+name: Trusted release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: filmframe-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build, attest, and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/access/package-lock.json
+
+      - name: Validate release identity
+        id: release
+        env:
+          EXPECTED_REPOSITORY: Zeno-cc/FilmFrame
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
+          [[ "$GITHUB_REF_TYPE" == "tag" ]]
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          node ops/release/validate-release-input.mjs ops/release/release-input.json --tag "$GITHUB_REF_NAME"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "filmframe_image=ghcr.io/zeno-cc/filmframe/filmframe" >> "$GITHUB_OUTPUT"
+          echo "access_image=ghcr.io/zeno-cc/filmframe/access" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix server/access ci
+
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Run release quality gates
+        run: |
+          npm run check:release
+          npm run test:release-contract
+
+      - name: Build deterministic deploy bundle
+        id: bundle
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          bundle="release/filmframe-deploy-${VERSION}.tar.gz"
+          ops/release/build-deploy-bundle.sh "$GITHUB_SHA" "$VERSION" "$bundle"
+          echo "path=$bundle" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$bundle" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push static image
+        id: static-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.release.outputs.filmframe_image }}:v${{ steps.release.outputs.version }}
+          build-args: |
+            FILMFRAME_VERSION=${{ steps.release.outputs.version }}
+            FILMFRAME_REVISION=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=filmframe-static
+          cache-to: type=gha,mode=max,scope=filmframe-static
+
+      - name: Build and push access image
+        id: access-image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: server/access
+          file: server/access/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.release.outputs.access_image }}:v${{ steps.release.outputs.version }}
+          build-args: |
+            FILMFRAME_VERSION=${{ steps.release.outputs.version }}
+            FILMFRAME_REVISION=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=filmframe-access
+          cache-to: type=gha,mode=max,scope=filmframe-access
+
+      - name: Attest static image provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ steps.release.outputs.filmframe_image }}
+          subject-digest: ${{ steps.static-image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest access image provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-name: ${{ steps.release.outputs.access_image }}
+          subject-digest: ${{ steps.access-image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate canonical release manifest
+        id: manifest
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          STATIC_DIGEST: ${{ steps.static-image.outputs.digest }}
+          ACCESS_DIGEST: ${{ steps.access-image.outputs.digest }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          manifest="release/filmframe-release-manifest.json"
+          notes="release/release-notes.md"
+          node ops/release/create-manifest.mjs \
+            --input ops/release/release-input.json \
+            --output "$manifest" \
+            --notes-output "$notes" \
+            --commit "$GITHUB_SHA" \
+            --published-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --filmframe-digest "$STATIC_DIGEST" \
+            --access-digest "$ACCESS_DIGEST" \
+            --deploy-bundle-sha256 "$BUNDLE_SHA256"
+          node ops/release/validate-manifest.mjs "$manifest" --check-canonical
+          echo "path=$manifest" >> "$GITHUB_OUTPUT"
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+
+      - name: Attest deploy bundle provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ steps.bundle.outputs.path }}
+
+      - name: Attest manifest provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ steps.manifest.outputs.path }}
+
+      - name: Verify signed release contract
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node ops/release/verify-attestations.mjs \
+            "${{ steps.manifest.outputs.path }}" \
+            "${{ steps.bundle.outputs.path }}"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: filmframe-release-${{ steps.release.outputs.version }}
+          path: |
+            ${{ steps.bundle.outputs.path }}
+            ${{ steps.manifest.outputs.path }}
+            ${{ steps.manifest.outputs.notes }}
+            ops/release/manifest.schema.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUNDLE: ${{ steps.bundle.outputs.path }}
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          NOTES: ${{ steps.manifest.outputs.notes }}
+        run: |
+          set -euo pipefail
+          gh release create "v${VERSION}" \
+            "$BUNDLE" \
+            "$MANIFEST" \
+            "ops/release/manifest.schema.json" \
+            --verify-tag \
+            --title "FilmFrame v${VERSION}" \
+            --notes-file "$NOTES"
