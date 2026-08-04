@@ -1,20 +1,28 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "minUpdaterVersion": "1.0.0",
   "database": {
     "schemaFrom": 3,
-    "schemaTo": 3,
-    "rollbackFloor": "1.0.0",
+    "schemaTo": 4,
+    "rollbackFloor": "1.1.1",
     "backwardCompatible": true
   },
   "summaryZh": [
     {
       "kind": "feature",
-      "text": "新增受信任的版本清单与管理员手动更新基础能力"
+      "text": "邀请码支持可配置生效与兑换截止时间"
+    },
+    {
+      "kind": "feature",
+      "text": "管理端新增邀请码可兑换状态与有效设备数"
     },
     {
       "kind": "security",
-      "text": "发布镜像固定到不可变摘要并附带来源证明"
+      "text": "批量邀请码限流覆盖定时生效参数"
+    },
+    {
+      "kind": "fix",
+      "text": "恢复演练兼容旧版邀请码数据库备份"
     }
   ]
 }
