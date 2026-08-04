@@ -417,3 +417,25 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: 发布邀请码定时有效功能 v1.2.0
+
+**Date**: 2026-08-04
+**Task**: 发布邀请码定时有效功能 v1.2.0
+**Branch**: `main`
+
+### Summary
+
+完成邀请码生效时间、兑换截止时间、状态展示与批量生成边界；通过发布质量门禁，创建 GitHub v1.2.0 Release，并经受信更新器完成生产升级及 schema 3 到 4 的验证。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `724ad3943702154e7254fc694a895357c5941dad` | (see git log) |
+| `fa2f3125ad9cfccfa8e76cffbb73ad37fbf7afab` | (see git log) |
+
+### Status
+
+[OK] **Completed**
