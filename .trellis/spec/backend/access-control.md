@@ -35,6 +35,7 @@ CREATE TABLE invites (
   code_hash BLOB NOT NULL UNIQUE,
   label TEXT NOT NULL,
   created_at INTEGER NOT NULL,
+  redeem_from INTEGER NOT NULL,
   redeem_by INTEGER NOT NULL,
   max_redemptions INTEGER NOT NULL,
   redemption_count INTEGER NOT NULL,
@@ -96,7 +97,9 @@ SECURE_COOKIES=true
 ### 3. Contracts
 
 - Generate invitation codes from 16 cryptographically random bytes and prefix the canonical Crockford Base32 value with `FF1-`. Persist only its SHA-256 hash.
-- Redemption is a `BEGIN IMMEDIATE` transaction. A seven-day, one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry.
+- Redemption is a `BEGIN IMMEDIATE` transaction. A one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry. The transaction accepts both the `redeem_from` and `redeem_by` boundary instants and rejects any instant outside them.
+- Invitation creation accepts optional timezone-qualified ISO 8601 `redeemFrom` and `redeemBy` values. Omitted values mean immediate start and a seven-day window; a start-only request ends seven days after its start, while an end-only request starts at creation. The end must be strictly later than the start.
+- Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
 - Invitation expiry blocks new redemption but does not end an already issued session. Revocation invalidates the invitation and all child sessions immediately.
 - The production cookie is `__Host-filmframe_session` with `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, and a bounded `Max-Age`.
 - `POST /auth/refresh` requires a valid unexpired session, the exact FilmFrame origin, and `X-FilmFrame-CSRF: 1`. In one immediate transaction it replaces the stored hash with a fresh 256 bit token hash, updates `last_seen_at` and the 400-day expiry, then sends the rotated token in the persistent Cookie. The old token becomes invalid as soon as the transaction commits.
@@ -106,8 +109,8 @@ SECURE_COOKIES=true
 - The admin service accepts only a cryptographically verified Cloudflare Access assertion. Pin `RS256`, exact issuer, application audience, `exp`, `nbf`, and the configured administrator email.
 - Admin writes require JSON, the exact admin Origin, and `X-FilmFrame-CSRF: 1`. Responses containing a newly generated plaintext code are `no-store`, and the code is never listed again.
 - Invitation creation also requires a UUID `Idempotency-Key`. Concurrent or repeated requests with the same key create one invitation; replayed responses return metadata without plaintext.
-- Batch creation accepts a strict name plus an integer count from 1 to 50. One immediate transaction creates the persisted batch, all hash-only invitations, and a payload-bound hashed idempotency record; a replay returns metadata without plaintext, while reuse with another normalized payload returns `409`.
-- Batch generation has a second process-local limit of 100 generated codes per source IP per minute. Valid idempotent replays cost zero even after the budget is full, invalid input costs one, and accepted fresh requests cost their requested invitation count.
+- Batch creation accepts a strict name, an integer count from 1 to 50, and the same optional schedule fields. One immediate transaction creates the persisted batch, all hash-only invitations sharing one window, and a payload-bound hashed idempotency record; a replay returns metadata without plaintext, while reuse with another normalized payload or schedule intent returns `409`.
+- Batch generation has a second process-local limit of 100 generated codes per source IP per minute. Valid idempotent replays cost zero even after the budget is full, invalid input costs one, and accepted fresh requests cost their requested invitation count. Weight calculation must reuse the complete strict batch-creation schema, including optional schedule fields; adding a valid optional field must never make a request fall back to cost one.
 - Batch revocation is idempotent and transactional: it preserves history, revokes every non-revoked invitation in the batch, and revokes all child sessions immediately.
 - Fresh invitation plaintext exists only in the first `201` response and transient administrator-page memory/DOM. CSV export prefixes spreadsheet formula-leading cells, and page exit or explicit clear removes the transient result.
 - Successful creation and revocation writes emit structured production audit events containing request and target IDs plus affected counts, but never invitation plaintext, cookies, JWTs, request bodies, or administrator email.
@@ -122,7 +125,9 @@ SECURE_COOKIES=true
 
 | Condition | Required result |
 | --- | --- |
-| Malformed, unknown, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
+| Malformed, unknown, not-yet-active, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
+| Start or end boundary instant | Redemption is allowed; one millisecond outside the window is rejected |
+| Missing, malformed, timezone-free, reversed, or zero-length creation window | `400`; no invitation, batch, or idempotency row |
 | Two or more concurrent redemptions of a one-use invitation | Exactly one success |
 | Missing, tampered, expired, or revoked session | Internal check returns `401` |
 | Valid session refresh with exact Origin and CSRF header | `204`; a fresh token is issued, the old token fails immediately, and database/Cookie expiry extend by 400 days |
@@ -137,6 +142,7 @@ SECURE_COOKIES=true
 | Missing exact Origin, JSON content type, or CSRF header on a write | Reject before mutation |
 | Repeated invitation creation with the same idempotency key | One invitation; replay exposes no plaintext code |
 | Batch count outside 1-50, fractional count, unknown field, or malformed security/idempotency input | `400`; no batch, invitation, or idempotency row |
+| Valid scheduled batch creation | Charge the requested invitation count against the 100-code window, exactly like an unscheduled batch |
 | Repeated batch creation with the same key and normalized payload | One batch; replay exposes metadata only and remains available when generation quota is full |
 | Repeated batch creation with the same key and a different payload | `409`; no additional row |
 | Batch generation cost exceeds 100 codes for one IP in one minute | `429`; no data mutation |
@@ -161,7 +167,7 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 
 ### 6. Tests Required
 
-- Unit tests cover invitation format/normalization, hash-only persistence, seven-day and 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, single and batch creation idempotency, batch atomic rollback/revocation, weighted limits, writable health probes, migration idempotency, and database reopen.
+- Unit tests cover invitation format/normalization, hash-only persistence, configurable schedule defaults and inclusive boundaries, all five lifecycle states, 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, active-device counts, single and batch creation idempotency, batch atomic rollback/revocation, weighted limits, writable health probes, legacy schedule migration, migration idempotency, and database reopen.
 - Backup tests use a real named volume in WAL mode and assert that the maintenance job has no network, the long-running service has no backup mount, the CLI opens the source without migrations or SQL writes, the output is `0600`, and the normalized snapshot passes `integrity_check` from a read-only mount.
 - Concurrency coverage sends 20 redemption attempts and asserts exactly one success.
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.

@@ -17,12 +17,14 @@ import {
   createInviteIdempotent,
   createInviteBatchIdempotent,
   BatchIdempotencyConflictError,
+  InvalidInviteScheduleError,
   listBatches,
   listInvites,
   listSessions,
   revokeInvite,
   revokeBatch,
   revokeSession,
+  type InviteScheduleInput,
   type InviteSummary,
   type BatchSummary,
   type SessionSummary,
@@ -34,10 +36,26 @@ import {
   type UpdaterErrorCode,
 } from "../updaterClient.js";
 
-const createInviteSchema = z.object({ label: z.string().trim().min(1).max(80) }).strict();
-const createBatchSchema = z
-  .object({ name: z.string().trim().min(1).max(64), count: z.number().int().min(1).max(50) })
+const scheduleFields = {
+  redeemFrom: z.iso.datetime({ offset: true }).optional(),
+  redeemBy: z.iso.datetime({ offset: true }).optional(),
+};
+const createInviteSchema = z
+  .object({ label: z.string().trim().min(1).max(80), ...scheduleFields })
   .strict();
+const createBatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(64),
+    count: z.number().int().min(1).max(50),
+    ...scheduleFields,
+  })
+  .strict();
+
+export function batchCreationRequestCount(input: unknown): number | null {
+  const parsed = createBatchSchema.safeParse(input);
+  return parsed.success ? parsed.data.count : null;
+}
+
 const inviteIdSchema = z.uuid();
 const idempotencyKeySchema = z.uuid();
 const sessionIdSchema = z.uuid();
@@ -102,6 +120,7 @@ function serializeInvite(invite: InviteSummary): Record<string, unknown> {
     id: invite.id,
     label: invite.label,
     createdAt: new Date(invite.createdAt).toISOString(),
+    redeemFrom: new Date(invite.redeemFrom).toISOString(),
     redeemBy: new Date(invite.redeemBy).toISOString(),
     maxRedemptions: invite.maxRedemptions,
     redemptionCount: invite.redemptionCount,
@@ -112,10 +131,22 @@ function serializeInvite(invite: InviteSummary): Record<string, unknown> {
     revokedAt:
       invite.revokedAt === null ? null : new Date(invite.revokedAt).toISOString(),
     status: invite.status,
+    redeemable: invite.redeemable,
+    activeSessionCount: invite.activeSessionCount,
     batchId: invite.batchId,
     batchName: invite.batchName,
     batchPosition: invite.batchPosition,
   };
+}
+
+function scheduleInput(input: {
+  redeemFrom?: string | undefined;
+  redeemBy?: string | undefined;
+}): InviteScheduleInput {
+  const schedule: InviteScheduleInput = {};
+  if (input.redeemFrom !== undefined) schedule.redeemFrom = Date.parse(input.redeemFrom);
+  if (input.redeemBy !== undefined) schedule.redeemBy = Date.parse(input.redeemBy);
+  return schedule;
 }
 
 function serializeBatch(batch: BatchSummary): Record<string, unknown> {
@@ -165,12 +196,13 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
   router.use(requireAdminAccess(options.config, options.accessJwtVerifier));
 
   router.get("/", (_request, response) => {
+    const requestNow = now();
     response.type("html").send(
       renderAdminPage({
         nonce: response.locals.cspNonce as string,
-        invites: listInvites(options.database, now()),
-        batches: listBatches(options.database, now()),
-        sessions: listSessions(options.database, now()),
+        invites: listInvites(options.database, requestNow),
+        batches: listBatches(options.database, requestNow),
+        sessions: listSessions(options.database, requestNow),
       }),
     );
   });
@@ -315,12 +347,23 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
       return;
     }
 
-    const created = createInviteIdempotent(
-      options.database,
-      input.data.label,
-      idempotencyKey.data,
-      now(),
-    );
+    const requestNow = now();
+    let created;
+    try {
+      created = createInviteIdempotent(
+        options.database,
+        input.data.label,
+        idempotencyKey.data,
+        requestNow,
+        scheduleInput(input.data),
+      );
+    } catch (error) {
+      if (error instanceof InvalidInviteScheduleError) {
+        response.status(400).json({ error: "invalid_request" });
+        return;
+      }
+      throw error;
+    }
     if (created.replayed) {
       response.status(200).json({
         invite: serializeInvite(created.invite),
@@ -342,7 +385,7 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
       targetType: "invite",
       targetId: created.invite.id,
       affected: { invites: 1 },
-      timestamp: now(),
+      timestamp: requestNow,
     });
   });
 
@@ -360,13 +403,15 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
         return;
       }
 
+      const requestNow = now();
       try {
         const result = createInviteBatchIdempotent(
           options.database,
           input.data.name,
           input.data.count,
           idempotencyKey.data,
-          now(),
+          requestNow,
+          scheduleInput(input.data),
         );
         if (result.replayed) {
           response.status(200).json({
@@ -390,11 +435,15 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
           targetType: "invite_batch",
           targetId: result.batch.id,
           affected: { invites: result.batch.inviteCount },
-          timestamp: now(),
+          timestamp: requestNow,
         });
       } catch (error) {
         if (error instanceof BatchIdempotencyConflictError) {
           response.status(409).json({ error: "idempotency_conflict" });
+          return;
+        }
+        if (error instanceof InvalidInviteScheduleError) {
+          response.status(400).json({ error: "invalid_request" });
           return;
         }
         throw error;

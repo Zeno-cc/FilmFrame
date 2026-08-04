@@ -13,18 +13,31 @@ import {
   InvalidInviteCodeError,
 } from "./inviteCode.js";
 
-export type InviteStatus = "active" | "redeemed" | "expired" | "revoked";
+export type InviteStatus = "scheduled" | "active" | "redeemed" | "expired" | "revoked";
+
+export interface InviteScheduleInput {
+  redeemFrom?: number;
+  redeemBy?: number;
+}
+
+interface InviteSchedule {
+  redeemFrom: number;
+  redeemBy: number;
+}
 
 export interface InviteSummary {
   id: string;
   label: string;
   createdAt: number;
+  redeemFrom: number;
   redeemBy: number;
   maxRedemptions: number;
   redemptionCount: number;
   lastRedeemedAt: number | null;
   revokedAt: number | null;
   status: InviteStatus;
+  redeemable: boolean;
+  activeSessionCount: number;
   batchId: string | null;
   batchName: string | null;
   batchPosition: number | null;
@@ -87,6 +100,7 @@ interface InviteRow {
   id: string;
   label: string;
   created_at: number;
+  redeem_from: number;
   redeem_by: number;
   max_redemptions: number;
   redemption_count: number;
@@ -95,6 +109,7 @@ interface InviteRow {
   batch_id: string | null;
   batch_name: string | null;
   batch_position: number | null;
+  active_session_count: number;
 }
 
 interface BatchRow {
@@ -123,6 +138,13 @@ export class InviteUnavailableError extends Error {
   }
 }
 
+export class InvalidInviteScheduleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidInviteScheduleError";
+  }
+}
+
 export class BatchIdempotencyConflictError extends Error {
   readonly status = 409;
 
@@ -135,21 +157,26 @@ export class BatchIdempotencyConflictError extends Error {
 function inviteStatus(row: InviteRow, now: number): InviteStatus {
   if (row.revoked_at !== null) return "revoked";
   if (row.redemption_count >= row.max_redemptions) return "redeemed";
+  if (now < row.redeem_from) return "scheduled";
   if (now > row.redeem_by) return "expired";
   return "active";
 }
 
 function toSummary(row: InviteRow, now: number): InviteSummary {
+  const status = inviteStatus(row, now);
   return {
     id: row.id,
     label: row.label,
     createdAt: row.created_at,
+    redeemFrom: row.redeem_from,
     redeemBy: row.redeem_by,
     maxRedemptions: row.max_redemptions,
     redemptionCount: row.redemption_count,
     lastRedeemedAt: row.last_redeemed_at,
     revokedAt: row.revoked_at,
-    status: inviteStatus(row, now),
+    status,
+    redeemable: status === "active",
+    activeSessionCount: row.active_session_count,
     batchId: row.batch_id,
     batchName: row.batch_name,
     batchPosition: row.batch_position,
@@ -197,6 +224,40 @@ function validateBatchCount(count: number): number {
   return count;
 }
 
+const MAX_DATE_TIMESTAMP = 8_640_000_000_000_000;
+
+function validateScheduleTimestamp(value: number, name: string): number {
+  if (
+    !Number.isSafeInteger(value) ||
+    value < -MAX_DATE_TIMESTAMP ||
+    value > MAX_DATE_TIMESTAMP
+  ) {
+    throw new InvalidInviteScheduleError(`${name} must be a valid timestamp`);
+  }
+  return value;
+}
+
+export function resolveInviteSchedule(
+  input: InviteScheduleInput = {},
+  now = Date.now(),
+): InviteSchedule {
+  const createdAt = validateScheduleTimestamp(now, "Creation time");
+  const redeemFrom = validateScheduleTimestamp(
+    input.redeemFrom ?? createdAt,
+    "Invitation start time",
+  );
+  const redeemBy = validateScheduleTimestamp(
+    input.redeemBy ?? redeemFrom + INVITE_TTL_MS,
+    "Invitation end time",
+  );
+  if (redeemBy <= redeemFrom) {
+    throw new InvalidInviteScheduleError(
+      "Invitation end time must be later than its start time",
+    );
+  }
+  return { redeemFrom, redeemBy };
+}
+
 function createSessionId(): string {
   return randomUUID();
 }
@@ -205,6 +266,7 @@ function insertInvite(
   database: AccessDatabase,
   normalizedLabel: string,
   now: number,
+  schedule: InviteSchedule,
   batch: { id: string; name: string; position: number } | null = null,
 ): CreatedInvite {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -214,7 +276,8 @@ function insertInvite(
       id,
       label: normalizedLabel,
       created_at: now,
-      redeem_by: now + INVITE_TTL_MS,
+      redeem_from: schedule.redeemFrom,
+      redeem_by: schedule.redeemBy,
       max_redemptions: 1,
       redemption_count: 0,
       last_redeemed_at: null,
@@ -222,22 +285,24 @@ function insertInvite(
       batch_id: batch?.id ?? null,
       batch_name: batch?.name ?? null,
       batch_position: batch?.position ?? null,
+      active_session_count: 0,
     };
 
     try {
       database
         .prepare(
           `INSERT INTO invites (
-            id, code_hash, label, created_at, redeem_by, max_redemptions,
+            id, code_hash, label, created_at, redeem_from, redeem_by, max_redemptions,
             redemption_count, last_redeemed_at, revoked_at, batch_id,
             batch_position
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           row.id,
           hashInviteCode(generated.canonical),
           row.label,
           row.created_at,
+          row.redeem_from,
           row.redeem_by,
           row.max_redemptions,
           row.redemption_count,
@@ -260,9 +325,15 @@ export function createInvite(
   database: AccessDatabase,
   label: string,
   now = Date.now(),
+  scheduleInput: InviteScheduleInput = {},
 ): CreatedInvite {
   const normalizedLabel = validateLabel(label);
-  return insertInvite(database, normalizedLabel, now);
+  return insertInvite(
+    database,
+    normalizedLabel,
+    now,
+    resolveInviteSchedule(scheduleInput, now),
+  );
 }
 
 export function createInviteIdempotent(
@@ -270,6 +341,7 @@ export function createInviteIdempotent(
   label: string,
   idempotencyKey: string,
   now = Date.now(),
+  scheduleInput: InviteScheduleInput = {},
 ): IdempotentInviteResult {
   const normalizedLabel = validateLabel(label);
   const key = validateIdempotencyKey(idempotencyKey);
@@ -278,19 +350,24 @@ export function createInviteIdempotent(
   const transaction = database.transaction(() => {
     const existing = database
       .prepare(
-        `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
+        `SELECT i.id, i.label, i.created_at, i.redeem_from, i.redeem_by,
+                i.max_redemptions,
                 i.redemption_count, i.last_redeemed_at, i.revoked_at,
-                i.batch_id, NULL AS batch_name, i.batch_position
+                i.batch_id, NULL AS batch_name, i.batch_position,
+                (SELECT count(*) FROM sessions s
+                 WHERE s.invite_id = i.id
+                   AND s.revoked_at IS NULL AND s.expires_at > ?) AS active_session_count
          FROM invite_creation_requests request
          JOIN invites i ON i.id = request.invite_id
          WHERE request.key_hash = ?`,
       )
-      .get(keyHash) as InviteRow | undefined;
+      .get(now, keyHash) as InviteRow | undefined;
     if (existing) {
       return { code: null, invite: toSummary(existing, now), replayed: true };
     }
 
-    const created = insertInvite(database, normalizedLabel, now);
+    const schedule = resolveInviteSchedule(scheduleInput, now);
+    const created = insertInvite(database, normalizedLabel, now, schedule);
     database
       .prepare(
         `INSERT INTO invite_creation_requests (key_hash, invite_id, created_at)
@@ -329,15 +406,19 @@ function batchInvites(
 ): InviteSummary[] {
   const rows = database
     .prepare(
-      `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
+      `SELECT i.id, i.label, i.created_at, i.redeem_from, i.redeem_by,
+              i.max_redemptions,
               i.redemption_count, i.last_redeemed_at, i.revoked_at,
-              i.batch_id, b.name AS batch_name, i.batch_position
+              i.batch_id, b.name AS batch_name, i.batch_position,
+              (SELECT count(*) FROM sessions s
+               WHERE s.invite_id = i.id
+                 AND s.revoked_at IS NULL AND s.expires_at > ?) AS active_session_count
        FROM invites i
        JOIN invite_batches b ON b.id = i.batch_id
        WHERE i.batch_id = ?
        ORDER BY i.batch_position ASC`,
     )
-    .all(batchId) as InviteRow[];
+    .all(now, batchId) as InviteRow[];
   return rows.map((row) => toSummary(row, now));
 }
 
@@ -347,13 +428,19 @@ export function createInviteBatchIdempotent(
   count: number,
   idempotencyKey: string,
   now = Date.now(),
+  scheduleInput: InviteScheduleInput = {},
 ): IdempotentBatchResult {
   const normalizedName = validateBatchName(name);
   const normalizedCount = validateBatchCount(count);
   const key = validateIdempotencyKey(idempotencyKey);
   const keyHash = hashValue(`invite-batch-create:${key}`);
   const payloadHash = hashValue(
-    JSON.stringify({ name: normalizedName, count: normalizedCount }),
+    JSON.stringify({
+      name: normalizedName,
+      count: normalizedCount,
+      redeemFrom: scheduleInput.redeemFrom ?? null,
+      redeemBy: scheduleInput.redeemBy ?? null,
+    }),
   );
 
   const transaction = database.transaction(() => {
@@ -378,6 +465,7 @@ export function createInviteBatchIdempotent(
       };
     }
 
+    const schedule = resolveInviteSchedule(scheduleInput, now);
     const batchId = randomUUID();
     database
       .prepare(
@@ -390,7 +478,7 @@ export function createInviteBatchIdempotent(
     for (let position = 1; position <= normalizedCount; position += 1) {
       const label = `${normalizedName} #${String(position).padStart(2, "0")}`;
       created.push(
-        insertInvite(database, label, now, {
+        insertInvite(database, label, now, schedule, {
           id: batchId,
           name: normalizedName,
           position,
@@ -455,14 +543,18 @@ export function listInvites(
 ): InviteSummary[] {
   const rows = database
     .prepare(
-      `SELECT i.id, i.label, i.created_at, i.redeem_by, i.max_redemptions,
+      `SELECT i.id, i.label, i.created_at, i.redeem_from, i.redeem_by,
+              i.max_redemptions,
               i.redemption_count, i.last_redeemed_at, i.revoked_at,
-              i.batch_id, b.name AS batch_name, i.batch_position
+              i.batch_id, b.name AS batch_name, i.batch_position,
+              (SELECT count(*) FROM sessions s
+               WHERE s.invite_id = i.id
+                 AND s.revoked_at IS NULL AND s.expires_at > ?) AS active_session_count
        FROM invites i
        LEFT JOIN invite_batches b ON b.id = i.batch_id
        ORDER BY i.created_at DESC, i.batch_position ASC`,
     )
-    .all() as InviteRow[];
+    .all(now) as InviteRow[];
   return rows.map((row) => toSummary(row, now));
 }
 
@@ -493,10 +585,11 @@ export function redeemInvite(
              last_redeemed_at = ?
          WHERE code_hash = ?
            AND revoked_at IS NULL
+           AND redeem_from <= ?
            AND redeem_by >= ?
            AND redemption_count < max_redemptions`,
       )
-      .run(now, codeHash, now);
+      .run(now, codeHash, now, now);
 
     if (update.changes !== 1) throw new InviteUnavailableError();
 

@@ -16,7 +16,10 @@ import {
 } from "./middleware/requestSecurity.js";
 import { isTrustedProxyAddress } from "./network.js";
 import { NonceStore } from "./nonceStore.js";
-import { createAdminRoutes } from "./routes/adminRoutes.js";
+import {
+  batchCreationRequestCount,
+  createAdminRoutes,
+} from "./routes/adminRoutes.js";
 import { createPublicRoutes } from "./routes/publicRoutes.js";
 import { readSessionCookie } from "./sessionCookie.js";
 import { hasInviteBatchCreationRequest, isSessionValid } from "./store.js";
@@ -128,20 +131,8 @@ export function createApp(options: CreateAppOptions): express.Express {
         limit: 100,
         windowMs: 60_000,
         cost: (request) => {
-          const body = request.body as unknown;
-          if (!body || typeof body !== "object" || Array.isArray(body)) return 1;
-          const values = body as Record<string, unknown>;
-          if (
-            Object.keys(values).length !== 2 ||
-            typeof values.name !== "string" ||
-            values.name.trim().length < 1 ||
-            values.name.trim().length > 64 ||
-            !Number.isSafeInteger(values.count) ||
-            (values.count as number) < 1 ||
-            (values.count as number) > 50
-          ) {
-            return 1;
-          }
+          const count = batchCreationRequestCount(request.body);
+          if (count === null) return 1;
           const idempotencyKey = request.header("Idempotency-Key");
           if (
             idempotencyKey &&
@@ -149,7 +140,7 @@ export function createApp(options: CreateAppOptions): express.Express {
           ) {
             return 0;
           }
-          return values.count as number;
+          return count;
         },
       }),
       updateRateLimiter: createRateLimiter({ limit: 12, windowMs: 60_000 }),

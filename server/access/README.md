@@ -63,13 +63,27 @@ Host. Administrator writes require the exact administrator Origin,
 requires a UUID `Idempotency-Key`: the first response returns plaintext once,
 while a replay returns only the existing invitation metadata.
 
-Batch creation accepts a strict `{ "name": string, "count": integer }` body
-with 1–50 invitations. The whole batch is committed atomically and one
-idempotency key is bound to its normalized name and count; reusing the key with
-another payload returns `409`. The first `201` response is the only place that
-contains the ordered plaintext codes. Replays and all list endpoints return
-metadata only. Batch generation is limited to 100 codes per source IP per
-minute in addition to the ordinary administrator request limit.
+Single and batch creation accept optional `redeemFrom` and `redeemBy` fields as
+timezone-qualified ISO 8601 timestamps. With neither field, an invitation is
+redeemable immediately for seven days. A start-only request ends seven days
+after that start, while an end-only request starts immediately. Both boundaries
+are inclusive and the end must be later than the start. Existing invitation
+windows are immutable; revoke and recreate an invitation to change one.
+
+Batch creation accepts a strict `{ "name": string, "count": integer,
+"redeemFrom"?: string, "redeemBy"?: string }` body with 1–50 invitations. The
+whole batch shares one schedule and is committed atomically. One idempotency key
+is bound to its normalized name, count, and schedule intent; reusing the key
+with another payload returns `409`. The first `201` response is the only place
+that contains the ordered plaintext codes. Replays and all list endpoints
+return metadata only. Batch generation is limited to 100 codes per source IP
+per minute in addition to the ordinary administrator request limit.
+
+Invitation metadata derives `scheduled`, `active`, `redeemed`, `expired`, or
+`revoked` at read time and exposes `redeemable` plus `activeSessionCount` to the
+authenticated administrator. `redeemable` is true only for `active`; it is not
+stored and is never an authorization boundary. Invitation expiry blocks new
+redemption but does not invalidate an already issued device session.
 
 The administrator page keeps fresh codes only in memory and the current DOM.
 It supports copy-all and spreadsheet-safe CSV download, then clears the result

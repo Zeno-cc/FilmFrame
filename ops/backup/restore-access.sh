@@ -65,9 +65,17 @@ const db = new Database(process.argv[1], { readonly: true, fileMustExist: true }
 const integrity = db.pragma("integrity_check", { simple: true });
 if (integrity !== "ok") process.exit(2);
 const schemaVersion = db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get().version;
+if (!Number.isInteger(schemaVersion)) process.exit(3);
+const inviteColumns = new Set(
+  db.pragma("table_info(invites)").map((column) => column.name),
+);
+const redeemFromProjection = inviteColumns.has("redeem_from")
+  ? "redeem_from AS redeemFrom"
+  : "created_at AS redeemFrom";
 const invites = db.prepare(`
   SELECT id, hex(code_hash) AS codeHash, label, created_at AS createdAt,
-         redeem_by AS redeemBy, max_redemptions AS maxRedemptions,
+         ${redeemFromProjection}, redeem_by AS redeemBy,
+         max_redemptions AS maxRedemptions,
          redemption_count AS redemptionCount, last_redeemed_at AS lastRedeemedAt,
          revoked_at AS revokedAt
   FROM invites
@@ -81,7 +89,7 @@ const sessions = db.prepare(`
   ORDER BY id
 `).all();
 db.close();
-process.stdout.write(JSON.stringify({ schemaVersion, invites, sessions }));
+process.stdout.write(JSON.stringify({ invites, sessions }));
 NODE
 )
 

@@ -224,6 +224,27 @@ describe("public invitation gateway", () => {
     assert.equal(response.headers["set-cookie"], undefined);
   });
 
+  it("uses the generic failure for invitations that have not started", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "尚未生效", now, {
+      redeemFrom: now + 60_000,
+      redeemBy: now + 120_000,
+    });
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .type("form")
+      .send({ code: created.code, nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 400);
+    assert.match(response.text, new RegExp(GENERIC_INVITE_ERROR));
+    assert.equal(response.headers["set-cookie"], undefined);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM sessions").get(), {
+      count: 0,
+    });
+  });
+
   it("rejects oversized redemption bodies without setting a cookie", async () => {
     const { app, config } = fixture();
     const access = await request(app).get("/access").set("Host", config.filmframeHost);
@@ -471,6 +492,22 @@ describe("public invitation gateway", () => {
 });
 
 describe("administrator routes", () => {
+  function inviteRequest(
+    app: ReturnType<typeof createApp>,
+    config: AccessConfig,
+    body: unknown,
+    key = randomUUID(),
+  ) {
+    return request(app)
+      .post("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Idempotency-Key", key)
+      .send(body);
+  }
+
   function batchRequest(
     app: ReturnType<typeof createApp>,
     config: AccessConfig,
@@ -640,6 +677,191 @@ describe("administrator routes", () => {
     assert.equal(JSON.stringify(list.body).includes("codeHash"), false);
   });
 
+  it("creates explicit, default, and partial invitation schedules", async () => {
+    const now = Date.parse("2026-08-04T00:00:00.000Z");
+    const { app, config } = fixture(now);
+    const explicit = await inviteRequest(app, config, {
+      label: "预约访客",
+      redeemFrom: "2026-08-05T08:00:00.000+08:00",
+      redeemBy: "2026-08-06T08:00:00.000+08:00",
+    });
+    const defaults = await inviteRequest(app, config, { label: "默认访客" });
+    const startOnly = await inviteRequest(app, config, {
+      label: "只设开始",
+      redeemFrom: "2026-08-10T00:00:00.000Z",
+    });
+    const endOnly = await inviteRequest(app, config, {
+      label: "只设截止",
+      redeemBy: "2026-08-20T00:00:00.000Z",
+    });
+
+    assert.equal(explicit.status, 201);
+    assert.deepEqual(
+      {
+        redeemFrom: explicit.body.invite.redeemFrom,
+        redeemBy: explicit.body.invite.redeemBy,
+        status: explicit.body.invite.status,
+        redeemable: explicit.body.invite.redeemable,
+        activeSessionCount: explicit.body.invite.activeSessionCount,
+      },
+      {
+        redeemFrom: "2026-08-05T00:00:00.000Z",
+        redeemBy: "2026-08-06T00:00:00.000Z",
+        status: "scheduled",
+        redeemable: false,
+        activeSessionCount: 0,
+      },
+    );
+    assert.equal(defaults.body.invite.redeemFrom, "2026-08-04T00:00:00.000Z");
+    assert.equal(defaults.body.invite.redeemBy, "2026-08-11T00:00:00.000Z");
+    assert.equal(startOnly.body.invite.redeemFrom, "2026-08-10T00:00:00.000Z");
+    assert.equal(startOnly.body.invite.redeemBy, "2026-08-17T00:00:00.000Z");
+    assert.equal(endOnly.body.invite.redeemFrom, "2026-08-04T00:00:00.000Z");
+    assert.equal(endOnly.body.invite.redeemBy, "2026-08-20T00:00:00.000Z");
+    for (const response of [explicit, defaults, startOnly, endOnly]) {
+      assert.equal("codeHash" in response.body.invite, false);
+      assert.equal("token" in response.body.invite, false);
+    }
+  });
+
+  it("rejects malformed or impossible schedules with zero writes", async () => {
+    const now = Date.parse("2026-08-04T00:00:00.000Z");
+    const { app, config, database } = fixture(now);
+    for (const body of [
+      { label: "缺少时区", redeemFrom: "2026-08-05T00:00:00" },
+      { label: "非法日期", redeemFrom: "2026-13-05T00:00:00.000Z" },
+      {
+        label: "倒置窗口",
+        redeemFrom: "2026-08-06T00:00:00.000Z",
+        redeemBy: "2026-08-05T00:00:00.000Z",
+      },
+      {
+        label: "零长度窗口",
+        redeemFrom: "2026-08-05T00:00:00.000Z",
+        redeemBy: "2026-08-05T00:00:00.000Z",
+      },
+      { label: "截止早于创建", redeemBy: "2026-08-03T00:00:00.000Z" },
+    ]) {
+      const response = await inviteRequest(app, config, body);
+      assert.equal(response.status, 400);
+      assert.deepEqual(response.body, { error: "invalid_request" });
+    }
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 0,
+    });
+    assert.deepEqual(
+      database.prepare("SELECT count(*) AS count FROM invite_creation_requests").get(),
+      { count: 0 },
+    );
+  });
+
+  it("returns every invitation lifecycle with current redeemability", async () => {
+    const now = 10_000;
+    const { app, config, database } = fixture(now);
+    createInvite(database, "未生效", now, {
+      redeemFrom: now + 1,
+      redeemBy: now + 2,
+    });
+    createInvite(database, "待兑换", now);
+    const redeemed = createInvite(database, "已兑换", now);
+    redeemInvite(database, redeemed.code, now);
+    createInvite(database, "已过期", now, {
+      redeemFrom: now - 2,
+      redeemBy: now - 1,
+    });
+    const revoked = createInvite(database, "已撤销", now);
+    revokeInvite(database, revoked.invite.id, now);
+
+    const response = await request(app)
+      .get("/api/invites")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(response.status, 200);
+    const summaries = Object.fromEntries(
+      response.body.invites.map(
+        (invite: {
+          label: string;
+          status: string;
+          redeemable: boolean;
+          activeSessionCount: number;
+        }) => [
+          invite.label,
+          {
+            status: invite.status,
+            redeemable: invite.redeemable,
+            activeSessionCount: invite.activeSessionCount,
+          },
+        ],
+      ),
+    );
+    assert.deepEqual(summaries, {
+      未生效: { status: "scheduled", redeemable: false, activeSessionCount: 0 },
+      待兑换: { status: "active", redeemable: true, activeSessionCount: 0 },
+      已兑换: { status: "redeemed", redeemable: false, activeSessionCount: 1 },
+      已过期: { status: "expired", redeemable: false, activeSessionCount: 0 },
+      已撤销: { status: "revoked", redeemable: false, activeSessionCount: 0 },
+    });
+  });
+
+  it("replays end-only API schedules after the deadline without new records", async () => {
+    let now = Date.parse("2026-08-04T00:00:00.000Z");
+    const config = testConfig();
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const app = createApp({
+      config,
+      database,
+      accessJwtVerifier: async (token) => {
+        if (token !== "valid-access-token") throw new Error("unauthorized");
+        return { subject: "admin", email: config.adminEmail };
+      },
+      now: () => now,
+    });
+    const redeemBy = "2026-08-04T00:00:01.000Z";
+    const singleKey = randomUUID();
+    const batchKey = randomUUID();
+    const single = await inviteRequest(
+      app,
+      config,
+      { label: "跨期单码", redeemBy },
+      singleKey,
+    );
+    const batch = await batchRequest(
+      app,
+      config,
+      { name: "跨期批次", count: 2, redeemBy },
+      batchKey,
+    );
+    assert.equal(single.status, 201);
+    assert.equal(batch.status, 201);
+
+    now += 1_001;
+    const singleReplay = await inviteRequest(
+      app,
+      config,
+      { label: "跨期单码", redeemBy },
+      singleKey,
+    );
+    const batchReplay = await batchRequest(
+      app,
+      config,
+      { name: "跨期批次", count: 2, redeemBy },
+      batchKey,
+    );
+    assert.equal(singleReplay.status, 200);
+    assert.equal(singleReplay.body.invite.status, "expired");
+    assert.equal(batchReplay.status, 200);
+    assert.equal(
+      batchReplay.body.invites.every(
+        (invite: { status: string }) => invite.status === "expired",
+      ),
+      true,
+    );
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 3,
+    });
+  });
+
   it("requires a UUID idempotency key before creating an invite", async () => {
     const { app, config, database } = fixture();
     const create = (key?: string) => {
@@ -788,19 +1010,67 @@ describe("administrator routes", () => {
     );
     assert.equal(conflict.status, 409);
     assert.equal(conflict.body.error, "idempotency_conflict");
+    const scheduledKey = randomUUID();
+    const scheduled = await batchRequest(
+      app,
+      config,
+      {
+        name: "时间冲突批次",
+        count: 2,
+        redeemFrom: "2026-08-05T00:00:00.000Z",
+        redeemBy: "2026-08-06T00:00:00.000Z",
+      },
+      scheduledKey,
+    );
+    assert.equal(scheduled.status, 201);
+    assert.equal(
+      scheduled.body.codes.every(
+        ({ invite }: { invite: Record<string, unknown> }) =>
+          invite.redeemFrom === "2026-08-05T00:00:00.000Z" &&
+          invite.redeemBy === "2026-08-06T00:00:00.000Z" &&
+          invite.status === "scheduled" &&
+          invite.redeemable === false,
+      ),
+      true,
+    );
+    const scheduleConflict = await batchRequest(
+      app,
+      config,
+      {
+        name: "时间冲突批次",
+        count: 2,
+        redeemFrom: "2026-08-05T00:00:00.000Z",
+        redeemBy: "2026-08-07T00:00:00.000Z",
+      },
+      scheduledKey,
+    );
+    assert.equal(scheduleConflict.status, 409);
     assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
-      count: 3,
+      count: 5,
     });
   });
 
   it("limits batch creation by generated code count", async () => {
     const { app, config, database } = fixture();
     assert.equal(
-      (await batchRequest(app, config, { name: "额度一", count: 50 })).status,
+      (
+        await batchRequest(app, config, {
+          name: "额度一",
+          count: 50,
+          redeemFrom: "2026-08-05T00:00:00.000Z",
+          redeemBy: "2026-08-12T00:00:00.000Z",
+        })
+      ).status,
       201,
     );
     assert.equal(
-      (await batchRequest(app, config, { name: "额度二", count: 50 })).status,
+      (
+        await batchRequest(app, config, {
+          name: "额度二",
+          count: 50,
+          redeemFrom: "2026-08-06T00:00:00.000Z",
+        })
+      ).status,
       201,
     );
     const limited = await batchRequest(app, config, { name: "超出额度", count: 1 });
@@ -1155,6 +1425,14 @@ describe("administrator routes", () => {
     assert.match(response.text, /pagehide/);
     assert.match(response.text, /invite-search/);
     assert.match(response.text, /revoke-batch/);
+    assert.match(response.text, /id="redeem-from"/);
+    assert.match(response.text, /id="redeem-by"/);
+    assert.match(response.text, /未生效/);
+    assert.match(response.text, /当前可兑换/);
+    assert.match(response.text, /有效设备/);
+    assert.match(response.text, /data-local-time/);
+    assert.match(response.text, /Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/);
+    assert.match(response.text, /schedule=\{redeemFrom,redeemBy\}/);
     assert.match(response.text, /\^\[=\+\\-@\]/);
     assert.doesNotMatch(response.text, /localStorage|sessionStorage/);
     assert.match(response.text, /data-label="会话 ID"/);

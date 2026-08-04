@@ -251,6 +251,7 @@ async function verifyConfigFiles() {
     cloudflareRealIp,
     backupScript,
     restoreScript,
+    inviteScheduleMigration,
   ] = await Promise.all([
     readFile(path.join(root, "nginx.conf"), "utf8"),
     readFile(
@@ -265,6 +266,10 @@ async function verifyConfigFiles() {
     readFile(path.join(root, "ops/openresty/cloudflare-real-ip.conf"), "utf8"),
     readFile(path.join(root, "ops/backup/backup-access.sh"), "utf8"),
     readFile(path.join(root, "ops/backup/restore-access.sh"), "utf8"),
+    readFile(
+      path.join(root, "server/access/migrations/004_invite_schedule.sql"),
+      "utf8",
+    ),
   ]);
 
   check(
@@ -371,8 +376,21 @@ async function verifyConfigFiles() {
   check(
     /target volume already exists; refusing overwrite/.test(restoreScript) &&
       /filmframe_access_restore_/.test(restoreScript) &&
-      /openDatabase/.test(restoreScript),
-    "restore script targets a new volume and reruns migrations",
+      /openDatabase/.test(restoreScript) &&
+      /table_info\(invites\)/.test(restoreScript) &&
+      /redeem_from AS redeemFrom/.test(restoreScript) &&
+      /created_at AS redeemFrom/.test(restoreScript),
+    "restore script migrates a new volume and compares legacy invite schedules",
+  );
+  check(
+    /ADD COLUMN redeem_from INTEGER NOT NULL DEFAULT 0/.test(
+      inviteScheduleMigration,
+    ) &&
+      /SET redeem_from = created_at/.test(inviteScheduleMigration) &&
+      /CREATE TRIGGER invites_set_legacy_redeem_from/.test(
+        inviteScheduleMigration,
+      ),
+    "invite schedule migration backfills history and supports legacy inserts",
   );
   check(
     /npm_config_build_from_source=true npm ci/.test(accessDockerfile),

@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, realpath, symlink, utimes, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -61,6 +69,15 @@ assert.equal(await exists(recentBackup), true);
 assert.equal(await exists(malformed), true);
 assert.equal(await exists(linked), true);
 assert.equal(await exists(outside), true);
+
+const restoreScript = await readFile(
+  path.resolve("ops/backup/restore-access.sh"),
+  "utf8",
+);
+assert.match(restoreScript, /table_info\(invites\)/);
+assert.match(restoreScript, /redeem_from AS redeemFrom/);
+assert.match(restoreScript, /created_at AS redeemFrom/);
+assert.match(restoreScript, /JSON\.stringify\(\{ invites, sessions \}\)/);
 
 const unsafe = spawnSync(
   "bash",

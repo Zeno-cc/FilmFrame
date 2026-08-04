@@ -19,6 +19,7 @@ import {
   createInviteBatchIdempotent,
   createInviteIdempotent,
   BatchIdempotencyConflictError,
+  InvalidInviteScheduleError,
   InviteUnavailableError,
   isSessionValid,
   listInvites,
@@ -89,6 +90,31 @@ describe("invitation and session store", () => {
       assert.equal(session.lastSeenAt, 2_000);
       assert.equal(session.inviteLabel, "旧会话");
       assert.equal(isSessionValid(upgraded, token, 3_000), true);
+      assert.equal(listInvites(upgraded, 3_000)[0]?.redeemFrom, 1_000);
+
+      upgraded
+        .prepare(
+          `INSERT INTO invites (
+            id, code_hash, label, created_at, redeem_by, max_redemptions,
+            redemption_count, last_redeemed_at, revoked_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "legacy-rollback-invite",
+          Buffer.alloc(32, 2),
+          "旧应用回滚创建",
+          2_500,
+          9_500,
+          1,
+          0,
+          null,
+          null,
+        );
+      assert.equal(
+        listInvites(upgraded, 3_000).find(({ id }) => id === "legacy-rollback-invite")
+          ?.redeemFrom,
+        2_500,
+      );
       upgraded.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -118,6 +144,99 @@ describe("invitation and session store", () => {
     assert.equal(replay.invite.label, "幂等访客");
     assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
       count: 1,
+    });
+    database.close();
+  });
+
+  it("applies default and partial invitation schedules deterministically", () => {
+    const database = openDatabase(":memory:");
+    const now = 10_000;
+    const defaults = createInvite(database, "默认窗口", now);
+    const startOnly = createInvite(database, "只设开始", now, {
+      redeemFrom: 20_000,
+    });
+    const endOnly = createInvite(database, "只设截止", now, {
+      redeemBy: 30_000,
+    });
+
+    assert.deepEqual(
+      [defaults, startOnly, endOnly].map(({ invite }) => ({
+        redeemFrom: invite.redeemFrom,
+        redeemBy: invite.redeemBy,
+      })),
+      [
+        { redeemFrom: now, redeemBy: now + INVITE_TTL_MS },
+        { redeemFrom: 20_000, redeemBy: 20_000 + INVITE_TTL_MS },
+        { redeemFrom: now, redeemBy: 30_000 },
+      ],
+    );
+    database.close();
+  });
+
+  it("rejects invalid invitation schedules before writing anything", () => {
+    const database = openDatabase(":memory:");
+    for (const schedule of [
+      { redeemFrom: 2_000, redeemBy: 2_000 },
+      { redeemFrom: 2_001, redeemBy: 2_000 },
+      { redeemFrom: Number.NaN, redeemBy: 3_000 },
+      { redeemFrom: 1_000, redeemBy: Number.MAX_SAFE_INTEGER },
+    ]) {
+      assert.throws(
+        () => createInvite(database, "非法窗口", 1_000, schedule),
+        InvalidInviteScheduleError,
+      );
+    }
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 0,
+    });
+    database.close();
+  });
+
+  it("replays end-only schedules after expiry without resolving a new window", () => {
+    const database = openDatabase(":memory:");
+    const redeemBy = 2_000;
+    const singleKey = "12345678-1234-4234-9234-123456789ac1";
+    const batchKey = "12345678-1234-4234-9234-123456789ac2";
+    const single = createInviteIdempotent(
+      database,
+      "跨期单码",
+      singleKey,
+      1_000,
+      { redeemBy },
+    );
+    const batch = createInviteBatchIdempotent(
+      database,
+      "跨期批次",
+      2,
+      batchKey,
+      1_000,
+      { redeemBy },
+    );
+
+    const singleReplay = createInviteIdempotent(
+      database,
+      "跨期单码",
+      singleKey,
+      redeemBy + 1,
+      { redeemBy },
+    );
+    const batchReplay = createInviteBatchIdempotent(
+      database,
+      "跨期批次",
+      2,
+      batchKey,
+      redeemBy + 1,
+      { redeemBy },
+    );
+
+    assert.equal(singleReplay.replayed, true);
+    assert.equal(singleReplay.invite.id, single.invite.id);
+    assert.equal(singleReplay.invite.status, "expired");
+    assert.equal(batchReplay.replayed, true);
+    assert.equal(batchReplay.batch.id, batch.batch.id);
+    assert.equal(batchReplay.invites.every(({ status }) => status === "expired"), true);
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 3,
     });
     database.close();
   });
@@ -201,6 +320,52 @@ describe("invitation and session store", () => {
     database.close();
   });
 
+  it("shares one schedule across a batch and binds it to idempotency", () => {
+    const database = openDatabase(":memory:");
+    const key = "12345678-1234-4234-9234-123456789ac3";
+    const schedule = { redeemFrom: 5_000, redeemBy: 9_000 };
+    const first = createInviteBatchIdempotent(
+      database,
+      "预约批次",
+      3,
+      key,
+      1_000,
+      schedule,
+    );
+    const replay = createInviteBatchIdempotent(
+      database,
+      "预约批次",
+      3,
+      key,
+      2_000,
+      schedule,
+    );
+
+    assert.equal(
+      first.created.every(
+        ({ invite }) =>
+          invite.redeemFrom === schedule.redeemFrom &&
+          invite.redeemBy === schedule.redeemBy &&
+          invite.status === "scheduled" &&
+          invite.redeemable === false,
+      ),
+      true,
+    );
+    assert.equal(replay.replayed, true);
+    assert.throws(
+      () =>
+        createInviteBatchIdempotent(database, "预约批次", 3, key, 2_000, {
+          redeemFrom: 5_001,
+          redeemBy: 9_000,
+        }),
+      BatchIdempotencyConflictError,
+    );
+    assert.deepEqual(database.prepare("SELECT count(*) AS count FROM invites").get(), {
+      count: 3,
+    });
+    database.close();
+  });
+
   it("rolls back the batch, invites, and idempotency record on insert failure", () => {
     const database = openDatabase(":memory:");
     database.exec(`
@@ -276,6 +441,68 @@ describe("invitation and session store", () => {
       () => redeemInvite(database, created.code, createdAt + 1),
       InviteUnavailableError,
     );
+    database.close();
+  });
+
+  it("enforces inclusive invitation schedule boundaries", () => {
+    const database = openDatabase(":memory:");
+    const redeemFrom = 10_000;
+    const redeemBy = 20_000;
+    const startsAtBoundary = createInvite(database, "开始边界", 1_000, {
+      redeemFrom,
+      redeemBy,
+    });
+    const endsAtBoundary = createInvite(database, "截止边界", 1_000, {
+      redeemFrom,
+      redeemBy,
+    });
+    const expiresAfterBoundary = createInvite(database, "截止后", 1_000, {
+      redeemFrom,
+      redeemBy,
+    });
+
+    const scheduled = listInvites(database, redeemFrom - 1);
+    assert.equal(scheduled.every(({ status }) => status === "scheduled"), true);
+    assert.equal(scheduled.every(({ redeemable }) => redeemable === false), true);
+    assert.throws(
+      () => redeemInvite(database, startsAtBoundary.code, redeemFrom - 1),
+      InviteUnavailableError,
+    );
+    assert.doesNotThrow(() =>
+      redeemInvite(database, startsAtBoundary.code, redeemFrom),
+    );
+    assert.doesNotThrow(() => redeemInvite(database, endsAtBoundary.code, redeemBy));
+    assert.throws(
+      () => redeemInvite(database, expiresAfterBoundary.code, redeemBy + 1),
+      InviteUnavailableError,
+    );
+    const expired = listInvites(database, redeemBy + 1).find(
+      ({ id }) => id === expiresAfterBoundary.invite.id,
+    );
+    assert.equal(expired?.status, "expired");
+    assert.equal(expired?.redeemable, false);
+    database.close();
+  });
+
+  it("reports active device counts independently from invitation availability", () => {
+    const database = openDatabase(":memory:");
+    const now = 30_000;
+    const created = createInvite(database, "设备计数", now, {
+      redeemBy: now + 1_000,
+    });
+    const session = redeemInvite(database, created.code, now);
+
+    let summary = listInvites(database, now)[0];
+    assert.equal(summary?.status, "redeemed");
+    assert.equal(summary?.redeemable, false);
+    assert.equal(summary?.activeSessionCount, 1);
+
+    summary = listInvites(database, now + 1_001)[0];
+    assert.equal(summary?.activeSessionCount, 1);
+    assert.equal(isSessionValid(database, session.token, now + 1_001), true);
+
+    assert.equal(revokeSession(database, session.sessionId, now + 1_002), true);
+    assert.equal(listInvites(database, now + 1_003)[0]?.activeSessionCount, 0);
     database.close();
   });
 
