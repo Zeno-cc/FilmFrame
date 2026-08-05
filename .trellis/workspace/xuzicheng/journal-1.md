@@ -439,3 +439,24 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: 完成 FilmFrame v1.3 可靠性收尾
+
+**Date**: 2026-08-05
+**Task**: 完成 FilmFrame v1.3 可靠性收尾
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+完成 1.3 可靠性与兼容性版本：管理员可配置 128–2048 MiB 单 Canvas RGBA 预算，默认 700 MiB；新增运行配置 API、前端有界准入、App 与 filmEngine 增量拆分、Worker/主线程预算传播、Chromium 压力门禁、Firefox/WebKit 聚焦兼容测试、更新器 CI 与移动端发布证据文档。前端 196/196、Access 89/89、类型检查与生产构建通过。修复启动配置/续期竞态、migration 005 时间戳约束和 nonce 规范 Base64URL 校验。Docker 反代 E2E 因 OrbStack 未启动未执行，iPhone Safari 与 Android Chrome 真机证据待补，因此未打 v1.3.0 标签、未推送、未部署。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f768bf0` | (see git log) |
+
+### Status
+
+[OK] **Completed**

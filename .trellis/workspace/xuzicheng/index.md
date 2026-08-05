@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
-- **Last Active**: 2026-08-04
+- **Total Sessions**: 16
+- **Last Active**: 2026-08-05
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~441 | Active |
+| `journal-1.md` | ~462 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-08-05 | 完成 FilmFrame v1.3 可靠性收尾 | `f768bf0` | `codex/filmframe-v1-3-hardening` |
 | 15 | 2026-08-04 | 发布邀请码定时有效功能 v1.2.0 | `724ad3943702154e7254fc694a895357c5941dad`, `fa2f3125ad9cfccfa8e76cffbb73ad37fbf7afab` | `main` |
 | 14 | 2026-08-03 | 上线可信版本更新系统 | `40d9fae`, `2b5ba73`, `ebe5dcb`, `ea5f373`, `b76426b`, `0958dc7`, `554186f` | `main` |
 | 13 | 2026-08-01 | Update Trellis tooling | `692b20a` | `main` |
