@@ -35,6 +35,13 @@ import {
   type UpdaterClient,
   type UpdaterErrorCode,
 } from "../updaterClient.js";
+import {
+  MAX_MAX_CANVAS_MIB,
+  MIN_MAX_CANVAS_MIB,
+  readRenderBudgetSetting,
+  updateRenderBudgetSetting,
+  type RenderBudgetSetting,
+} from "../runtimeConfig.js";
 
 const scheduleFields = {
   redeemFrom: z.iso.datetime({ offset: true }).optional(),
@@ -73,6 +80,11 @@ const historyLimitSchema = z
   .transform(Number)
   .pipe(z.number().int().min(1).max(50));
 const emptyObjectSchema = z.object({}).strict();
+const renderBudgetSchema = z
+  .object({
+    maxCanvasMiB: z.number().int().min(MIN_MAX_CANVAS_MIB).max(MAX_MAX_CANVAS_MIB),
+  })
+  .strict();
 
 const updaterErrorStatuses: Record<UpdaterErrorCode, number> = {
   invalid_request: 400,
@@ -176,6 +188,14 @@ function serializeSession(session: SessionSummary): Record<string, unknown> {
   };
 }
 
+function serializeRenderBudget(setting: RenderBudgetSetting): Record<string, unknown> {
+  return {
+    maxCanvasMiB: setting.maxCanvasMiB,
+    maxCanvasBytes: setting.maxCanvasBytes,
+    updatedAt: setting.updatedAt,
+  };
+}
+
 export interface AdminRouteOptions {
   config: AccessConfig;
   database: AccessDatabase;
@@ -203,6 +223,7 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
         invites: listInvites(options.database, requestNow),
         batches: listBatches(options.database, requestNow),
         sessions: listSessions(options.database, requestNow),
+        renderBudget: readRenderBudgetSetting(options.database),
       }),
     );
   });
@@ -229,6 +250,43 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
     requireWriteCsrf(options.config.adminOrigin),
     requireJsonContentType,
   ];
+
+  router.get("/api/runtime-settings/render-budget", (_request, response) => {
+    response.json({
+      renderBudget: serializeRenderBudget(readRenderBudgetSetting(options.database)),
+    });
+  });
+
+  router.put(
+    "/api/runtime-settings/render-budget",
+    ...writeSecurity,
+    (request, response) => {
+      const input = renderBudgetSchema.safeParse(request.body);
+      if (!input.success) {
+        response.status(400).json({ error: "invalid_request" });
+        return;
+      }
+
+      const requestNow = now();
+      const result = updateRenderBudgetSetting(
+        options.database,
+        input.data.maxCanvasMiB,
+        requestNow,
+      );
+      response.json({ renderBudget: serializeRenderBudget(result.current) });
+      emitAuditEvent(options.config.nodeEnv, {
+        requestId: String(response.locals.requestId),
+        action: "runtime_setting.update",
+        targetType: "runtime_setting",
+        targetId: "render_budget",
+        affected: {
+          previousMaxCanvasMiB: result.previous.maxCanvasMiB,
+          maxCanvasMiB: result.current.maxCanvasMiB,
+        },
+        timestamp: requestNow,
+      });
+    },
+  );
 
   router.get("/api/system-update", async (_request, response) => {
     response.locals.operation = "system_update_status";

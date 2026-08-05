@@ -29,6 +29,14 @@ GET  /api/sessions
 POST /api/sessions/:id/revoke
 ```
 
+```ts
+NonceStore.issue(): string
+NonceStore.verify(nonce: string): boolean
+
+// Canonical wire format; Base64URL segments are unpadded.
+// <base36 timestamp>.<16 random bytes / 22 chars>.<HMAC-SHA256 / 43 chars>
+```
+
 ```sql
 CREATE TABLE invites (
   id TEXT PRIMARY KEY,
@@ -97,6 +105,12 @@ SECURE_COOKIES=true
 ### 3. Contracts
 
 - Generate invitation codes from 16 cryptographically random bytes and prefix the canonical Crockford Base32 value with `FF1-`. Persist only its SHA-256 hash.
+- Invitation-form nonces are stateless, bounded to 128 characters, and signed
+  with a process-local 256 bit HMAC key. Verification requires the exact
+  canonical unpadded Base64URL representation of both random and signature
+  segments before constant-time digest comparison. Node's permissive
+  Base64URL decoder is not itself a syntax validator: reject any signature
+  whose decode-then-encode value differs from the received text.
 - Redemption is a `BEGIN IMMEDIATE` transaction. A one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry. The transaction accepts both the `redeem_from` and `redeem_by` boundary instants and rejects any instant outside them.
 - Invitation creation accepts optional timezone-qualified ISO 8601 `redeemFrom` and `redeemBy` values. Omitted values mean immediate start and a seven-day window; a start-only request ends seven days after its start, while an end-only request starts at creation. The end must be strictly later than the start.
 - Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
@@ -126,6 +140,7 @@ SECURE_COOKIES=true
 | Condition | Required result |
 | --- | --- |
 | Malformed, unknown, not-yet-active, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
+| Nonce with bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, future timestamp beyond skew, or expired timestamp | Reject nonce; no invitation or session mutation |
 | Start or end boundary instant | Redemption is allowed; one millisecond outside the window is rejected |
 | Missing, malformed, timezone-free, reversed, or zero-length creation window | `400`; no invitation, batch, or idempotency row |
 | Two or more concurrent redemptions of a one-use invitation | Exactly one success |
@@ -160,7 +175,12 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 ### 5. Good / Base / Bad Cases
 
 - Good: an anonymous asset URL redirects to `/access`; one valid invitation establishes a device session; each application visit renews it; revoking its invitation makes the next request fail.
+- Good: a freshly issued nonce round-trips through the exact canonical
+  Base64URL wire format and verifies until its exclusive expiry boundary.
 - Base: the static site remains a browser-only renderer after authorization, while the sidecar stores only access metadata.
+- Bad: decode a signature with `Buffer.from(value, "base64url")` and compare
+  only its bytes; permissive aliases can represent the same digest with a
+  different final character.
 - Bad: React checks an invitation against an environment variable or `localStorage`, then publicly serves the Vite bundle and overlay assets.
 - Bad: a visible “logout” control clears the only one-use invitation session and forces the same device to obtain a new code.
 - Bad: Cloudflare Access checks the admin UI at the edge, but the origin trusts the presence of `Cf-Access-Jwt-Assertion` without verifying its signature and claims.
@@ -168,6 +188,9 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 ### 6. Tests Required
 
 - Unit tests cover invitation format/normalization, hash-only persistence, configurable schedule defaults and inclusive boundaries, all five lifecycle states, 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, active-device counts, single and batch creation idempotency, batch atomic rollback/revocation, weighted limits, writable health probes, legacy schedule migration, migration idempotency, and database reopen.
+- Nonce tests assert a fresh token succeeds, a one-character signature mutation
+  fails even when a permissive decoder maps it to the same bytes, the last
+  valid millisecond succeeds, and the expiry boundary fails.
 - Backup tests use a real named volume in WAL mode and assert that the maintenance job has no network, the long-running service has no backup mount, the CLI opens the source without migrations or SQL writes, the output is `0600`, and the normalized snapshot passes `integrity_check` from a read-only mount.
 - Concurrency coverage sends 20 redemption attempts and asserts exactly one success.
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.
@@ -190,6 +213,12 @@ if (localStorage.getItem("invite") === import.meta.env.VITE_INVITE_CODE) {
 ```ts
 // Header presence does not prove Cloudflare signed the identity.
 if (request.headers["cf-access-jwt-assertion"]) showAdminPage();
+```
+
+```ts
+// Wrong: byte equality alone accepts non-canonical Base64URL aliases.
+const received = Buffer.from(signature, "base64url");
+return timingSafeEqual(received, expected);
 ```
 
 #### Correct
@@ -219,6 +248,14 @@ void fetch("/auth/refresh", {
   credentials: "same-origin",
   headers: { "X-FilmFrame-CSRF": "1" },
 });
+```
+
+```ts
+// Correct: require one canonical text representation before comparing bytes.
+const received = Buffer.from(signature, "base64url");
+return received.toString("base64url") === signature
+  && received.length === expected.length
+  && timingSafeEqual(received, expected);
 ```
 
 ```yaml
@@ -606,4 +643,99 @@ ProtectSystem=strict
 CacheDirectory=filmframe-updater
 CacheDirectoryMode=0700
 Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater
+```
+
+## Scenario: Persisted Public Render-Budget Configuration
+
+### 1. Scope / Trigger
+
+Apply this contract whenever migration `005`, administrator runtime settings,
+the public runtime-config endpoint, or the FilmFrame OpenResty route changes.
+
+### 2. Signatures
+
+```sql
+CREATE TABLE render_budget_settings (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  max_canvas_mib INTEGER NOT NULL CHECK (max_canvas_mib BETWEEN 128 AND 2048),
+  updated_at INTEGER NOT NULL CHECK (updated_at >= 0)
+);
+```
+
+```http
+GET /api/runtime-settings/render-budget
+PUT /api/runtime-settings/render-budget
+Content-Type: application/json
+X-FilmFrame-CSRF: 1
+
+{"maxCanvasMiB":1024}
+
+GET /api/runtime-config
+{"maxCanvasMiB":1024,"maxCanvasBytes":1073741824,"updatedAt":1785859200000}
+```
+
+### 3. Contracts
+
+- Migration `005` adds one singleton row seeded to 700 MiB and timestamp `0`.
+  It is additive and remains backward-compatible with v1.2, which ignores the
+  table.
+- Administrator reads and writes require the exact admin host and verified
+  Cloudflare Access identity. Writes also require exact Origin, JSON, CSRF,
+  existing rate limits, strict request fields, and a redacted audit event.
+- Accept only integer `maxCanvasMiB` values from 128 through 2,048 and derive
+  `maxCanvasBytes` server-side. Never accept bytes, pixels, identity, or generic
+  settings JSON from the request.
+- Public `GET /api/runtime-config` requires an active invited-device session,
+  returns only the three documented fields, and is `no-store`.
+- OpenResty proxies only the exact `/api/runtime-config` path to Access after
+  the normal session subrequest. The static catch-all remains unchanged and no
+  other Access API becomes public.
+- The setting controls browser admission only; Access never receives photos,
+  EXIF, film settings, Canvas output, or Blob URLs.
+
+### 4. Validation & Error Matrix
+
+- Missing/invalid administrator assertion or wrong host -> reject before read
+  or write.
+- Missing Origin/CSRF/JSON, unknown field, non-integer, `<128`, or `>2048` ->
+  fixed 4xx response and zero database mutation.
+- Valid write -> atomically retain the previous value for audit, save the new
+  value/timestamp, and return the canonical derived response.
+- Missing, expired, revoked, or tampered device session -> public endpoint
+  returns 401; wrong host returns 421.
+- Access unavailable behind OpenResty -> fail closed; never serve SPA HTML as
+  runtime JSON and never bypass to a default at the proxy layer.
+
+### 5. Good / Base / Bad Cases
+
+- Good: an authenticated administrator saves 1,024 MiB, a refreshed invited
+  application receives 1,073,741,824 bytes, and no identity data is exposed.
+- Base: migration seeds 700 MiB and an unchanged deployment keeps its prior
+  rendering behavior.
+- Bad: a prefix `/api/` proxy exposes administrator routes or lets an anonymous
+  browser read runtime policy without an invited session.
+
+### 6. Tests Required
+
+- Store tests cover seed, inclusive boundaries, invalid values/timestamps,
+  persistence, and zero mutation on failure.
+- Access integration tests cover admin authentication, write security, strict
+  payloads, exact derived bytes, redacted audit output, public session, wrong
+  host, and absent session.
+- Proxy integration tests cover anonymous redirect, invited JSON response,
+  exact routing, Cookie forwarding only to Access, and static-backend isolation.
+- Deployment verification asserts the exact OpenResty location and fails when
+  the session check or Access target is missing.
+
+### 7. Wrong vs Correct
+
+```nginx
+# Wrong: exposes every Access API through one public prefix.
+location /api/ { proxy_pass http://filmframe_access_backend; }
+
+# Correct: expose one session-protected read contract.
+location = /api/runtime-config {
+    auth_request /_filmframe_session_check;
+    proxy_pass http://filmframe_access_backend/api/runtime-config;
+}
 ```

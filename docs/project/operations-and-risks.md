@@ -1,6 +1,6 @@
 # 风险、排障与上线控制
 
-> 最后核验：2026-07-30。本文区分“仓库已实现”和“生产外部状态”，避免把配置模板误认为已经上线。
+> 最后核验：2026-08-05。本文区分“仓库已实现”和“生产外部状态”，避免把配置模板误认为已经上线。
 
 ## 当前状态
 
@@ -10,8 +10,9 @@
 | 邀请页、管理页、SSH CLI 和设备授权续期 | 已实现 |
 | OpenResty 公开/管理 vhost 示例 | 已实现，尚需合并到线上目标站点 |
 | Compose 回环端口、私网、持久卷与容器加固 | 已实现 |
-| 根 Vitest | 2026-07-30 实测 24 文件、165 项通过 |
-| Access 自动化 | 27 项；必须在 Node 22 和匹配 ABI 的原生依赖环境执行 |
+| 根 Vitest | 2026-08-05 实测 27 文件、196 项通过 |
+| Access 自动化 | 2026-08-05 实测 89 项；必须在 Node 22 和匹配 ABI 的原生依赖环境执行 |
+| 浏览器自动化 | 2026-08-05 实测 Chromium 42 项、Firefox/WebKit 聚焦 2 项通过 |
 | Cloudflare Google IdP、精确邮箱 policy、Independent MFA | 外部配置，尚需生产预检和验收 |
 | 管理 DNS、证书路径、缓存 bypass/purge、活动 OpenResty reload | 外部配置，尚需生产实施和验收 |
 
@@ -143,6 +144,10 @@ npm run check:access
 
 门禁与渲染是独立层。先确认应用资源已授权加载，再按原有顺序检查 MIME/尺寸解码、同源胶片素材、Worker 能力、主线程 fallback、Canvas 预算、stale 结果和 Object URL 回收。不要通过上传用户照片到 sidecar 来规避浏览器兼容问题。
 
+The administrator setting controls only the estimated RGBA bytes of one Canvas. It does not change upload bytes, decoded-source thresholds, aggregate processing working-set thresholds, ZIP limits, or the 32,767 px edge ceiling. Values from 128 through 2,048 MiB are accepted, with 700 MiB as the bounded fallback. Raising the value is not proof that a browser can allocate that Canvas.
+
+If `/api/runtime-config` is unavailable or malformed, confirm the invited session and exact OpenResty route first. The frontend must report a recoverable fallback state and continue with 700 MiB; it must never become unbounded. A saved value applies to newly opened or refreshed tabs only.
+
 ## 回滚原则
 
 上线前保存时间戳备份：当前 Compose、两个目标 OpenResty vhost、证书引用和迁移前 SQLite。任何 reload 前先运行 `openresty -t`。
@@ -166,6 +171,8 @@ npm run check:access
 ```bash
 npm run check:all
 npm run test:e2e
+PYTHONPATH=ops/updater python3 -m unittest discover -s ops/updater/tests -p 'test_*.py' -v
+bash ops/updater/tests/test-install-layout.sh
 git diff --check
 docker compose config
 docker compose build
@@ -173,4 +180,4 @@ npm run verify:deployment -- --live
 openresty -t
 ```
 
-再补充外网 HTTPS、直连源站、Cloudflare cache、Google + WebAuthn、管理员撤销、站点数据清理、access 停机 fail-closed、数据库恢复和其他 vhost 回归结果。缺少这些外部证据时，只能说仓库实现完成，不能说生产门禁完成。
+再补充外网 HTTPS、直连源站、Cloudflare cache、Google + WebAuthn、管理员撤销、站点数据清理、access 停机 fail-closed、数据库恢复和其他 vhost 回归结果。For v1.3, redacted physical iPhone Safari and Android Chrome records are also mandatory before tag creation; desktop emulation is not a substitute. 缺少这些外部证据时，只能说仓库实现完成，不能说生产门禁完成。

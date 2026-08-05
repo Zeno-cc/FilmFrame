@@ -1,12 +1,12 @@
 # 文件与模块地图
 
-> 最后核验：2026-07-30。排除 `.git/`、`node_modules/`、`dist/`、测试产物和本地秘密文件。
+> 最后核验：2026-08-05。排除 `.git/`、`node_modules/`、`dist/`、测试产物和本地秘密文件。
 
 ## 根目录与部署入口
 
 | 文件 | 职责 | 维护注意 |
 | --- | --- | --- |
-| `App.tsx` | 根 controller；上传、选片、处理、预览、导出、URL 生命周期和设备授权续期 | 鉴权判断不在 React；启动时只调用服务端固定续期路由 |
+| `App.tsx` | 根 controller；上传、选片、处理、预览、导出、URL 生命周期、设备授权续期和运行预算状态 | 鉴权判断不在 React；纯准入计算与运行配置校验属于 service |
 | `types.ts` | 胶片、设置、图片与构图领域类型 | 新字段需同步 storage、主线程与 Worker |
 | `index.tsx` | React 挂载入口 | `React.StrictMode` 开启 |
 | `index.html` | 页面壳、favicon、module 入口 | 已无 `window.process` polyfill；安全响应头由 Nginx 设置 |
@@ -19,7 +19,7 @@
 | `.env.example` | Compose 非秘密配置模板 | 真实值写本地 `.env`，不得提交 |
 | `.dockerignore` | 限制前端 Docker build context | `server/access` 由自己的 build context 构建 |
 | `vite.config.ts` | React/Vitest 配置 | 排除 Playwright E2E 文件 |
-| `playwright.config.ts` | Chromium E2E web server 与输出配置 | E2E 使用独立测试服务，不代表生产门禁已上线 |
+| `playwright.config.ts` | Full Chromium project plus focused Firefox/WebKit compatibility projects | Desktop WebKit does not replace physical iPhone evidence |
 | `README.md` | 用户、开发、隐私和部署入口 | 架构事实应与本目录文档同步 |
 
 ## 浏览器应用
@@ -42,7 +42,8 @@
 | 模块 | 职责 |
 | --- | --- |
 | `filmWorkerClient.ts` / `filmWorker.ts` | Worker 能力/策略、请求协议、超时、取消和主线程回退 |
-| `filmEngine.ts` | 主线程经典/真实 135 单图与长条渲染 |
+| `filmEngine.ts` | 主线程经典/真实 135 单图与长条渲染策略及稳定公开门面 |
+| `canvasRuntime.ts` | DOM Canvas image load, Blob export, output rotation/orientation, and coupled mask mechanics |
 | `filmGeometry.ts` / `filmResolution.ts` | 135 几何、cover、旋转和输出分辨率 |
 | `filmOverlay.ts` / `filmSprocket.ts` | 真实 135 模板、片窗和齿孔合成 |
 | `filmTexture.ts` / `filmMarkings.ts` / `filmFrameNumber.ts` | 片基纹理、标记与帧号 |
@@ -50,7 +51,9 @@
 | `renderResult.ts` / `imageBatch.ts` / `workflowState.ts` | 结果签名、generation gate、批次和 UI 状态推导 |
 | `uploadFiles.ts` | MIME、尺寸解码、大图提示和 EXIF 编排 |
 | `settingsStorage.ts` / `recipeStorage.ts` | 白名单本地偏好和配方 |
-| `renderBudget.ts` / `zip.ts` | Canvas、工作集与 ZIP 容量边界 |
+| `runtimeConfig.ts` | Strict same-origin runtime-config decoding, 700 MiB fallback, and MiB-to-budget conversion |
+| `renderAdmission.ts` / `renderBudget.ts` / `batchAdmission.ts` | App-local estimates and feedback, single-Canvas limits, and independent source/work-set/strip admission |
+| `zip.ts` | ZIP input boundary, independent from the configured Canvas budget |
 | `previewDownload.ts` / `shareArtifact.ts` | 下载和 Web Share 文件边界 |
 | `photographyQuotes.ts` | 随应用发布的审核名言快照，不在浏览器运行时请求第三方 API |
 
@@ -71,9 +74,12 @@
 | `src/middleware/` | Host、私有来源、管理员断言、CSRF、Content-Type 和限速 |
 | `src/routes/publicRoutes.ts` | `/access`、`/auth/redeem`、`/auth/refresh` |
 | `src/routes/adminRoutes.ts` | 管理页、列表、创建和撤销 API |
+| `src/runtimeConfig.ts` | Persisted singleton Canvas budget validation and exact MiB/byte conversion |
+| `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–2,048 MiB Canvas budget |
 | `src/views/html.ts` | 无第三方脚本的服务端邀请页和管理页；一次性明文可清除 |
 | `src/cli.ts` | SSH 应急 create/list/revoke/backup |
 | `migrations/001_initial.sql` | invites、sessions 和索引的初始 schema |
+| `migrations/005_render_budget.sql` | Additive singleton render-budget table seeded to 700 MiB |
 | `tests/all.test.ts` | 单进程聚合测试入口，避免原生 SQLite 多进程退出问题 |
 | `Dockerfile` | Node 22 多阶段构建；build stage 编译 `better-sqlite3`，非 root runtime |
 | `.env.example` | sidecar 配置示例，不包含真实身份或凭据 |
@@ -93,11 +99,12 @@
 
 | 测试层 | 当前实况 | 重点 |
 | --- | --- | --- |
-| 根 Vitest | 24 个文件、165 项测试 | 上传、几何、设置、构图、批次、Worker、结果、预算、ZIP、模板、齿孔、纹理和名言 |
-| Access Node test | 单进程聚合测试 | 邀请码、nonce、SQLite、并发兑换、Cookie、续期、管理 API 和 Access JWT |
-| Playwright | `tests/e2e/` | 前端主流程、胶片素材和设备授权续期 POST 合同 |
+| 根 Vitest | 27 个文件、196 项测试 | 上传、几何、设置、构图、批次、Worker、结果、运行配置、Canvas 预算、ZIP、模板、齿孔、纹理和名言 |
+| Access Node test | 89 项，单进程聚合测试 | 邀请码、nonce、SQLite、并发兑换、Cookie、续期、运行配置、管理 API 和 Access JWT |
+| Playwright Chromium | 42 项，`tests/e2e/` | Complete frontend regression suite, including bounded render-budget stress |
+| Playwright Firefox/WebKit | 2 项，`browser-compatibility.spec.ts` | Focused local upload, rendering, preview, rotation, navigation, and export contract |
 
-根 Vitest 数量来自 2026-07-30 的真实执行。Access 测试必须在 Node 22 LTS 且原生依赖由同一 Node 版本安装的环境运行。
+根 Vitest 与 Access 数量来自 2026-08-05 的真实执行。Access 测试必须在 Node 22 LTS 且原生依赖由同一 Node 版本安装的环境运行。
 
 ## 静态素材与生成目录
 

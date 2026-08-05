@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Run the complete frontend quality checklist."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify render budget, browser matrix, privacy, cancellation, and Object URL behavior."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify App async ownership and stale-result suppression."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify strict runtime-config decoding and safe-integer boundaries."}
+{"file":".trellis/spec/backend/index.md","reason":"Run the complete backend quality checklist."}
+{"file":".trellis/spec/backend/access-control.md","reason":"Verify migration, admin/public APIs, proxy routing, security, audit, and updater gates."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check duplicated limits, conversions, and sizing formulas."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify storage-to-renderer data flow and failure propagation."}

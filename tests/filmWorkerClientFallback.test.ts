@@ -60,6 +60,32 @@ describe('main-thread render output metadata', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:image-result');
   });
 
+  it('passes the render budget to the main-thread fallback', async () => {
+    engine.processImage.mockResolvedValue('blob:image-result');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(['result'])),
+    }));
+    const renderBudgetLimits = { maxPixels: 32_000_000 };
+
+    await processImage(
+      'blob:source',
+      settings,
+      undefined,
+      undefined,
+      undefined,
+      renderBudgetLimits,
+    );
+
+    expect(engine.processImage).toHaveBeenCalledWith(
+      'blob:source',
+      settings,
+      undefined,
+      undefined,
+      renderBudgetLimits,
+    );
+  });
+
   it('revokes an unreturned strip URL when its response body cannot be read', async () => {
     engine.generateFilmStrip.mockResolvedValue('blob:strip-result');
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);

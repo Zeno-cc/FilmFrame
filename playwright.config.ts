@@ -16,8 +16,17 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      // Use the locally installed Chrome also used for manual smoke checks.
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      testMatch: /browser-compatibility\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      testMatch: /browser-compatibility\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
     },
   ],
   webServer: {

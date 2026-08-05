@@ -14,6 +14,7 @@ import {
   refreshSession,
 } from "../store.js";
 import { renderAccessPage } from "../views/html.js";
+import { readRenderBudgetSetting } from "../runtimeConfig.js";
 
 const redeemSchema = z
   .object({
@@ -34,6 +35,21 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
   const router = Router();
   const now = options.now ?? Date.now;
   const filmHost = requireHost(options.config.filmframeHost);
+
+  router.get("/api/runtime-config", filmHost, (request, response) => {
+    const token = readSessionCookie(request, options.config);
+    if (!isSessionValid(options.database, token, now())) {
+      response.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const setting = readRenderBudgetSetting(options.database);
+    response.json({
+      maxCanvasMiB: setting.maxCanvasMiB,
+      maxCanvasBytes: setting.maxCanvasBytes,
+      updatedAt: setting.updatedAt,
+    });
+  });
 
   router.get("/access", filmHost, (request, response) => {
     const token = readSessionCookie(request, options.config);

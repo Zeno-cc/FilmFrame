@@ -23,6 +23,7 @@ import {
   type UpdateJob,
   type UpdaterClient,
 } from "../src/updaterClient.js";
+import { updateRenderBudgetSetting } from "../src/runtimeConfig.js";
 
 const databases: AccessDatabase[] = [];
 afterEach(() => {
@@ -489,6 +490,36 @@ describe("public invitation gateway", () => {
     assert.equal(responseRequestId, log.requestId);
     assert.equal(JSON.stringify(log).includes(created.code), false);
   });
+
+  it("returns runtime configuration only to a valid invited device session", async () => {
+    const { app, config, database } = fixture(10_000);
+    const created = createInvite(database, "运行配置设备", 10_000);
+    const session = redeemInvite(database, created.code, 10_000);
+    updateRenderBudgetSetting(database, 1_536, 10_000);
+
+    const missing = await request(app)
+      .get("/api/runtime-config")
+      .set("Host", config.filmframeHost);
+    const wrongHost = await request(app)
+      .get("/api/runtime-config")
+      .set("Host", "unknown.example.test");
+    const valid = await request(app)
+      .get("/api/runtime-config")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", `${config.sessionCookieName}=${session.token}`);
+
+    assert.equal(missing.status, 401);
+    assert.deepEqual(missing.body, { error: "unauthorized" });
+    assert.equal(wrongHost.status, 421);
+    assert.equal(valid.status, 200);
+    assert.deepEqual(valid.body, {
+      maxCanvasMiB: 1_536,
+      maxCanvasBytes: 1_536 * 1024 * 1024,
+      updatedAt: 10_000,
+    });
+    assert.equal("adminEmail" in valid.body, false);
+    assert.equal("invite" in valid.body, false);
+  });
 });
 
 describe("administrator routes", () => {
@@ -524,6 +555,20 @@ describe("administrator routes", () => {
       .send(body);
   }
 
+  function renderBudgetRequest(
+    app: ReturnType<typeof createApp>,
+    config: AccessConfig,
+    body: unknown,
+  ) {
+    return request(app)
+      .put("/api/runtime-settings/render-budget")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .send(body);
+  }
+
   it("requires a verified Access assertion for the page and APIs", async () => {
     const { app, config } = fixture();
     const missing = await request(app).get("/").set("Host", config.adminHost);
@@ -539,7 +584,85 @@ describe("administrator routes", () => {
     assert.equal(missing.status, 401);
     assert.equal(invalid.status, 401);
     assert.equal(valid.status, 200);
-    assert.match(valid.text, /暗房邀请管理/);
+    assert.match(valid.text, /暗房管理/);
+    assert.match(valid.text, /运行配置/);
+    assert.match(valid.text, /min="128" max="2048"/);
+  });
+
+  it("reads and updates the global Canvas budget within inclusive bounds", async () => {
+    const { app, config } = fixture(2_000);
+    const read = () =>
+      request(app)
+        .get("/api/runtime-settings/render-budget")
+        .set("Host", config.adminHost)
+        .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+
+    const initial = await read();
+    assert.equal(initial.status, 200);
+    assert.deepEqual(initial.body.renderBudget, {
+      maxCanvasMiB: 700,
+      maxCanvasBytes: 700 * 1024 * 1024,
+      updatedAt: 0,
+    });
+
+    for (const value of [128, 2_048]) {
+      const updated = await renderBudgetRequest(app, config, { maxCanvasMiB: value });
+      assert.equal(updated.status, 200);
+      assert.equal(updated.body.renderBudget.maxCanvasMiB, value);
+      assert.equal(updated.body.renderBudget.maxCanvasBytes, value * 1024 * 1024);
+      assert.equal(updated.body.renderBudget.updatedAt, 2_000);
+    }
+    assert.equal((await read()).body.renderBudget.maxCanvasMiB, 2_048);
+  });
+
+  it("rejects insecure or invalid Canvas-budget writes without mutation", async () => {
+    const { app, config } = fixture();
+    const insecure = await request(app)
+      .put("/api/runtime-settings/render-budget")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .send({ maxCanvasMiB: 900 });
+    assert.equal(insecure.status, 403);
+
+    for (const body of [
+      { maxCanvasMiB: 127 },
+      { maxCanvasMiB: 2_049 },
+      { maxCanvasMiB: 700.5 },
+      { maxCanvasMiB: 700, unknown: true },
+      {},
+    ]) {
+      assert.equal((await renderBudgetRequest(app, config, body)).status, 400);
+    }
+
+    const current = await request(app)
+      .get("/api/runtime-settings/render-budget")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(current.body.renderBudget.maxCanvasMiB, 700);
+  });
+
+  it("emits a redacted audit event when the Canvas budget changes", async () => {
+    const { app, config } = fixture(3_000, { nodeEnv: "production" });
+    const messages: string[] = [];
+    const originalInfo = console.info;
+    console.info = (message?: unknown) => messages.push(String(message));
+    try {
+      const response = await renderBudgetRequest(app, config, { maxCanvasMiB: 1_024 });
+      assert.equal(response.status, 200);
+    } finally {
+      console.info = originalInfo;
+    }
+
+    assert.equal(messages.length, 1);
+    const event = JSON.parse(messages[0] as string) as Record<string, unknown>;
+    assert.equal(event.event, "admin_audit");
+    assert.equal(event.action, "runtime_setting.update");
+    assert.equal(event.targetId, "render_budget");
+    assert.deepEqual(event.affected, {
+      previousMaxCanvasMiB: 700,
+      maxCanvasMiB: 1_024,
+    });
+    assert.equal(JSON.stringify(event).includes(config.adminEmail), false);
   });
 
   it("allows the local admin token only in development", async () => {
@@ -574,7 +697,7 @@ describe("administrator routes", () => {
     assert.equal(missing.status, 401);
     assert.equal(invalid.status, 401);
     assert.equal(valid.status, 200);
-    assert.match(valid.text, /暗房邀请管理/);
+    assert.match(valid.text, /暗房管理/);
   });
 
   it("rejects development admin tokens in production configuration", () => {

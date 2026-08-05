@@ -3,6 +3,7 @@ import {
   validateCanvasBudget,
   validateKodakStripBudget,
 } from '../services/renderBudget';
+import { createRuntimeRenderConfig } from '../services/runtimeConfig';
 
 describe('canvas render budget', () => {
   it('accepts dimensions exactly at the default pixel limit', () => {
@@ -47,6 +48,8 @@ describe('canvas render budget', () => {
     [100, 0],
     [Number.NaN, 100],
     [100, Number.POSITIVE_INFINITY],
+    [1.5, 100],
+    [Number.MAX_SAFE_INTEGER + 1, 1],
   ])('rejects invalid dimensions (%s, %s)', (width, height) => {
     expect(validateCanvasBudget(width, height)).toEqual({
       ok: false,
@@ -54,6 +57,25 @@ describe('canvas render budget', () => {
       reason: 'invalid-dimensions',
     });
   });
+
+  it.each([128, 700, 2_048])(
+    'enforces the %i MiB threshold immediately below, at, and above it',
+    (maxCanvasMiB) => {
+      const limits = {
+        ...createRuntimeRenderConfig(maxCanvasMiB, null).renderBudgetLimits,
+        maxEdge: Number.MAX_SAFE_INTEGER,
+      };
+      const maxPixels = limits.maxPixels;
+      if (maxPixels === undefined) throw new Error('Expected an exact pixel limit');
+
+      expect(validateCanvasBudget(maxPixels - 1, 1, limits).ok).toBe(true);
+      expect(validateCanvasBudget(maxPixels, 1, limits).ok).toBe(true);
+      expect(validateCanvasBudget(maxPixels + 1, 1, limits)).toMatchObject({
+        ok: false,
+        reason: 'max-pixels-exceeded',
+      });
+    },
+  );
 });
 
 describe('Kodak strip render budget', () => {

@@ -1,6 +1,6 @@
 # 渲染引擎与图像算法
 
-> 最后核验：2026-07-29。核心文件：`filmEngine.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
+> 最后核验：2026-08-05。核心文件：`filmEngine.ts`、`canvasRuntime.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
 
 ## 路由决策
 
@@ -132,7 +132,21 @@ sourceHeight > sourceWidth && frameWidth > frameHeight
 | 真实长条 preview | 每帧 900 |
 | 真实长条 high | 每帧 1400 |
 
-高质量模式会把小于 1800 宽的源图放大。所有单张和长条画布创建前统一检查 32767 最大边长和 700 MiB RGBA 预算（183,500,800 像素）；超限时在分配画布前失败。
+高质量模式会把小于 1800 宽的源图放大。所有单张和长条画布创建前统一检查 32767 最大边长和管理员配置的单 Canvas RGBA 预算；预算范围为 `128–2048 MiB`，默认 `700 MiB`（183,500,800 像素）。超限时必须在分配画布前失败。
+
+The Canvas budget is one admission guardrail, not an upload limit or a browser capability guarantee. The following measurements remain independent:
+
+| Measurement | Contract |
+| --- | --- |
+| Upload bytes | Warning at 25 MiB; unchanged by the administrator setting |
+| Decoded source | `width * height * 4` estimated RGBA bytes |
+| Batch working set | Decoded source estimate times the processing multiplier, plus strip output |
+| Single Canvas | 32,767 px edge and configured 128–2,048 MiB RGBA ceiling |
+| ZIP input | Warning at 192 MiB and block above 256 MiB |
+
+At startup, `runtimeConfig.ts` reads the same-origin, invitation-session-protected `/api/runtime-config` response and converts whole MiB to exact `RenderBudgetLimits`. Invalid or unavailable configuration is recoverable and remains bounded by the compiled 700 MiB default. A saved administrator change applies only after the application is opened again or refreshed.
+
+`canvasRuntime.ts` owns main-thread DOM Canvas mechanics: image loading, Canvas-to-Blob/Object URL export, output rotation/orientation restoration, and the coupled luminance-to-alpha mask conversion. `filmEngine.ts` retains film policy, drawing order, templates, texture, markings, and the stable public rendering facade. The Worker keeps its separate `OffscreenCanvas` implementation.
 
 ## Gold 200 色彩
 

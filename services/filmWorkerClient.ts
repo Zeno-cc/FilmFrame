@@ -1,14 +1,27 @@
 import type { FilmSettings, ImageItem, RenderTransform } from '../types';
 import * as mainThreadEngine from './filmEngine';
 import { supportsReal135Template } from './filmOverlay';
+import type { RenderBudgetLimits } from './renderBudget';
 
 type WorkerResponse =
   | { id: number; ok: true; blob: Blob }
   | { id: number; ok: false; error: string };
 
 type WorkerRequestPayload =
-  | { type: 'processImage'; file: File; settings: FilmSettings; dateOverride?: string; transform?: RenderTransform }
-  | { type: 'generateFilmStrip'; images: ImageItem[]; settings: FilmSettings };
+  | {
+    type: 'processImage';
+    file: File;
+    settings: FilmSettings;
+    dateOverride?: string;
+    transform?: RenderTransform;
+    renderBudgetLimits?: RenderBudgetLimits;
+  }
+  | {
+    type: 'generateFilmStrip';
+    images: ImageItem[];
+    settings: FilmSettings;
+    renderBudgetLimits?: RenderBudgetLimits;
+  };
 
 type WorkerLike = {
   onmessage: ((event: MessageEvent<WorkerResponse>) => void) | null;
@@ -24,8 +37,13 @@ export type WorkerRenderer = {
     settings: FilmSettings,
     dateOverride?: string,
     transform?: RenderTransform,
+    renderBudgetLimits?: RenderBudgetLimits,
   ) => Promise<RenderOutput>;
-  generateFilmStrip: (images: ImageItem[], settings: FilmSettings) => Promise<RenderOutput>;
+  generateFilmStrip: (
+    images: ImageItem[],
+    settings: FilmSettings,
+    renderBudgetLimits?: RenderBudgetLimits,
+  ) => Promise<RenderOutput>;
   dispose: () => void;
 };
 
@@ -181,10 +199,10 @@ export function createWorkerRenderer(
   };
 
   return {
-    processImage: (file, settings, dateOverride, transform) =>
-      request({ type: 'processImage', file, settings, dateOverride, transform }),
-    generateFilmStrip: (images, settings) =>
-      request({ type: 'generateFilmStrip', images, settings }),
+    processImage: (file, settings, dateOverride, transform, renderBudgetLimits) =>
+      request({ type: 'processImage', file, settings, dateOverride, transform, renderBudgetLimits }),
+    generateFilmStrip: (images, settings, renderBudgetLimits) =>
+      request({ type: 'generateFilmStrip', images, settings, renderBudgetLimits }),
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -253,13 +271,20 @@ export const processImage = async (
   dateOverride?: string,
   previewUrlFallback?: string,
   transform?: RenderTransform,
+  renderBudgetLimits?: RenderBudgetLimits,
 ): Promise<RenderOutput> => {
   const canSendFile = typeof File !== 'undefined' && fileOrSource instanceof File;
   if (canSendFile && shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
     if (renderer) {
       try {
-        return await renderer.processImage(fileOrSource, settings, dateOverride, transform);
+        return await renderer.processImage(
+          fileOrSource,
+          settings,
+          dateOverride,
+          transform,
+          renderBudgetLimits,
+        );
       } catch (error) {
         if (isWorkerCancelledError(error)) throw error;
         console.warn('Worker image processing failed; falling back to main thread.', error);
@@ -268,20 +293,27 @@ export const processImage = async (
   }
 
   return withImageSourceUrl(fileOrSource, previewUrlFallback, async (sourceUrl) => {
-    const url = await mainThreadEngine.processImage(sourceUrl, settings, dateOverride, transform);
+    const url = await mainThreadEngine.processImage(
+      sourceUrl,
+      settings,
+      dateOverride,
+      transform,
+      renderBudgetLimits,
+    );
     return readRenderOutput(url, 'Failed to read generated image');
   });
 };
 
 export const generateFilmStrip = async (
   images: ImageItem[],
-  settings: FilmSettings
+  settings: FilmSettings,
+  renderBudgetLimits?: RenderBudgetLimits,
 ): Promise<RenderOutput> => {
   if (shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
     if (renderer) {
       try {
-        return await renderer.generateFilmStrip(images, settings);
+        return await renderer.generateFilmStrip(images, settings, renderBudgetLimits);
       } catch (error) {
         if (isWorkerCancelledError(error)) throw error;
         console.warn('Worker film strip generation failed; falling back to main thread.', error);
@@ -289,6 +321,6 @@ export const generateFilmStrip = async (
     }
   }
 
-  const url = await mainThreadEngine.generateFilmStrip(images, settings);
+  const url = await mainThreadEngine.generateFilmStrip(images, settings, renderBudgetLimits);
   return readRenderOutput(url, 'Failed to read generated film strip');
 };

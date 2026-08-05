@@ -47,15 +47,17 @@ Local HTTP development must set both `NODE_ENV=development` and
 
 ## Route Contract
 
-- FilmFrame host: `GET /access`, `POST /auth/redeem`, `POST /auth/refresh`
+- FilmFrame host: `GET /access`, `POST /auth/redeem`, `POST /auth/refresh`,
+  `GET /api/runtime-config`
 - Internal host `access`: `GET /healthz`, `GET /internal/session-check`
 - Administrator host: `GET /`, `GET /api/invites`, `POST /api/invites`,
   `POST /api/invites/:id/revoke`, `GET /api/invite-batches`,
   `POST /api/invite-batches`, `POST /api/invite-batches/:id/revoke`,
   `GET /api/sessions`, `POST /api/sessions/:id/revoke`,
   `GET /api/system-update`, `POST /api/system-update/check`,
-  `POST /api/system-update/jobs`, `GET /api/system-update/jobs/:id`, and
-  `GET /api/system-update/history`
+  `POST /api/system-update/jobs`, `GET /api/system-update/jobs/:id`,
+  `GET /api/system-update/history`, `GET /api/runtime-settings/render-budget`,
+  and `PUT /api/runtime-settings/render-budget`
 
 Internal checks accept only a loopback/private proxy address and the internal
 Host. Administrator writes require the exact administrator Origin,
@@ -99,6 +101,15 @@ CSRF, JSON, rate-limit, and UUID idempotency gates. The browser receives only
 allowlisted release, stage, history, and fixed error fields; raw updater logs,
 commands, paths, environment values, and authentication assertions never cross
 the socket bridge.
+
+The render-budget setting is a dedicated SQLite singleton introduced by
+migration `005`. Administrators may save a whole-MiB value from 128 through
+2,048; the seed and frontend fallback are 700 MiB. The write retains the normal
+administrator authentication, exact Origin, CSRF, JSON, rate-limit, and audit
+boundaries. The public runtime-config response is protected by the invitation
+session and exposes only the effective Canvas byte budget. It contains no
+administrator identity, invitation metadata, or photo data. Changes are read
+when a FilmFrame page is newly opened or refreshed; there is no live push.
 
 Device sessions use a 400-day rolling lifetime. `POST /auth/refresh` rotates
 the opaque token atomically and requires the exact public Origin plus the CSRF

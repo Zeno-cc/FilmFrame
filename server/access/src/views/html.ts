@@ -4,6 +4,12 @@ import {
   adminUpdateStyles,
   renderAdminUpdateView,
 } from "./adminUpdateView.js";
+import {
+  adminSettingsScript,
+  adminSettingsStyles,
+  renderAdminSettingsView,
+} from "./adminSettingsView.js";
+import type { RenderBudgetSetting } from "../runtimeConfig.js";
 
 export function escapeHtml(value: string): string {
   return value
@@ -152,10 +158,11 @@ export function renderAdminPage(options: {
   invites: readonly InviteSummary[];
   batches: readonly BatchSummary[];
   sessions: readonly SessionSummary[];
+  renderBudget: RenderBudgetSetting;
 }): string {
   const body = `<main class="shell admin">
-  <header><div><p class="eyebrow">FilmFrame Access</p><h1>暗房邀请管理</h1></div><p class="policy">时间窗口可设置 · 单次使用 · 激活设备长期使用</p></header>
-  <nav class="admin-nav" aria-label="管理视图"><button class="nav-button" type="button" data-admin-view="invites" aria-controls="admin-view-invites" aria-selected="true">邀请与设备</button><button class="nav-button" type="button" data-admin-view="updates" aria-controls="admin-view-updates" aria-selected="false">版本与更新<span id="update-nav-dot" class="update-dot" hidden></span></button></nav>
+  <header><div><p class="eyebrow">FilmFrame Access</p><h1>暗房管理</h1></div><p class="policy">邀请访问 · 运行配置 · 可信更新</p></header>
+  <nav class="admin-nav" aria-label="管理视图"><button class="nav-button" type="button" data-admin-view="invites" aria-controls="admin-view-invites" aria-selected="true">邀请与设备</button><button class="nav-button" type="button" data-admin-view="settings" aria-controls="admin-view-settings" aria-selected="false">运行配置</button><button class="nav-button" type="button" data-admin-view="updates" aria-controls="admin-view-updates" aria-selected="false">版本与更新<span id="update-nav-dot" class="update-dot" hidden></span></button></nav>
   <div id="admin-view-invites" class="admin-view">
   <section class="create" aria-labelledby="create-title">
     <div><h2 id="create-title">生成邀请码</h2><p class="muted">邀请码明文只显示一次，请立即复制或下载。</p></div>
@@ -168,6 +175,7 @@ export function renderAdminPage(options: {
   <section class="list" aria-labelledby="list-title"><div class="list-heading"><h2 id="list-title">邀请码记录</h2><div id="status-counters" class="counters"></div></div><p class="muted list-intro">“当前可兑换”表示邀请码此刻能否创建新设备授权；已激活设备是否可用以“有效设备”和下方会话记录为准。</p><div class="filters"><input id="invite-search" type="search" placeholder="搜索备注、ID 或批次"><select id="batch-filter" aria-label="批次筛选"><option value="all">全部批次</option><option value="standalone">历史单码</option>${options.batches.map((batch) => `<option value="${escapeHtml(batch.id)}">${escapeHtml(batch.name)}</option>`).join("")}</select><select id="status-filter" aria-label="状态筛选"><option value="all">全部状态</option><option value="scheduled">未生效</option><option value="active">待兑换</option><option value="redeemed">已兑换</option><option value="expired">已过期</option><option value="revoked">已撤销</option></select></div><div class="table-wrap"><table><thead><tr><th>备注 / ID</th><th>批次</th><th>状态</th><th>当前可兑换</th><th>有效设备</th><th>生效时间</th><th>兑换截止</th><th>最近兑换</th><th>操作</th></tr></thead><tbody id="invite-list">${inviteRows(options.invites)}</tbody></table></div></section>
   <section class="list" aria-labelledby="session-list-title"><h2 id="session-list-title">设备会话</h2><p class="muted list-intro">单独撤销只影响当前设备；撤销邀请码仍会终止该邀请下的全部设备会话。</p><div class="table-wrap"><table><thead><tr><th>邀请</th><th>会话 ID</th><th>状态</th><th>创建时间</th><th>最近使用</th><th>到期时间</th><th>操作</th></tr></thead><tbody id="session-list">${sessionRows(options.sessions)}</tbody></table></div></section>
   </div>
+  ${renderAdminSettingsView(options.renderBudget)}
   ${renderAdminUpdateView()}
 </main>
 <style nonce="${escapeHtml(options.nonce)}">
@@ -176,6 +184,7 @@ export function renderAdminPage(options: {
   .one-time{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px;border:1px solid #b77b31;background:#19140d}.one-time-content{min-width:0;flex:1}.one-time p{margin:0 0 8px}.created-codes{max-height:240px;overflow:auto;font:13px/1.7 ui-monospace,SFMono-Regular,monospace;color:#ffd69e}.created-code-row{display:grid;grid-template-columns:1fr auto;gap:16px;border-bottom:1px solid #3b2c1a;padding:4px 0}.one-time-actions{display:flex;flex-wrap:wrap;gap:8px}
   .notice{margin:18px 0 0;padding:12px 14px;border-left:3px solid #b77b31;background:#19140d;color:#f2d2a4}.list{padding-top:34px}.list-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.counters{color:#a99f91;font-size:12px}.filters{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:8px;margin:14px 0}.list-intro{margin:0 0 14px;font-size:12px;line-height:1.6}.table-wrap{overflow-x:auto;border-top:1px solid #423c33}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #302c26;vertical-align:middle;white-space:nowrap}th{color:#a99f91;font-weight:500}td:first-child{white-space:normal}td small{display:block;margin-top:5px;color:#797269;font-size:10px}.standalone-id{max-width:150px;overflow-wrap:anywhere}.status,.availability{display:inline-block;padding:4px 7px;border-left:2px solid #777}.status.scheduled{border-color:#7f7a9d;color:#bbb5d6}.status.active{border-color:#d99b47;color:#f0c27d}.status.redeemed{border-color:#668773;color:#9ac4aa}.status.expired{color:#8c857b}.status.revoked{border-color:#9f5448;color:#d89a8f}.availability.yes{border-color:#668773;color:#9ac4aa}.availability.no{color:#8c857b}.revoke,.revoke-session,.revoke-batch{min-height:34px;padding:0 10px;font-size:12px}.button:disabled{cursor:not-allowed;opacity:.45}.empty{text-align:center;color:#8e877c;padding:36px}.error{margin-bottom:0}
   ${adminUpdateStyles}
+  ${adminSettingsStyles}
   @media(max-width:700px){.admin{padding-top:26px}header{display:block}.policy{margin-top:16px}.create{grid-template-columns:1fr;gap:18px}.create-row{grid-template-columns:1fr 88px}.create-row .button{grid-column:1/-1}.schedule-row{grid-template-columns:1fr}.one-time{align-items:stretch;flex-direction:column}.one-time-actions{display:grid;grid-template-columns:1fr}.one-time .button{width:100%}.filters{grid-template-columns:1fr}.list-heading{align-items:flex-start;flex-direction:column}table,thead,tbody,tr,th,td{display:block}thead{position:absolute;clip:rect(0 0 0 0)}tr{padding:12px 0;border-bottom:1px solid #302c26}td{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:14px;border:0;padding:7px 0;overflow-wrap:anywhere;white-space:normal}td::before{content:attr(data-label);color:#8f8678;font-size:11px;font-weight:500}.revoke,.revoke-session,.revoke-batch{width:100%}}
 </style>`;
 
@@ -220,7 +229,8 @@ byId("clear-code").addEventListener("click",clearCreatedCodes);window.addEventLi
 inviteList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke");if(!button||button.disabled||!confirm("撤销后，该邀请码签发的会话也会立即失效。确定继续？"))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/invites/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const row=button.closest("tr");row.dataset.status="revoked";setStatus(row.querySelector(".record-status"),"revoked",inviteStatusLabels);setAvailability(row.querySelector(".record-redeemable"),false);row.querySelector(".invite-sessions").textContent="0";sessionList.querySelectorAll("tr[data-invite-id]").forEach((sessionRow)=>{if(sessionRow.dataset.inviteId===button.dataset.id)markSessionRevoked(sessionRow)});applyFilters();showNotice("邀请码及其设备会话已撤销。")}catch{button.disabled=false;showError("撤销失败，请稍后重试。")}});
 batchList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke-batch");if(!button||button.disabled)return;const message="确定撤销批次「"+button.dataset.name+"」？将影响 "+button.dataset.count+" 个邀请码和 "+button.dataset.sessions+" 个有效设备会话。";if(!confirm(message))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/invite-batches/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const result=await response.json();button.textContent="已撤销";button.dataset.sessions="0";button.closest("tr").querySelector(".batch-sessions").textContent="0";inviteList.querySelectorAll("tr[data-batch-id]").forEach((row)=>{if(row.dataset.batchId===button.dataset.id){row.dataset.status="revoked";setStatus(row.querySelector(".record-status"),"revoked",inviteStatusLabels);setAvailability(row.querySelector(".record-redeemable"),false);row.querySelector(".invite-sessions").textContent="0";row.querySelector(".revoke").disabled=true}});sessionList.querySelectorAll("tr[data-invite-id]").forEach((row)=>{const inviteRow=Array.from(inviteList.querySelectorAll("tr[data-record-id]")).find((item)=>item.dataset.recordId===row.dataset.inviteId);if(inviteRow?.dataset.batchId===button.dataset.id)markSessionRevoked(row)});applyFilters();showNotice("批次已撤销："+result.revokedInviteCount+" 个邀请码、"+result.revokedSessionCount+" 个设备会话已失效。")}catch{button.disabled=false;showError("批次撤销失败，请稍后重试。")}});
 sessionList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke-session");if(!button||button.disabled||!confirm("确定只撤销这个设备会话？"))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/sessions/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const row=button.closest("tr");decrementActiveSessionCounts(row);markSessionRevoked(row);showNotice("设备会话已撤销。")}catch{button.disabled=false;showError("会话撤销失败，请稍后重试。")}});
+${adminSettingsScript}
 ${adminUpdateScript}`;
 
-  return pageShell("FilmFrame 邀请管理", options.nonce, body, script);
+  return pageShell("FilmFrame 管理", options.nonce, body, script);
 }

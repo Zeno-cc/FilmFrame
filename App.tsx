@@ -39,18 +39,26 @@ import { deleteRecipe, loadRecipes, saveRecipe } from './services/recipeStorage'
 import { shareArtifact } from './services/shareArtifact';
 import { createPreviewRenderController } from './services/previewRenderController';
 import {
-  createFilmTemplateStripLayout,
-  createKodakGoldStripLayout,
   getReal135OverlayUrl,
   KODAK_GOLD_APERTURE_ASPECT,
   supportsReal135Template,
 } from './services/filmOverlay';
-import { getReal135StripTargetImageWidth } from './services/filmResolution';
 import {
   evaluateBatchAdmission,
-  formatBatchAdmission,
-  type BatchAdmissionResult,
 } from './services/batchAdmission';
+import {
+  evaluateSingleImageRenderAdmission,
+  formatAdmissionFeedback,
+  formatSingleImageAdmissionFeedback,
+  frameNumberForIndex,
+  getStripCanvasSize,
+  settingsForImage,
+} from './services/renderAdmission';
+import {
+  DEFAULT_RUNTIME_RENDER_CONFIG,
+  loadRuntimeRenderConfig,
+  type RuntimeConfigState,
+} from './services/runtimeConfig';
 import {
   getIncludedImageCount,
   getIncludedImages,
@@ -135,17 +143,6 @@ function timestampForFilename(): string {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '_');
 }
 
-function frameNumberForIndex(settings: FilmSettings, index: number): number {
-  return ((settings.frameNumber + index - 1) % (settings.maxRollFrames ?? 36)) + 1;
-}
-
-function settingsForImage(settings: FilmSettings, index: number): FilmSettings {
-  return {
-    ...settings,
-    frameNumber: frameNumberForIndex(settings, index),
-  };
-}
-
 function getCurrentImageArtifact(
   item: ImageItem,
   index: number,
@@ -187,60 +184,6 @@ function readImageSize(src: string): Promise<{ width: number; height: number }> 
   });
 }
 
-function getStripCanvasSize(settings: FilmSettings, frameCount: number): { width: number; height: number } {
-  if (
-    (settings.frameRenderMode ?? 'real135') === 'real135'
-    && settings.useFilmOverlayTemplate !== false
-    && supportsReal135Template(settings.brandText)
-  ) {
-    const layout = settings.brandText === FilmType.KODAK_GOLD_200
-      ? createKodakGoldStripLayout(
-        getReal135StripTargetImageWidth(settings.processingMode),
-        frameCount,
-        4,
-      )
-      : createFilmTemplateStripLayout(
-      getReal135StripTargetImageWidth(settings.processingMode),
-      frameCount,
-      4,
-    );
-    return { width: layout.totalW, height: layout.totalH };
-  }
-
-  // Mirrors the classic renderer's fixed geometry so admission happens before Canvas allocation.
-  const maxPerRow = 6;
-  const stripHeight = 1600;
-  const rowGap = 120;
-  const borderSize = Math.floor(stripHeight * 0.16);
-  const imageAreaHeight = stripHeight - borderSize * 2;
-  const frameWidth = imageAreaHeight * 1.5;
-  const frameGap = frameWidth * 0.055;
-  const columns = Math.min(frameCount, maxPerRow);
-  const rows = Math.ceil(frameCount / maxPerRow);
-  const width = frameWidth * 0.2 * 2
-    + frameWidth * columns
-    + frameGap * Math.max(0, columns - 1);
-
-  return {
-    width: Math.ceil(width),
-    height: rows * stripHeight + Math.max(0, rows - 1) * rowGap,
-  };
-}
-
-const ADMISSION_ACTION_COPY: Record<BatchAdmissionResult['recommendations'][number], string> = {
-  'select-images': '取消部分入选',
-  'remove-largest-images': '移除最大图片',
-  'use-preview-mode': '切换预览质量',
-};
-
-function formatAdmissionFeedback(result: BatchAdmissionResult, operation: string): string {
-  const advice = result.recommendations
-    .map(action => ADMISSION_ACTION_COPY[action])
-    .join('、');
-  const suffix = advice ? ` 建议：${advice}。` : '';
-  return `${operation}前预检：${formatBatchAdmission(result)}${suffix}`;
-}
-
 const App: React.FC = () => {
   const [initialPreferences] = useState(() => loadPreferences(DEFAULT_SETTINGS, 'single'));
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -269,6 +212,10 @@ const App: React.FC = () => {
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [deleteAllPhotosOpen, setDeleteAllPhotosOpen] = useState(false);
   const [incompleteExportOpen, setIncompleteExportOpen] = useState(false);
+  const [runtimeConfigState, setRuntimeConfigState] = useState<RuntimeConfigState>({
+    status: 'loading',
+    config: DEFAULT_RUNTIME_RENDER_CONFIG,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const cropTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -280,6 +227,8 @@ const App: React.FC = () => {
   const mountedRef = useRef(true);
   const hasReal135Template = supportsReal135Template(settings.brandText);
   const isReal135Mode = hasReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
+  const renderConfigReady = runtimeConfigState.status !== 'loading';
+  const renderBudgetLimits = runtimeConfigState.config.renderBudgetLimits;
 
   // Drag and drop refs
   const dragItem = useRef<number | null>(null);
@@ -311,11 +260,35 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void fetch('/auth/refresh', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'X-FilmFrame-CSRF': '1' },
-    }).catch(() => undefined);
+    const controller = new AbortController();
+    let active = true;
+
+    const loadRuntimeConfig = async () => {
+      const result = await loadRuntimeRenderConfig({ signal: controller.signal });
+      if (!active || controller.signal.aborted) return;
+
+      setRuntimeConfigState(result);
+      if (result.status === 'fallback') {
+        setNotice(current => current ?? {
+          tone: 'warning',
+          message: '运行配置暂时无法读取，当前按 700 MiB 的 Canvas 安全上限继续使用。刷新页面可重试。',
+        });
+      }
+
+      // Read with the current session before refresh rotates its opaque token.
+      void fetch('/auth/refresh', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-FilmFrame-CSRF': '1' },
+        signal: controller.signal,
+      }).catch(() => undefined);
+    };
+
+    void loadRuntimeConfig();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -523,6 +496,10 @@ const App: React.FC = () => {
 
   const processAll = async (force = false): Promise<BatchProcessOutcome> => {
     if (processing || exporting) return 'noop';
+    if (!renderConfigReady) {
+      setNotice({ tone: 'info', message: '正在读取运行配置，请稍后再开始冲洗。' });
+      return 'blocked';
+    }
 
     const sourceImages = [...imagesRef.current];
     const batchSettings = settings;
@@ -552,12 +529,27 @@ const App: React.FC = () => {
       return 'completed';
     }
 
+    if (batchMode === 'single') {
+      for (const { item, index } of batchEntries) {
+        const canvasAdmission = evaluateSingleImageRenderAdmission(
+          item,
+          settingsForImage(batchSettings, index),
+          renderBudgetLimits,
+        );
+        if (!canvasAdmission.ok) {
+          setErrorMsg(formatSingleImageAdmissionFeedback(canvasAdmission, '开始冲洗'));
+          return 'blocked';
+        }
+      }
+    }
+
     const admission = batchMode === 'strip'
       ? evaluateBatchAdmission({
         operation: 'strip',
         includedImages: batchImages,
         totalImageCount: sourceImages.length,
         stripCanvas: getStripCanvasSize(batchSettings, batchImages.length),
+        canvasLimits: renderBudgetLimits,
       })
       : evaluateBatchAdmission({
         operation: 'process',
@@ -587,7 +579,11 @@ const App: React.FC = () => {
         const stripImages = getIncludedStripImages(sourceImages);
         const settingsKey = createOrderedStripKey(batchSettings, stripImages);
         setProcessingMessage(`正在拼合 ${batchImages.length} 张照片...`);
-        const result = await generateFilmStrip(stripImages, batchSettings);
+        const result = await generateFilmStrip(
+          stripImages,
+          batchSettings,
+          renderBudgetLimits,
+        );
         const currentKey = createOrderedStripKey(
           settingsRef.current,
           getIncludedStripImages(imagesRef.current),
@@ -628,6 +624,7 @@ const App: React.FC = () => {
               item.exifDate,
               item.previewUrl,
               item.transform,
+              renderBudgetLimits,
             );
 
             const currentIndex = imagesRef.current.findIndex(current => current.id === item.id);
@@ -737,6 +734,10 @@ const App: React.FC = () => {
 
   const retryImage = async (id: string) => {
     if (processing || exporting) return;
+    if (!renderConfigReady) {
+      setNotice({ tone: 'info', message: '正在读取运行配置，请稍后再重新冲洗。' });
+      return;
+    }
 
     const currentImages = imagesRef.current;
     const index = currentImages.findIndex(img => img.id === id);
@@ -744,6 +745,17 @@ const App: React.FC = () => {
     if (!item) return;
     if (!isImageIncluded(item)) {
       setNotice({ tone: 'info', message: '这张照片未入选，请先加入本次冲洗。' });
+      return;
+    }
+
+    const retrySettings = settingsForImage(settings, index);
+    const canvasAdmission = evaluateSingleImageRenderAdmission(
+      item,
+      retrySettings,
+      renderBudgetLimits,
+    );
+    if (!canvasAdmission.ok) {
+      setErrorMsg(formatSingleImageAdmissionFeedback(canvasAdmission, '重新冲洗此张照片'));
       return;
     }
 
@@ -758,7 +770,6 @@ const App: React.FC = () => {
     }
 
     const generation = ++renderGenerationRef.current;
-    const retrySettings = settingsForImage(settings, index);
     const settingsKey = createImageRenderKey(retrySettings, item.exifDate, item.transform);
 
     setProcessing(true);
@@ -784,6 +795,7 @@ const App: React.FC = () => {
         item.exifDate,
         item.previewUrl,
         item.transform,
+        renderBudgetLimits,
       );
 
       const currentIndex = imagesRef.current.findIndex(current => current.id === id);
@@ -1201,6 +1213,28 @@ const App: React.FC = () => {
       setPreviewRendering(false);
       return;
     }
+    if (!renderConfigReady) {
+      setPreviewRendering(false);
+      return;
+    }
+
+    const previewSettings = {
+      ...settingsForImage(settings, previewImageIndex),
+      processingMode: 'preview' as const,
+    };
+    const canvasAdmission = evaluateSingleImageRenderAdmission(
+      previewImageItem,
+      previewSettings,
+      renderBudgetLimits,
+    );
+    if (!canvasAdmission.ok) {
+      setPreviewRendering(false);
+      setNotice({
+        tone: 'warning',
+        message: formatSingleImageAdmissionFeedback(canvasAdmission, '生成即时预览'),
+      });
+      return;
+    }
 
     setPreviewRendering(true);
     const controller = createPreviewRenderController<PreviewRenderRequest>({
@@ -1210,6 +1244,7 @@ const App: React.FC = () => {
         request.item.exifDate,
         request.item.previewUrl,
         request.item.transform,
+        renderBudgetLimits,
       )).url,
       onResult: url => {
         setEditorPreviewUrl(url);
@@ -1226,7 +1261,14 @@ const App: React.FC = () => {
       controller.dispose();
       setEditorPreviewUrl(null);
     };
-  }, [preview?.type, previewImageItem, previewImageIndex, settings]);
+  }, [
+    preview?.type,
+    previewImageItem,
+    previewImageIndex,
+    renderBudgetLimits,
+    renderConfigReady,
+    settings,
+  ]);
 
   const effectivePreviewSource =
     preview?.type === 'single' && previewImageItem
@@ -1239,6 +1281,8 @@ const App: React.FC = () => {
       ? '先添加图片'
       : includedCount === 0
         ? '请先选择至少一张照片'
+      : !renderConfigReady
+        ? '正在读取运行配置'
       : outputMode === 'strip'
         ? (currentStripResult ? '重新生成胶片长条' : '生成胶片长条')
         : includedPendingCount > 0
@@ -1265,6 +1309,7 @@ const App: React.FC = () => {
   const primaryAction = {
     ...basePrimaryAction,
     disabled: basePrimaryAction.disabled
+      || (!renderConfigReady && basePrimaryAction.command === 'process')
       || (!processing && !exporting && images.length > 0 && includedCount === 0),
   };
   const imageRemovalAllowed = isImageRemovalAllowed(
@@ -1325,7 +1370,9 @@ const App: React.FC = () => {
     processedCount: includedProcessedCount,
     primaryActionLabel: processing ? '停止后续' : processButtonLabel,
     primaryActionDisabled: exporting || (!processing && images.length > 0 && (
-      includedCount === 0 || (outputMode === 'single' && includedPendingCount === 0)
+      !renderConfigReady
+      || includedCount === 0
+      || (outputMode === 'single' && includedPendingCount === 0)
     )),
     primaryActionTone: processing
       ? 'stop'
@@ -1567,7 +1614,7 @@ const App: React.FC = () => {
                     quarterTurns: ((previewTransform.quarterTurns + 1) % 4) as 0 | 1 | 2 | 3,
                   })
                 : undefined}
-              onApply={previewImageItem && !processing && !exporting
+              onApply={previewImageItem && renderConfigReady && !processing && !exporting
                 ? () => void retryImage(previewImageItem.id)
                 : undefined}
               isCropping={isCropping}

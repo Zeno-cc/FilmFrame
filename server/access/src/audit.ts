@@ -1,7 +1,12 @@
 export interface AuditEvent {
   requestId: string;
   action: string;
-  targetType: "invite" | "session" | "invite_batch" | "system_update";
+  targetType:
+    | "invite"
+    | "session"
+    | "invite_batch"
+    | "system_update"
+    | "runtime_setting";
   targetId: string;
   affected: Record<string, number>;
   timestamp: number;

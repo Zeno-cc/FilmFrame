@@ -177,6 +177,25 @@ describe('createWorkerRenderer', () => {
     void strip.catch(() => undefined);
   });
 
+  it('preserves the validated render budget in single and strip worker payloads', () => {
+    const { renderer, worker } = createHarness();
+    const renderBudgetLimits = { maxPixels: 128 * 1024 * 1024 / 4 };
+    const single = renderer.processImage(
+      {} as File,
+      settings,
+      undefined,
+      undefined,
+      renderBudgetLimits,
+    );
+    const strip = renderer.generateFilmStrip([], settings, renderBudgetLimits);
+
+    expect(worker.messages[0]).toMatchObject({ renderBudgetLimits });
+    expect(worker.messages[1]).toMatchObject({ renderBudgetLimits });
+    renderer.dispose();
+    void single.catch(() => undefined);
+    void strip.catch(() => undefined);
+  });
+
   it('preserves full-roll positions in curated strip worker payloads', () => {
     const { renderer, worker } = createHarness();
     const strip = renderer.generateFilmStrip([{

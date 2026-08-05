@@ -131,9 +131,26 @@ test("release workflow pins actions and never publishes a mutable latest tag", a
   assert.match(workflow, /sbom: true/);
   assert.match(workflow, /verify-attestations\.mjs/);
   assert.match(workflow, /gh release create/);
+  assert.match(workflow, /playwright install --with-deps chromium firefox webkit/);
   for (const line of workflow.split("\n").filter((entry) => entry.includes("uses:"))) {
     assert.match(line, /@[0-9a-f]{40}(?:\s|$)/, `action is not commit-pinned: ${line}`);
   }
+});
+
+test("release workflow blocks artifact construction on the Ubuntu updater gates", async () => {
+  const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
+  const pythonGate = "PYTHONPATH=ops/updater python3 -m unittest discover";
+  const layoutGate = "bash ops/updater/tests/test-install-layout.sh";
+  const bundleBuild = "ops/release/build-deploy-bundle.sh";
+
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.match(workflow, /sys\.platform\.startswith\("linux"\).*SO_PEERCRED/);
+  assert.match(workflow, new RegExp(pythonGate));
+  assert.match(workflow, /-s ops\/updater\/tests -p 'test_\*\.py' -v/);
+  assert.match(workflow, new RegExp(layoutGate));
+  assert.ok(workflow.indexOf(pythonGate) < workflow.indexOf(layoutGate));
+  assert.ok(workflow.indexOf(layoutGate) < workflow.indexOf(bundleBuild));
+  assert.doesNotMatch(workflow, /(?:unittest discover|test-install-layout\.sh).*\|\|\s*true/);
 });
 
 test("both runtime images expose immutable release identity labels", async () => {

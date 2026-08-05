@@ -482,6 +482,107 @@ if (readiness.status === 'incomplete') openIncompleteExportDialog();
 else downloadZip(readiness.readyEntries);
 ```
 
+## Scenario: Administrator-Configurable Single-Canvas Budget
+
+### 1. Scope / Trigger
+
+Apply this contract whenever runtime configuration, Canvas sizing, render
+admission, Worker requests, or main-thread Canvas allocation changes.
+
+### 2. Signatures
+
+```ts
+type RuntimeConfigState =
+  | { status: 'loading'; config: RuntimeRenderConfig }
+  | { status: 'ready'; config: RuntimeRenderConfig }
+  | { status: 'fallback'; config: RuntimeRenderConfig; reason: string };
+
+function decodeRuntimeRenderConfig(value: unknown): RuntimeRenderConfig;
+function loadRuntimeRenderConfig(options?: LoadRuntimeConfigOptions): Promise<
+  Exclude<RuntimeConfigState, { status: 'loading' }>
+>;
+function assertCanvasBudget(
+  width: number,
+  height: number,
+  limits?: RenderBudgetLimits,
+): void;
+```
+
+The same-origin response has exactly these fields:
+
+```json
+{"maxCanvasMiB":700,"maxCanvasBytes":734003200,"updatedAt":0}
+```
+
+### 3. Contracts
+
+- Accept only whole-MiB values from 128 through 2,048. Four RGBA bytes per
+  pixel convert the value to `RenderBudgetLimits`; the compiled default is 700
+  MiB.
+- Fetch `/api/runtime-config` with same-origin credentials, `no-store`, and a
+  bounded five-second timeout. Reject missing, additional, inconsistent, or
+  unsafe-integer fields.
+- Read runtime configuration before sending the startup session refresh. The
+  refresh atomically rotates the opaque Cookie, so concurrent requests can
+  leave the configuration request carrying the newly invalidated old token
+  and incorrectly activate the 700 MiB fallback.
+- While the configuration is loading, block expensive single-image, retry,
+  preview, and strip rendering. Failure is recoverable but remains bounded by
+  the 700 MiB fallback and must be visible to the user.
+- Treat the loaded value as a page-lifetime snapshot. An administrator change
+  applies only to a newly opened or refreshed page.
+- Pass one validated `RenderBudgetLimits` object through App admission,
+  `filmWorkerClient`, Worker requests, and main-thread fallback. Validate every
+  dynamic output-sized HTMLCanvas/OffscreenCanvas allocation, including
+  scanner, rotation, mask, emulsion, single-output, and strip canvases, before
+  allocation.
+- The setting controls one Canvas RGBA estimate only. It never changes upload
+  bytes, decoded-source limits, aggregate working-set limits, ZIP input, or the
+  32,767-pixel edge ceiling.
+
+### 4. Validation & Error Matrix
+
+- `128..2048` whole MiB with matching bytes/timestamp -> ready and bounded.
+- HTTP failure, timeout, malformed JSON, schema drift, or inconsistent bytes ->
+  fallback to 700 MiB and show recoverable status.
+- Render command during loading -> no renderer call; show wait guidance.
+- Invalid dimensions, edge overflow, or configured pixel overflow -> reject
+  before creating Canvas or Worker work.
+- Worker failure -> main-thread fallback receives the identical budget;
+  cancellation remains terminal and must not fall back.
+
+### 5. Good / Base / Bad Cases
+
+- Good: a 128 MiB configuration blocks a 20-frame high-quality real-135 strip
+  before any Canvas allocation or Worker creation.
+- Base: a valid 700 MiB response preserves the established default behavior.
+- Bad: App preflight uses 128 MiB but the Worker or main-thread fallback omits
+  the limits and allocates using a larger compiled default.
+
+### 6. Tests Required
+
+- Unit tests cover 128, 700, and 2,048 MiB; immediately outside each boundary;
+  exact byte conversion; strict response fields; timeout; fallback; and every
+  Canvas sizing helper without allocating a giant Canvas.
+- Worker-client and fallback tests assert the same limits are forwarded for
+  single and strip requests.
+- Chromium stress coverage instruments Canvas/OffscreenCanvas/Worker creation
+  and proves an over-budget strip is rejected before rendering starts.
+- Run the physical iPhone Safari and Android Chrome smoke protocol before
+  authorizing a release tag; desktop emulation is not a substitute.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: admission and allocation use different limits.
+evaluateBatchAdmission({ operation: 'strip', stripCanvas, canvasLimits });
+await generateFilmStrip(images, settings);
+
+// Correct: one validated snapshot reaches both boundaries.
+evaluateBatchAdmission({ operation: 'strip', stripCanvas, canvasLimits });
+await generateFilmStrip(images, settings, canvasLimits);
+```
+
 ## Accessibility Review
 
 - Use role/name selectors in E2E tests; this verifies both interaction and accessible naming.

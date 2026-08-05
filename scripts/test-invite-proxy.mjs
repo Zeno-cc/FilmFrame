@@ -168,6 +168,7 @@ try {
   stage = "anonymous resource gating";
   for (const pathname of [
     "/",
+    "/api/runtime-config",
     "/film-overlays/kodak-portra-160.png",
     "/film-sprocket-masks/kodak-portra-160.png",
   ]) {
@@ -228,6 +229,16 @@ try {
   const authorized = await request("/", { headers: { Cookie: cookie } });
   assert.equal(authorized.status, 200);
   assert.match(authorized.body, /<div id="root"><\/div>/);
+
+  const runtimeConfig = await request("/api/runtime-config", {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(runtimeConfig.status, 200);
+  assert.deepEqual(JSON.parse(runtimeConfig.body), {
+    maxCanvasMiB: 700,
+    maxCanvasBytes: 700 * 1024 * 1024,
+    updatedAt: 0,
+  });
 
   const cookieProbe = await request("/__proxy_test/static-cookie", {
     headers: { Cookie: cookie },

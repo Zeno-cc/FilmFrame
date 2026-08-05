@@ -23,7 +23,7 @@ import {
   Film135SideLayout,
   PHYS_135,
 } from './filmGeometry';
-import { getAutoQuarterTurns, getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
+import { getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
 import { draw135Markings, draw135SideMarkings } from './filmMarkings';
 import {
   KODAK_GOLD_APERTURE_MASK_URL,
@@ -43,15 +43,18 @@ import {
   drawGrain as drawRealGrain,
   drawRealFilmStockTexture,
 } from './filmTexture';
-import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from './filmResolution';
-import { validateCanvasBudget } from './renderBudget';
-
-function assertCanvasBudget(width: number, height: number) {
-  const budget = validateCanvasBudget(width, height);
-  if (!budget.ok) {
-    throw new Error(`Render canvas exceeds the safe budget: ${budget.reason}`);
-  }
-}
+import {
+  getReal135StripTargetImageWidth,
+  getReal135TargetImageWidth,
+  getScannerCanvasSize,
+} from './filmResolution';
+import { assertCanvasBudget, type RenderBudgetLimits } from './renderBudget';
+import {
+  createLuminanceAlphaMask,
+  exportCanvasToObjectUrl,
+  loadCanvasImage,
+  restoreOutputOrientationForSource,
+} from './canvasRuntime';
 
 /**
  * 绘制圆角矩形 polyfill
@@ -74,29 +77,21 @@ function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w:
   ctx.closePath();
 }
 
-/**
- * 内部辅助：加载图片对象
- */
-const loadImage = (src: string): Promise<HTMLImageElement> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-        // Removed Security Fix: Image dimension limits deleted per user request
-        resolve(img);
-    };
-    img.onerror = () => reject(new Error(`Failed to load image`));
-    img.src = src;
-  });
-};
-
-async function createTintedSprocketOverlay(settings: FilmSettings): Promise<HTMLCanvasElement | null> {
+async function createTintedSprocketOverlay(
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<HTMLCanvasElement | null> {
   const color = getReal135SprocketColor(settings);
   const maskUrl = getReal135SprocketMaskUrl(settings.brandText);
   if (!color || !maskUrl) return null;
 
   try {
-    const mask = await loadImage(maskUrl);
+    const mask = await loadCanvasImage(maskUrl);
+    assertCanvasBudget(
+      REAL135_SPROCKET_MASK_WIDTH,
+      REAL135_SPROCKET_MASK_HEIGHT,
+      renderBudgetLimits,
+    );
     const canvas = document.createElement('canvas');
     canvas.width = REAL135_SPROCKET_MASK_WIDTH;
     canvas.height = REAL135_SPROCKET_MASK_HEIGHT;
@@ -121,9 +116,9 @@ let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null
 const loadKodakGoldLayeredAssets = (): Promise<KodakGoldLayeredAssets> => {
   if (!kodakGoldLayeredAssetsPromise) {
     kodakGoldLayeredAssetsPromise = Promise.all([
-      loadImage(KODAK_GOLD_BASE_URL),
-      loadImage(KODAK_GOLD_APERTURE_MASK_URL),
-      loadImage(KODAK_GOLD_APERTURE_SHADOW_URL),
+      loadCanvasImage(KODAK_GOLD_BASE_URL),
+      loadCanvasImage(KODAK_GOLD_APERTURE_MASK_URL),
+      loadCanvasImage(KODAK_GOLD_APERTURE_SHADOW_URL),
     ])
       .then(([base, apertureMask, apertureShadow]) => ({ base, apertureMask, apertureShadow }))
       .catch((error) => {
@@ -134,95 +129,6 @@ const loadKodakGoldLayeredAssets = (): Promise<KodakGoldLayeredAssets> => {
 
   return kodakGoldLayeredAssetsPromise;
 };
-
-const exportCanvasToObjectUrl = (
-  canvas: HTMLCanvasElement,
-  outputFormat: string,
-  outputQuality: number,
-  errorMessage = 'Failed to export canvas blob'
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error(errorMessage));
-          return;
-        }
-        resolve(URL.createObjectURL(blob));
-      },
-      outputFormat,
-      outputQuality
-    );
-  });
-};
-
-function rotateCanvas(canvas: HTMLCanvasElement, radians: number): HTMLCanvasElement {
-  if (radians === 0) return canvas;
-
-  const quarterTurn = Math.abs(Math.abs(radians) - Math.PI / 2) < 0.0001;
-  const output = document.createElement('canvas');
-  output.width = quarterTurn ? canvas.height : canvas.width;
-  output.height = quarterTurn ? canvas.width : canvas.height;
-
-  const ctx = output.getContext('2d', { alpha: false });
-  if (!ctx) throw new Error('Canvas context not found');
-
-  ctx.fillStyle = '#e8e3d8';
-  ctx.fillRect(0, 0, output.width, output.height);
-  ctx.translate(output.width / 2, output.height / 2);
-  ctx.rotate(radians);
-  ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-  return output;
-}
-
-function restoreOutputOrientationForSource(
-  canvas: HTMLCanvasElement,
-  img: HTMLImageElement,
-  frameWidth: number,
-  frameHeight: number,
-  transform?: RenderTransform,
-): HTMLCanvasElement {
-  const normalized = normalizeRenderTransform(transform);
-  const autoQuarterTurns = getAutoQuarterTurns(
-    img.width,
-    img.height,
-    frameWidth,
-    frameHeight,
-    normalized.quarterTurns,
-  );
-  return rotateCanvas(
-    canvas,
-    -autoQuarterTurns * Math.PI / 2,
-  );
-}
-
-function createLuminanceAlphaMask(
-  mask: HTMLImageElement,
-  width: number,
-  height: number
-): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas context not found');
-
-  ctx.drawImage(mask, 0, 0, width, height);
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = Math.round(data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722);
-    data[i] = 255;
-    data[i + 1] = 255;
-    data[i + 2] = 255;
-    data[i + 3] = alpha;
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-  return canvas;
-}
 
 /**
  * 内部辅助：绘制单个齿孔（带3D效果）
@@ -296,10 +202,11 @@ let cachedNoiseCanvas: HTMLCanvasElement | null = null;
  * 相比于在主画布上逐像素操作，先生成小块纹理再平铺 (Pattern) 性能提升巨大。
  * 优化：使用 Box-Muller 变换生成真实的高斯分布(正态分布)噪点，而非简单的 Uniform Noise。
  */
-const getNoisePatternCanvas = (): HTMLCanvasElement => {
+const getNoisePatternCanvas = (renderBudgetLimits: RenderBudgetLimits = {}): HTMLCanvasElement => {
   if (cachedNoiseCanvas) return cachedNoiseCanvas;
 
   const size = 256;
+  assertCanvasBudget(size, size, renderBudgetLimits);
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -337,7 +244,15 @@ const getNoisePatternCanvas = (): HTMLCanvasElement => {
  * 内部辅助：绘制颗粒 (性能优化版)
  * 使用 globalCompositeOperation = 'overlay' 配合 Pattern 填充
  */
-const drawGrain = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, intensity: number) => {
+const drawGrain = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  intensity: number,
+  renderBudgetLimits: RenderBudgetLimits = {},
+) => {
   if (intensity <= 0) return;
   if (width <= 0 || height <= 0) return;
 
@@ -349,7 +264,7 @@ const drawGrain = (ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.clip();
 
   // 2. 准备噪点纹理
-  const noiseCanvas = getNoisePatternCanvas();
+  const noiseCanvas = getNoisePatternCanvas(renderBudgetLimits);
   const pattern = ctx.createPattern(noiseCanvas, 'repeat');
 
   if (pattern) {
@@ -509,19 +424,14 @@ function drawReal135Hole(
 function composeOnScannerCanvas(
   filmCanvas: HTMLCanvasElement,
   backgroundColor = DEFAULT_SCAN_BACKGROUND_COLOR,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): HTMLCanvasElement {
-  const paddingRatio = 0.055;
-  const outputW = filmCanvas.width;
-  const outputH = Math.round((outputW * 3) / 4);
+  const { width: canvasW, height: canvasH } = getScannerCanvasSize({
+    width: filmCanvas.width,
+    height: filmCanvas.height,
+  });
 
-  let canvasW = outputW;
-  let canvasH = outputH;
-
-  if (filmCanvas.height > canvasH * (1 - paddingRatio * 2)) {
-    canvasH = Math.round(filmCanvas.height / (1 - paddingRatio * 2));
-    canvasW = Math.round((canvasH * 4) / 3);
-  }
-
+  assertCanvasBudget(canvasW, canvasH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
   canvas.height = canvasH;
@@ -558,11 +468,13 @@ export const processImageReal135 = async (
   settings: FilmSettings,
   dateOverride?: string,
   transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<string> => {
-  const img = await loadImage(imageSource);
+  const img = await loadCanvasImage(imageSource);
   const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
   const layout = create135SidePerforationLayout(targetImageWidthPx);
 
+  assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const filmCanvas = document.createElement('canvas');
   filmCanvas.width = layout.filmW;
   filmCanvas.height = layout.filmH;
@@ -589,10 +501,21 @@ export const processImageReal135 = async (
 
   const finalCanvas =
     (settings.scanOutputAspect ?? '4:3') === '4:3'
-      ? composeOnScannerCanvas(filmCanvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+      ? composeOnScannerCanvas(
+        filmCanvas,
+        settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
+        renderBudgetLimits,
+      )
       : filmCanvas;
 
-  const outputCanvas = restoreOutputOrientationForSource(finalCanvas, img, layout.imageW, layout.imageH, transform);
+  const outputCanvas = restoreOutputOrientationForSource(
+    finalCanvas,
+    img,
+    layout.imageW,
+    layout.imageH,
+    transform,
+    renderBudgetLimits,
+  );
   return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
 };
 
@@ -600,16 +523,17 @@ const processImageWithTemplateOverlay = async (
   imageSource: string,
   settings: FilmSettings,
   transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<string | null> => {
   if (settings.useFilmOverlayTemplate === false) return null;
   const registeredOverlayUrl = getReal135OverlayUrl(settings.brandText);
   if (!registeredOverlayUrl) return null;
-  const sprocketOverlay = await createTintedSprocketOverlay(settings);
+  const sprocketOverlay = await createTintedSprocketOverlay(settings, renderBudgetLimits);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     try {
       const layeredAssets = await loadKodakGoldLayeredAssets();
-      const img = await loadImage(imageSource);
+      const img = await loadCanvasImage(imageSource);
       const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
       const canvas = renderKodakGoldLayeredFrameCanvas(
         img,
@@ -620,11 +544,16 @@ const processImageWithTemplateOverlay = async (
         targetImageWidthPx,
         transform,
         sprocketOverlay,
+        renderBudgetLimits,
       );
 
       const finalCanvas =
         (settings.scanOutputAspect ?? 'native') === '4:3'
-          ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+          ? composeOnScannerCanvas(
+            canvas,
+            settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
+            renderBudgetLimits,
+          )
           : canvas;
 
       const outputCanvas = restoreOutputOrientationForSource(
@@ -633,6 +562,7 @@ const processImageWithTemplateOverlay = async (
         targetImageWidthPx,
         Math.round(targetImageWidthPx * 2 / 3),
         transform,
+        renderBudgetLimits,
       );
       return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
     } catch (error) {
@@ -644,8 +574,8 @@ const processImageWithTemplateOverlay = async (
     const overlayUrl = settings.brandText === FilmType.KODAK_GOLD_200
       ? settings.filmOverlayUrl || registeredOverlayUrl
       : registeredOverlayUrl;
-    const overlay = await loadImage(overlayUrl);
-    const img = await loadImage(imageSource);
+    const overlay = await loadCanvasImage(overlayUrl);
+    const img = await loadCanvasImage(imageSource);
     const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
     const canvas = renderKodakGoldTemplateFrameCanvas(
       img,
@@ -654,11 +584,16 @@ const processImageWithTemplateOverlay = async (
       targetImageWidthPx,
       transform,
       sprocketOverlay,
+      renderBudgetLimits,
     );
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
-        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+        ? composeOnScannerCanvas(
+          canvas,
+          settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
+          renderBudgetLimits,
+        )
         : canvas;
 
     const outputCanvas = restoreOutputOrientationForSource(
@@ -667,6 +602,7 @@ const processImageWithTemplateOverlay = async (
       targetImageWidthPx,
       Math.round(targetImageWidthPx * 2 / 3),
       transform,
+      renderBudgetLimits,
     );
     return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
   } catch (error) {
@@ -682,8 +618,10 @@ function renderKodakGoldTemplateFrameCanvas(
   targetImageWidthPx: number,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+  assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
   canvas.width = layout.filmW;
   canvas.height = layout.filmH;
@@ -704,8 +642,10 @@ function renderKodakGoldLayeredFrameCanvas(
   targetImageWidthPx: number,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): HTMLCanvasElement {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+  assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
   canvas.width = layout.filmW;
   canvas.height = layout.filmH;
@@ -723,6 +663,7 @@ function renderKodakGoldLayeredFrameCanvas(
     settings,
     transform,
     sprocketOverlay,
+    renderBudgetLimits,
   );
   return canvas;
 }
@@ -737,12 +678,14 @@ function drawKodakGoldLayeredFrame(
   settings: FilmSettings,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#050403';
   ctx.fillRect(0, 0, layout.filmW, layout.filmH);
 
+  assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const emulsion = document.createElement('canvas');
   emulsion.width = layout.filmW;
   emulsion.height = layout.filmH;
@@ -762,7 +705,16 @@ function drawKodakGoldLayeredFrame(
 
   emulsionCtx.save();
   emulsionCtx.globalCompositeOperation = 'destination-in';
-  emulsionCtx.drawImage(createLuminanceAlphaMask(apertureMask, layout.filmW, layout.filmH), 0, 0);
+  emulsionCtx.drawImage(
+    createLuminanceAlphaMask(
+      apertureMask,
+      layout.filmW,
+      layout.filmH,
+      renderBudgetLimits,
+    ),
+    0,
+    0,
+  );
   emulsionCtx.restore();
 
   ctx.drawImage(emulsion, 0, 0);
@@ -979,7 +931,8 @@ function drawContinuousDxBlocks(
 
 const generateReal135FilmStrip = async (
   images: ImageItem[],
-  settings: FilmSettings
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<string | null> => {
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) return null;
   if (settings.brandText !== FilmType.KODAK_GOLD_200) {
@@ -988,16 +941,16 @@ const generateReal135FilmStrip = async (
 
     let overlay: HTMLImageElement;
     try {
-      overlay = await loadImage(overlayUrl);
+      overlay = await loadCanvasImage(overlayUrl);
     } catch (error) {
       console.warn('Film strip overlay template not available, falling back to classic strip.', error);
       return null;
     }
-    const sprocketOverlay = await createTintedSprocketOverlay(settings);
+    const sprocketOverlay = await createTintedSprocketOverlay(settings, renderBudgetLimits);
 
     const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
     const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
-    assertCanvasBudget(layout.totalW, layout.totalH);
+    assertCanvasBudget(layout.totalW, layout.totalH, renderBudgetLimits);
     const canvas = document.createElement('canvas');
     canvas.width = layout.totalW;
     canvas.height = layout.totalH;
@@ -1012,7 +965,7 @@ const generateReal135FilmStrip = async (
       const col = index % layout.maxPerRow;
       const x = layout.padding + col * layout.frameStride;
       const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-      const img = await loadImage(images[index].previewUrl);
+      const img = await loadCanvasImage(images[index].previewUrl);
       const frameSettings = {
         ...settings,
         frameNumber: getFrameNumberForImage(
@@ -1047,7 +1000,7 @@ const generateReal135FilmStrip = async (
 
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
   const layout = createKodakGoldStripLayout(targetImageWidthPx, images.length, 4);
-  assertCanvasBudget(layout.totalW, layout.totalH);
+  assertCanvasBudget(layout.totalW, layout.totalH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
   canvas.width = layout.totalW;
   canvas.height = layout.totalH;
@@ -1068,7 +1021,7 @@ const generateReal135FilmStrip = async (
     const row = Math.floor(index / layout.maxPerRow);
     const col = index % layout.maxPerRow;
     const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-    const img = await loadImage(images[index].previewUrl);
+    const img = await loadCanvasImage(images[index].previewUrl);
     const frameSettings = {
       ...settings,
       frameNumber: getFrameNumberForImage(
@@ -1106,25 +1059,37 @@ export const processImage = async (
   settings: FilmSettings,
   dateOverride?: string,
   transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<string> => {
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
-    const templatedResult = await processImageWithTemplateOverlay(imageSource, settings, transform);
+    const templatedResult = await processImageWithTemplateOverlay(
+      imageSource,
+      settings,
+      transform,
+      renderBudgetLimits,
+    );
     if (templatedResult) return templatedResult;
 
-    return processImageReal135(imageSource, settings, dateOverride, transform);
+    return processImageReal135(
+      imageSource,
+      settings,
+      dateOverride,
+      transform,
+      renderBudgetLimits,
+    );
   }
 
   const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
   if (!preset) throw new Error("Invalid Preset");
 
-  const img = await loadImage(imageSource);
+  const img = await loadCanvasImage(imageSource);
   const rotated = getRotatedDimensions(img.width, img.height, normalizeRenderTransform(transform).quarterTurns);
   const isPortrait = rotated.height > rotated.width;
   const baseDim = isPortrait ? rotated.height : rotated.width;
   const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
   const canvasWidth = isPortrait ? rotated.width + borderSize * 2 : rotated.width;
   const canvasHeight = isPortrait ? rotated.height : rotated.height + borderSize * 2;
-  assertCanvasBudget(canvasWidth, canvasHeight);
+  assertCanvasBudget(canvasWidth, canvasHeight, renderBudgetLimits);
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
@@ -1151,7 +1116,7 @@ export const processImage = async (
   drawImageCoverWithTransform(ctx, img, imgX, imgY, imgW, imgH, transform);
 
   // 3. 施加颗粒 (使用优化后的叠加算法)
-  drawGrain(ctx, imgX, imgY, imgW, imgH, settings.grainIntensity);
+  drawGrain(ctx, imgX, imgY, imgW, imgH, settings.grainIntensity, renderBudgetLimits);
 
   // === 齿孔计算 ===
   const TARGET_HOLE_COUNT = 8;
@@ -1288,12 +1253,13 @@ export const processImage = async (
  */
 export const generateFilmStrip = async (
   images: ImageItem[],
-  settings: FilmSettings
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<string> => {
   if (images.length === 0) return '';
 
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
-    const realStrip = await generateReal135FilmStrip(images, settings);
+    const realStrip = await generateReal135FilmStrip(images, settings, renderBudgetLimits);
     if (realStrip) return realStrip;
   }
   
@@ -1319,9 +1285,14 @@ export const generateFilmStrip = async (
   const START_GAP = FRAME_WIDTH * 0.2;
   const END_GAP = FRAME_WIDTH * 0.2;
   
-  const totalWidth = START_GAP + (FRAME_WIDTH * colsInMaxRow) + (FRAME_GAP * (Math.max(0, colsInMaxRow - 1))) + END_GAP;
+  const totalWidth = Math.trunc(
+    START_GAP
+    + FRAME_WIDTH * colsInMaxRow
+    + FRAME_GAP * Math.max(0, colsInMaxRow - 1)
+    + END_GAP,
+  );
   const totalHeight = (numRows * STRIP_HEIGHT_PX) + ((numRows - 1) * ROW_GAP);
-  assertCanvasBudget(totalWidth, totalHeight);
+  assertCanvasBudget(totalWidth, totalHeight, renderBudgetLimits);
 
   const canvas = document.createElement('canvas');
   canvas.width = totalWidth;
@@ -1346,7 +1317,7 @@ export const generateFilmStrip = async (
         
         // 关键内存优化：每次只加载一张大图，画完立即释放引用
         // 之前 Promise.all 会同时将所有大图加载进内存
-        const img = await loadImage(imgItem.previewUrl);
+        const img = await loadCanvasImage(imgItem.previewUrl);
 
         const frameX = START_GAP + i * (FRAME_WIDTH + FRAME_GAP);
         const frameY = rowOffsetY + borderSize;
@@ -1361,7 +1332,15 @@ export const generateFilmStrip = async (
         );
 
         // 施加颗粒 (使用优化后的算法)
-        drawGrain(ctx, frameX, frameY, FRAME_WIDTH, imageAreaHeight, settings.grainIntensity);
+        drawGrain(
+          ctx,
+          frameX,
+          frameY,
+          FRAME_WIDTH,
+          imageAreaHeight,
+          settings.grainIntensity,
+          renderBudgetLimits,
+        );
     }
 
     // 3.3 绘制齿孔 (与图片加载无关，可以批量绘制)

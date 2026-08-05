@@ -12,6 +12,8 @@
 | [file-map.md](file-map.md) | 每个源码、配置、测试和素材文件负责什么 |
 | [engineering.md](engineering.md) | 安装、构建、测试实况、依赖、部署、CI 和发布建议 |
 | [operations-and-risks.md](operations-and-risks.md) | 已知缺陷、排障顺序、内存/浏览器/素材风险和优先级 |
+| [browser-mobile-smoke.md](browser-mobile-smoke.md) | v1.3 desktop compatibility, physical-device smoke, privacy, and bounded stress protocol |
+| [mobile-smoke-evidence-template.md](mobile-smoke-evidence-template.md) | Redacted iPhone Safari and Android Chrome release evidence template |
 | [current-worktree.md](current-worktree.md) | 稳定化提交范围、相对前序基线的变化和验证快照 |
 
 维护原则：实现细节只在最相关的文档中展开，其他文档通过链接引用；所有“已验证”陈述必须能对应源码、配置或实际命令结果。

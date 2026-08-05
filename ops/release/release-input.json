@@ -1,28 +1,28 @@
 {
-  "version": "1.2.0",
-  "minUpdaterVersion": "1.0.0",
+  "version": "1.3.0",
+  "minUpdaterVersion": "1.0.2",
   "database": {
-    "schemaFrom": 3,
-    "schemaTo": 4,
-    "rollbackFloor": "1.1.1",
+    "schemaFrom": 4,
+    "schemaTo": 5,
+    "rollbackFloor": "1.2.0",
     "backwardCompatible": true
   },
   "summaryZh": [
     {
       "kind": "feature",
-      "text": "邀请码支持可配置生效与兑换截止时间"
+      "text": "管理员可配置单画布内存预算与安全范围"
     },
     {
       "kind": "feature",
-      "text": "管理端新增邀请码可兑换状态与有效设备数"
-    },
-    {
-      "kind": "security",
-      "text": "批量邀请码限流覆盖定时生效参数"
+      "text": "新增火狐与桌面苹果浏览器兼容性门禁"
     },
     {
       "kind": "fix",
-      "text": "恢复演练兼容旧版邀请码数据库备份"
+      "text": "可信发布流程新增更新器系统级验证"
+    },
+    {
+      "kind": "feature",
+      "text": "拆分浏览器画布运行时并完善内存边界测试"
     }
   ]
 }

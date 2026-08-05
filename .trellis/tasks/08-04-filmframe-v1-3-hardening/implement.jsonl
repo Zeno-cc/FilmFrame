@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package routing and required quality gates."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Canvas, Worker, browser, privacy, and resource-ownership contracts."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"App generation, latest-state, and Object URL ownership rules."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Strict decoding requirements for browser and API inputs."}
+{"file":".trellis/spec/backend/index.md","reason":"Backend package routing and quality gates."}
+{"file":".trellis/spec/backend/access-control.md","reason":"Access, SQLite, API, OpenResty, audit, and release contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace persisted settings through API, proxy, frontend, and renderer boundaries."}
+{"file":".trellis/tasks/08-04-filmframe-v1-3-hardening/research/current-state.md","reason":"v1.2 baseline, known gaps, and external evidence constraints."}

@@ -26,9 +26,13 @@ import {
 } from './filmOverlay';
 import { drawImageCoverAutoRotate, drawImageCoverWithTransform } from './filmGeometry';
 import { getAutoQuarterTurns, getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
-import { getReal135StripTargetImageWidth, getReal135TargetImageWidth } from './filmResolution';
+import {
+  getReal135StripTargetImageWidth,
+  getReal135TargetImageWidth,
+  getScannerCanvasSize,
+} from './filmResolution';
 import { drawGrain } from './filmTexture';
-import { validateCanvasBudget } from './renderBudget';
+import { assertCanvasBudget, type RenderBudgetLimits } from './renderBudget';
 
 type ProcessRequest = {
   id: number;
@@ -37,6 +41,7 @@ type ProcessRequest = {
   settings: FilmSettings;
   dateOverride?: string;
   transform?: RenderTransform;
+  renderBudgetLimits?: RenderBudgetLimits;
 };
 
 type StripRequest = {
@@ -44,6 +49,7 @@ type StripRequest = {
   type: 'generateFilmStrip';
   images: ImageItem[];
   settings: FilmSettings;
+  renderBudgetLimits?: RenderBudgetLimits;
 };
 
 type WorkerRequest = ProcessRequest | StripRequest;
@@ -61,13 +67,6 @@ type KodakGoldLayeredAssets = {
   apertureMask: ImageBitmap;
   apertureShadow: ImageBitmap;
 };
-
-function assertCanvasBudget(width: number, height: number) {
-  const budget = validateCanvasBudget(width, height);
-  if (!budget.ok) {
-    throw new Error(`Render canvas exceeds the safe budget: ${budget.reason}`);
-  }
-}
 
 let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
 const real135OverlayPromises = new Map<string, Promise<ImageBitmap>>();
@@ -180,12 +179,20 @@ function loadReal135SprocketMask(brand: FilmType): Promise<ImageBitmap> {
   return loadCachedBitmap(real135SprocketMaskPromises, maskUrl);
 }
 
-async function createTintedSprocketOverlay(settings: FilmSettings): Promise<OffscreenCanvas | null> {
+async function createTintedSprocketOverlay(
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<OffscreenCanvas | null> {
   const color = getReal135SprocketColor(settings);
   if (!color) return null;
 
   try {
     const mask = await loadReal135SprocketMask(settings.brandText);
+    assertCanvasBudget(
+      REAL135_SPROCKET_MASK_WIDTH,
+      REAL135_SPROCKET_MASK_HEIGHT,
+      renderBudgetLimits,
+    );
     const canvas = new OffscreenCanvas(REAL135_SPROCKET_MASK_WIDTH, REAL135_SPROCKET_MASK_HEIGHT);
     const context = canvas.getContext('2d', { alpha: true });
     if (!context) return null;
@@ -197,7 +204,13 @@ async function createTintedSprocketOverlay(settings: FilmSettings): Promise<Offs
   }
 }
 
-function createLuminanceAlphaMask(mask: WorkerImage, width: number, height: number): WorkerCanvas {
+function createLuminanceAlphaMask(
+  mask: WorkerImage,
+  width: number,
+  height: number,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): WorkerCanvas {
+  assertCanvasBudget(width, height, renderBudgetLimits);
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas init failed');
@@ -221,19 +234,14 @@ function createLuminanceAlphaMask(mask: WorkerImage, width: number, height: numb
 function composeOnScannerCanvas(
   filmCanvas: WorkerCanvas,
   backgroundColor = DEFAULT_SCAN_BACKGROUND_COLOR,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): WorkerCanvas {
-  const paddingRatio = 0.055;
-  const outputW = filmCanvas.width;
-  const outputH = Math.round((outputW * 3) / 4);
+  const { width: canvasW, height: canvasH } = getScannerCanvasSize({
+    width: filmCanvas.width,
+    height: filmCanvas.height,
+  });
 
-  let canvasW = outputW;
-  let canvasH = outputH;
-
-  if (filmCanvas.height > canvasH * (1 - paddingRatio * 2)) {
-    canvasH = Math.round(filmCanvas.height / (1 - paddingRatio * 2));
-    canvasW = Math.round((canvasH * 4) / 3);
-  }
-
+  assertCanvasBudget(canvasW, canvasH, renderBudgetLimits);
   const canvas = new OffscreenCanvas(canvasW, canvasH);
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas init failed');
@@ -261,13 +269,20 @@ function composeOnScannerCanvas(
   return canvas;
 }
 
-function rotateCanvas(canvas: WorkerCanvas, radians: number): WorkerCanvas {
+function rotateCanvas(
+  canvas: WorkerCanvas,
+  radians: number,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): WorkerCanvas {
   if (radians === 0) return canvas;
 
   const quarterTurn = Math.abs(Math.abs(radians) - Math.PI / 2) < 0.0001;
+  const width = quarterTurn ? canvas.height : canvas.width;
+  const height = quarterTurn ? canvas.width : canvas.height;
+  assertCanvasBudget(width, height, renderBudgetLimits);
   const output = new OffscreenCanvas(
-    quarterTurn ? canvas.height : canvas.width,
-    quarterTurn ? canvas.width : canvas.height
+    width,
+    height,
   );
   const ctx = output.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas init failed');
@@ -287,6 +302,7 @@ function restoreOutputOrientationForSource(
   frameWidth: number,
   frameHeight: number,
   transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ) {
   const normalized = normalizeRenderTransform(transform);
   const autoQuarterTurns = getAutoQuarterTurns(
@@ -299,6 +315,7 @@ function restoreOutputOrientationForSource(
   return rotateCanvas(
     canvas,
     -autoQuarterTurns * Math.PI / 2,
+    renderBudgetLimits,
   );
 }
 
@@ -309,7 +326,13 @@ async function canvasToBlob(canvas: OffscreenCanvas, settings: FilmSettings) {
   });
 }
 
-async function renderClassicFrame(file: File, settings: FilmSettings, dateOverride?: string, transform?: RenderTransform): Promise<Blob> {
+async function renderClassicFrame(
+  file: File,
+  settings: FilmSettings,
+  dateOverride?: string,
+  transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<Blob> {
   const img = await createImageBitmap(file);
   try {
     const preset = FILM_PRESETS[settings.brandText] || FILM_PRESETS['KODAK PORTRA 400'];
@@ -321,7 +344,7 @@ async function renderClassicFrame(file: File, settings: FilmSettings, dateOverri
     const borderSize = Math.floor(baseDim * (settings.borderSize / 100));
     const canvasWidth = isPortrait ? rotated.width + borderSize * 2 : rotated.width;
     const canvasHeight = isPortrait ? rotated.height : rotated.height + borderSize * 2;
-    assertCanvasBudget(canvasWidth, canvasHeight);
+    assertCanvasBudget(canvasWidth, canvasHeight, renderBudgetLimits);
     const canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('Canvas init failed');
@@ -432,17 +455,18 @@ async function renderFlattenedReal135Frame(
   file: File,
   settings: FilmSettings,
   transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<Blob> {
   const [overlay, sprocketOverlay] = await Promise.all([
     loadReal135Overlay(settings.brandText),
-    createTintedSprocketOverlay(settings),
+    createTintedSprocketOverlay(settings, renderBudgetLimits),
   ]);
   const img = await createImageBitmap(file);
 
   try {
     const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
     const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
-    assertCanvasBudget(layout.filmW, layout.filmH);
+    assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
     const canvas = new OffscreenCanvas(layout.filmW, layout.filmH);
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('Canvas init failed');
@@ -451,7 +475,11 @@ async function renderFlattenedReal135Frame(
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
-        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+        ? composeOnScannerCanvas(
+          canvas,
+          settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
+          renderBudgetLimits,
+        )
         : canvas;
     const outputCanvas = restoreOutputOrientationForSource(
       finalCanvas,
@@ -459,6 +487,7 @@ async function renderFlattenedReal135Frame(
       targetImageWidthPx,
       Math.round(targetImageWidthPx * 2 / 3),
       transform,
+      renderBudgetLimits,
     );
     return canvasToBlob(outputCanvas, settings);
   } finally {
@@ -466,21 +495,33 @@ async function renderFlattenedReal135Frame(
   }
 }
 
-async function renderReal135Frame(file: File, settings: FilmSettings, transform?: RenderTransform): Promise<Blob> {
+async function renderReal135Frame(
+  file: File,
+  settings: FilmSettings,
+  transform?: RenderTransform,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<Blob> {
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
-    return renderClassicFrame(file, { ...settings, frameRenderMode: 'classic' }, undefined, transform);
+    return renderClassicFrame(
+      file,
+      { ...settings, frameRenderMode: 'classic' },
+      undefined,
+      transform,
+      renderBudgetLimits,
+    );
   }
   if (settings.brandText !== FilmType.KODAK_GOLD_200) {
-    return renderFlattenedReal135Frame(file, settings, transform);
+    return renderFlattenedReal135Frame(file, settings, transform, renderBudgetLimits);
   }
 
   const assets = await loadKodakGoldLayeredAssets();
-  const sprocketOverlay = await createTintedSprocketOverlay(settings);
+  const sprocketOverlay = await createTintedSprocketOverlay(settings, renderBudgetLimits);
   const img = await createImageBitmap(file);
 
   try {
     const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
     const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
+    assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
     const canvas = new OffscreenCanvas(layout.filmW, layout.filmH);
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('Canvas init failed');
@@ -490,6 +531,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
     ctx.fillStyle = '#050403';
     ctx.fillRect(0, 0, layout.filmW, layout.filmH);
 
+    assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
     const emulsion = new OffscreenCanvas(layout.filmW, layout.filmH);
     const emulsionCtx = emulsion.getContext('2d', { alpha: true });
     if (!emulsionCtx) throw new Error('Canvas init failed');
@@ -502,7 +544,16 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
 
     emulsionCtx.save();
     emulsionCtx.globalCompositeOperation = 'destination-in';
-    emulsionCtx.drawImage(createLuminanceAlphaMask(assets.apertureMask, layout.filmW, layout.filmH), 0, 0);
+    emulsionCtx.drawImage(
+      createLuminanceAlphaMask(
+        assets.apertureMask,
+        layout.filmW,
+        layout.filmH,
+        renderBudgetLimits,
+      ),
+      0,
+      0,
+    );
     emulsionCtx.restore();
 
     ctx.drawImage(emulsion, 0, 0);
@@ -516,7 +567,11 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
-        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR)
+        ? composeOnScannerCanvas(
+          canvas,
+          settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
+          renderBudgetLimits,
+        )
         : canvas;
     const outputCanvas = restoreOutputOrientationForSource(
       finalCanvas,
@@ -524,6 +579,7 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
       targetImageWidthPx,
       Math.round(targetImageWidthPx * 2 / 3),
       transform,
+      renderBudgetLimits,
     );
 
     return canvasToBlob(outputCanvas, settings);
@@ -532,7 +588,11 @@ async function renderReal135Frame(file: File, settings: FilmSettings, transform?
   }
 }
 
-async function renderClassicStrip(images: ImageItem[], settings: FilmSettings): Promise<Blob> {
+async function renderClassicStrip(
+  images: ImageItem[],
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<Blob> {
   if (images.length === 0) throw new Error('No images to render');
 
   const frameHeight = 1200;
@@ -543,9 +603,11 @@ async function renderClassicStrip(images: ImageItem[], settings: FilmSettings): 
   const maxPerRow = 6;
   const rows = Math.ceil(images.length / maxPerRow);
   const cols = Math.min(images.length, maxPerRow);
-  const totalWidth = frameWidth * cols + gap * Math.max(0, cols - 1) + frameWidth * 0.4;
+  const totalWidth = Math.trunc(
+    frameWidth * cols + gap * Math.max(0, cols - 1) + frameWidth * 0.4,
+  );
   const totalHeight = rows * frameHeight + Math.max(0, rows - 1) * 100;
-  assertCanvasBudget(totalWidth, totalHeight);
+  assertCanvasBudget(totalWidth, totalHeight, renderBudgetLimits);
   const canvas = new OffscreenCanvas(totalWidth, totalHeight);
   const ctx = canvas.getContext('2d', { alpha: true });
   if (!ctx) throw new Error('Canvas init failed');
@@ -727,14 +789,15 @@ function drawContinuousStripMarkings(
 async function renderFlattenedReal135Strip(
   images: ImageItem[],
   settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<Blob> {
   const [overlay, sprocketOverlay] = await Promise.all([
     loadReal135Overlay(settings.brandText),
-    createTintedSprocketOverlay(settings),
+    createTintedSprocketOverlay(settings, renderBudgetLimits),
   ]);
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
   const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
-  assertCanvasBudget(layout.totalW, layout.totalH);
+  assertCanvasBudget(layout.totalW, layout.totalH, renderBudgetLimits);
   const canvas = new OffscreenCanvas(layout.totalW, layout.totalH);
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas init failed');
@@ -779,18 +842,26 @@ async function renderFlattenedReal135Strip(
   return canvasToBlob(canvas, settings);
 }
 
-async function renderReal135Strip(images: ImageItem[], settings: FilmSettings): Promise<Blob> {
+async function renderReal135Strip(
+  images: ImageItem[],
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<Blob> {
   if (images.length === 0) throw new Error('No images to render');
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
-    return renderClassicStrip(images, { ...settings, frameRenderMode: 'classic' });
+    return renderClassicStrip(
+      images,
+      { ...settings, frameRenderMode: 'classic' },
+      renderBudgetLimits,
+    );
   }
   if (settings.brandText !== FilmType.KODAK_GOLD_200) {
-    return renderFlattenedReal135Strip(images, settings);
+    return renderFlattenedReal135Strip(images, settings, renderBudgetLimits);
   }
 
   const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
   const layout = createKodakGoldStripLayout(targetImageWidthPx, images.length, 4);
-  assertCanvasBudget(layout.totalW, layout.totalH);
+  assertCanvasBudget(layout.totalW, layout.totalH, renderBudgetLimits);
   const canvas = new OffscreenCanvas(layout.totalW, layout.totalH);
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas init failed');
@@ -843,11 +914,30 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     const blob =
       request.type === 'processImage'
         ? (request.settings.frameRenderMode ?? 'real135') === 'real135'
-          ? await renderReal135Frame(request.file, request.settings, request.transform)
-          : await renderClassicFrame(request.file, request.settings, request.dateOverride, request.transform)
+          ? await renderReal135Frame(
+            request.file,
+            request.settings,
+            request.transform,
+            request.renderBudgetLimits,
+          )
+          : await renderClassicFrame(
+            request.file,
+            request.settings,
+            request.dateOverride,
+            request.transform,
+            request.renderBudgetLimits,
+          )
         : (request.settings.frameRenderMode ?? 'real135') === 'real135'
-          ? await renderReal135Strip(request.images, request.settings)
-          : await renderClassicStrip(request.images, request.settings);
+          ? await renderReal135Strip(
+            request.images,
+            request.settings,
+            request.renderBudgetLimits,
+          )
+          : await renderClassicStrip(
+            request.images,
+            request.settings,
+            request.renderBudgetLimits,
+          );
 
     self.postMessage({ id: request.id, ok: true, blob } satisfies WorkerResponse);
   } catch (error) {

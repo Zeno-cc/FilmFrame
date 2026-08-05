@@ -16,27 +16,28 @@ export type RenderBudgetLimits = {
   maxPixels?: number;
 };
 
-const DEFAULT_MAX_EDGE = 32_767;
-const MEBIBYTE = 1024 * 1024;
-const RGBA_BYTES_PER_PIXEL = 4;
-const DEFAULT_MAX_CANVAS_BYTES = 700 * MEBIBYTE;
-const DEFAULT_MAX_PIXELS = DEFAULT_MAX_CANVAS_BYTES / RGBA_BYTES_PER_PIXEL;
+export const DEFAULT_MAX_CANVAS_EDGE = 32_767;
+export const DEFAULT_MAX_CANVAS_MIB = 700;
+export const MEBIBYTE = 1024 * 1024;
+export const RGBA_BYTES_PER_PIXEL = 4;
+export const DEFAULT_MAX_CANVAS_BYTES = DEFAULT_MAX_CANVAS_MIB * MEBIBYTE;
+export const DEFAULT_MAX_CANVAS_PIXELS = DEFAULT_MAX_CANVAS_BYTES / RGBA_BYTES_PER_PIXEL;
 
 export function validateCanvasBudget(
   width: number,
   height: number,
   limits: RenderBudgetLimits = {}
 ): RenderBudgetResult {
-  const maxEdge = limits.maxEdge ?? DEFAULT_MAX_EDGE;
-  const maxPixels = limits.maxPixels ?? DEFAULT_MAX_PIXELS;
+  const maxEdge = limits.maxEdge ?? DEFAULT_MAX_CANVAS_EDGE;
+  const maxPixels = limits.maxPixels ?? DEFAULT_MAX_CANVAS_PIXELS;
 
   if (
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
     width <= 0 ||
     height <= 0 ||
-    !Number.isFinite(maxEdge) ||
-    !Number.isFinite(maxPixels) ||
+    !Number.isSafeInteger(maxEdge) ||
+    !Number.isSafeInteger(maxPixels) ||
     maxEdge <= 0 ||
     maxPixels <= 0
   ) {
@@ -48,11 +49,22 @@ export function validateCanvasBudget(
     return { ok: false, pixels, reason: 'max-edge-exceeded' };
   }
 
-  if (!Number.isFinite(pixels) || pixels > maxPixels) {
+  if (!Number.isSafeInteger(pixels) || pixels > maxPixels) {
     return { ok: false, pixels, reason: 'max-pixels-exceeded' };
   }
 
   return { ok: true, pixels };
+}
+
+export function assertCanvasBudget(
+  width: number,
+  height: number,
+  limits: RenderBudgetLimits = {},
+): void {
+  const budget = validateCanvasBudget(width, height, limits);
+  if (!budget.ok) {
+    throw new Error(`Render canvas exceeds the safe budget: ${budget.reason}`);
+  }
 }
 
 export function validateKodakStripBudget(

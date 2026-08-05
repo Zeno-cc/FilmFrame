@@ -42,7 +42,11 @@ export class NonceStore {
     } catch {
       return false;
     }
-    return received.length === expected.length && timingSafeEqual(received, expected);
+    return (
+      received.toString("base64url") === signature
+      && received.length === expected.length
+      && timingSafeEqual(received, expected)
+    );
   }
 
   private sign(payload: string): string {

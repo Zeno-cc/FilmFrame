@@ -1,6 +1,6 @@
 # 开发、测试与部署
 
-> 最后核验：2026-07-30。仓库已包含邀请码门禁实现和部署模板，但 Google、Cloudflare 与生产 OpenResty 配置仍需外部完成。
+> 最后核验：2026-08-05。仓库已包含邀请码门禁实现和部署模板，但 Google、Cloudflare 与生产 OpenResty 配置仍需外部完成。
 
 ## 运行环境
 
@@ -35,12 +35,12 @@ sidecar 的必需配置见 `server/access/.env.example`。本地 HTTP 只能在�
 ## 构建与质量门禁
 
 ```bash
-npm test                         # 根 Vitest：24 文件、165 项测试
+npm test                         # 根 Vitest：27 文件、196 项测试
 npm run typecheck
 npm run build
 npm run check                   # 根测试 + 类型检查 + Vite 生产构建
 
-npm --prefix server/access test # Node test：27 项，要求 Node 22
+npm --prefix server/access test # Node test：89 项，要求 Node 22
 npm run check:access            # sidecar 测试 + 类型检查 + 构建
 npm run check:all               # 前端和 sidecar 完整检查
 
@@ -48,9 +48,11 @@ npm run test:e2e                # Playwright 浏览器流程
 git diff --check
 ```
 
-`server/access/tests/all.test.ts` 在单一 Node test 进程中导入 5 个测试模块，并将 concurrency 固定为 1。这样既覆盖 SQLite 并发事务，又避免 `better-sqlite3` 在多测试子进程退出时发生本机不稳定。
+`server/access/tests/all.test.ts` 在单一 Node test 进程中导入 9 个测试模块，并将 concurrency 固定为 1。这样既覆盖 SQLite 并发事务，又避免 `better-sqlite3` 在多测试子进程退出时发生本机不稳定。
 
 根 `tsconfig.json` 明确排除 `server/access`；根构建不会误用浏览器 TypeScript 配置检查 Express 代码，`check:all` 会显式检查两边。
+
+The 2026-08-05 browser gate passed 42 Chromium tests plus the focused Firefox and WebKit journey. The trusted Release workflow runs the same matrix. Before artifact construction it also runs the updater Python suite and Linux install-layout checks on Ubuntu, including the `SO_PEERCRED` boundary. Desktop WebKit is automation evidence only; physical iPhone Safari and Android Chrome records remain mandatory before authorizing the `v1.3.0` tag.
 
 ## Docker 构建
 
@@ -133,6 +135,7 @@ npm run verify:deployment -- \
 - 完整上传、Worker/主线程渲染、长条、JPEG/PNG、ZIP 和设备授权续期流程正常。
 - 浏览器 Network 中没有照片、EXIF、Blob 或渲染结果上传请求。
 - iOS Safari、Android Chrome、桌面 Safari/Chrome/Edge 至少完成一次管理登录和邀请码操作。
+- Follow [browser-mobile-smoke.md](browser-mobile-smoke.md) for the v1.3 physical rendering, download, strip, privacy, and bounded memory-stress evidence. Store results with [mobile-smoke-evidence-template.md](mobile-smoke-evidence-template.md).
 
 ## 数据备份与 SSH 应急
 
@@ -150,8 +153,8 @@ docker compose --profile maintenance run --rm --no-deps access-backup \
 
 ## 当前工程门禁缺口
 
-- 仓库尚无正式 CI、coverage、ESLint/format、tag/CHANGELOG 自动化和发布流水线。
-- Playwright 以 Chromium 为主，Safari/Firefox/移动设备仍需手工或新增 CI 覆盖。
+- The trusted tag workflow exists, but coverage reporting, ESLint/format enforcement, and changelog automation remain absent.
+- Firefox and desktop WebKit have a focused automated journey; physical iPhone Safari and Android Chrome remain manual release-blocking evidence.
 - Canvas/OffscreenCanvas 尚无完整像素级视觉等价性基线。
 - Cloudflare Access、Google OAuth Client、DNS、证书和线上 OpenResty 属于外部状态，仓库测试无法证明其已经正确配置。
 

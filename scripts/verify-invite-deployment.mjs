@@ -319,6 +319,12 @@ async function verifyConfigFiles() {
     "public device-session refresh requires authentication",
   );
   check(
+    /location = \/api\/runtime-config \{[\s\S]*?auth_request \/_filmframe_session_check;[\s\S]*?proxy_pass http:\/\/filmframe_access_backend\/api\/runtime-config;[\s\S]*?proxy_set_header Cookie \$filmframe_session_cookie;/.test(
+      publicVhost,
+    ),
+    "public runtime configuration requires the invited device session",
+  );
+  check(
     !/location = \/auth\/logout \{/.test(publicVhost),
     "public vhost exposes no device logout route",
   );

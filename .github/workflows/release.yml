@@ -58,7 +58,15 @@ jobs:
           npm --prefix server/access ci
 
       - name: Install browser test runtime
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run updater Ubuntu gates
+        run: |
+          set -euo pipefail
+          python3 -c 'import socket, sys; assert sys.platform.startswith("linux") and hasattr(socket, "SO_PEERCRED"), "Linux peer credentials required"'
+          PYTHONPATH=ops/updater python3 -m unittest discover \
+            -s ops/updater/tests -p 'test_*.py' -v
+          bash ops/updater/tests/test-install-layout.sh
 
       - name: Run release quality gates
         run: |
