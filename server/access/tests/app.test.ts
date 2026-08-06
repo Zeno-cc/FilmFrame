@@ -155,10 +155,20 @@ function formNonce(html: string): string {
 }
 
 function firstSetCookie(headers: Record<string, unknown>): string {
+  return setCookies(headers)[0] as string;
+}
+
+function setCookies(headers: Record<string, unknown>): string[] {
   const value = headers["set-cookie"];
   assert.ok(Array.isArray(value));
-  assert.equal(typeof value[0], "string");
-  return value[0] as string;
+  assert.ok(value.every((entry) => typeof entry === "string"));
+  return value as string[];
+}
+
+function setCookieNamed(headers: Record<string, unknown>, name: string): string {
+  const cookie = setCookies(headers).find((entry) => entry.startsWith(`${name}=`));
+  assert.ok(cookie, `expected ${name} Set-Cookie`);
+  return cookie;
 }
 
 function cookiePair(setCookie: string): string {
@@ -182,6 +192,59 @@ describe("public invitation gateway", () => {
     assert.match(response.headers["cache-control"], /private, no-store/);
     assert.match(response.headers["content-security-policy"], /default-src 'none'/);
     assert.doesNotMatch(response.text, /版本与更新|system-update/);
+    const bindingCookie = setCookieNamed(response.headers, "__Host-filmframe_redeem");
+    assert.match(bindingCookie, /Max-Age=600/);
+    assert.match(bindingCookie, /Path=\//);
+    assert.match(bindingCookie, /HttpOnly/);
+    assert.match(bindingCookie, /Secure/);
+    assert.match(bindingCookie, /SameSite=Strict/);
+    assert.doesNotMatch(bindingCookie, /Domain=/);
+  });
+
+  it("uses the non-Secure development binding cookie for local HTTP", async () => {
+    const { app, config } = fixture(1_000_000, {
+      secureCookies: false,
+      sessionCookieName: "filmframe_session_dev",
+    });
+    const response = await request(app).get("/access").set("Host", config.filmframeHost);
+
+    const bindingCookie = setCookieNamed(response.headers, "filmframe_redeem");
+    assert.match(bindingCookie, /HttpOnly/);
+    assert.match(bindingCookie, /SameSite=Strict/);
+    assert.doesNotMatch(bindingCookie, /Secure/);
+  });
+
+  it("accepts the exact local HTTP Origin including its development port", async () => {
+    const { app, config, database, now } = fixture(1_000_000, {
+      secureCookies: false,
+      sessionCookieName: "filmframe_session_dev",
+    });
+    const created = createInvite(database, "本地端口", now);
+    const host = `${config.filmframeHost}:5175`;
+    const access = await request(app).get("/access").set("Host", host);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", host)
+      .set("Origin", `http://${host}`)
+      .set("Cookie", cookiePair(setCookieNamed(access.headers, "filmframe_redeem")))
+      .type("form")
+      .send({ code: created.code, nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 303);
+  });
+
+  it("redirects an authorized device without issuing a redemption binding", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "已授权设备", now);
+    const session = redeemInvite(database, created.code, now);
+    const response = await request(app)
+      .get("/access")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", `${config.sessionCookieName}=${session.token}`);
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.location, "/");
+    assert.equal(response.headers["set-cookie"], undefined);
   });
 
   it("sets the hardened host-only session cookie only after successful redemption", async () => {
@@ -191,18 +254,21 @@ describe("public invitation gateway", () => {
     const response = await request(app)
       .post("/auth/redeem")
       .set("Host", config.filmframeHost)
+      .set("Cookie", cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")))
       .type("form")
       .send({ code: created.code, nonce: formNonce(access.text) });
 
     assert.equal(response.status, 303);
     assert.equal(response.headers.location, "/");
-    const cookie = firstSetCookie(response.headers);
+    const cookie = setCookieNamed(response.headers, config.sessionCookieName);
     assert.match(cookie, /^__Host-filmframe_session=/);
     assert.match(cookie, /Max-Age=34560000/);
     assert.match(cookie, /Path=\//);
     assert.match(cookie, /HttpOnly/);
     assert.match(cookie, /Secure/);
     assert.match(cookie, /SameSite=Strict/);
+    const clearedBinding = setCookieNamed(response.headers, "__Host-filmframe_redeem");
+    assert.match(clearedBinding, /Expires=Thu, 01 Jan 1970 00:00:00 GMT/);
 
     const check = await request(app)
       .get("/internal/session-check")
@@ -217,12 +283,152 @@ describe("public invitation gateway", () => {
     const response = await request(app)
       .post("/auth/redeem")
       .set("Host", config.filmframeHost)
+      .set("Cookie", cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")))
       .type("form")
       .send({ code: "not-an-invite", nonce: formNonce(access.text) });
 
     assert.equal(response.status, 400);
     assert.match(response.text, new RegExp(GENERIC_INVITE_ERROR));
-    assert.equal(response.headers["set-cookie"], undefined);
+    assert.equal(
+      setCookies(response.headers).some((cookie) =>
+        cookie.startsWith(`${config.sessionCookieName}=`)),
+      false,
+    );
+    assert.match(
+      setCookieNamed(response.headers, "__Host-filmframe_redeem"),
+      /Max-Age=600/,
+    );
+  });
+
+  it("rejects cross-site and null origins before rate limiting or nonce consumption", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "跨站保护", now);
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const bindingCookie = cookiePair(
+      setCookieNamed(access.headers, "__Host-filmframe_redeem"),
+    );
+    const input = { code: created.code, nonce: formNonce(access.text) };
+
+    for (const origin of ["https://evil.example", "null", ...Array(9).fill("https://evil.example")]) {
+      const rejected = await request(app)
+        .post("/auth/redeem")
+        .set("Host", config.filmframeHost)
+        .set("Origin", origin)
+        .set("Cookie", bindingCookie)
+        .type("form")
+        .send(input);
+      assert.equal(rejected.status, 403);
+    }
+
+    const accepted = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-Forwarded-Proto", "https")
+      .set("Cookie", bindingCookie)
+      .type("form")
+      .send(input);
+    assert.equal(accepted.status, 303);
+    assert.deepEqual(database.prepare("SELECT redemption_count FROM invites").get(), {
+      redemption_count: 1,
+    });
+  });
+
+  it("does not consume a nonce when the binding cookie is missing or belongs to another browser", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "浏览器绑定", now);
+    const firstPage = await request(app).get("/access").set("Host", config.filmframeHost);
+    const secondPage = await request(app).get("/access").set("Host", config.filmframeHost);
+    const nonce = formNonce(firstPage.text);
+
+    const missing = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .type("form")
+      .send({ code: created.code, nonce });
+    assert.equal(missing.status, 400);
+
+    const transferred = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set(
+        "Cookie",
+        cookiePair(setCookieNamed(secondPage.headers, "__Host-filmframe_redeem")),
+      )
+      .type("form")
+      .send({ code: created.code, nonce });
+    assert.equal(transferred.status, 400);
+
+    const accepted = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set(
+        "Cookie",
+        cookiePair(setCookieNamed(firstPage.headers, "__Host-filmframe_redeem")),
+      )
+      .type("form")
+      .send({ code: created.code, nonce });
+    assert.equal(accepted.status, 303);
+    assert.deepEqual(database.prepare("SELECT redemption_count FROM invites").get(), {
+      redemption_count: 1,
+    });
+  });
+
+  it("consumes a valid nonce once even when the invitation result is a failure", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "不可复用", now);
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const bindingCookie = cookiePair(
+      setCookieNamed(access.headers, "__Host-filmframe_redeem"),
+    );
+    const nonce = formNonce(access.text);
+
+    const failed = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", bindingCookie)
+      .type("form")
+      .send({ code: "not-an-invite", nonce });
+    assert.equal(failed.status, 400);
+
+    const replayed = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", bindingCookie)
+      .type("form")
+      .send({ code: created.code, nonce });
+    assert.equal(replayed.status, 400);
+    assert.deepEqual(database.prepare("SELECT redemption_count FROM invites").get(), {
+      redemption_count: 0,
+    });
+  });
+
+  it("atomically allows only one concurrent redemption with the same nonce", async () => {
+    const { app, config, database, now } = fixture();
+    const firstInvite = createInvite(database, "并发 nonce A", now);
+    const secondInvite = createInvite(database, "并发 nonce B", now);
+    const access = await request(app).get("/access").set("Host", config.filmframeHost);
+    const bindingCookie = cookiePair(
+      setCookieNamed(access.headers, "__Host-filmframe_redeem"),
+    );
+    const nonce = formNonce(access.text);
+
+    const responses = await Promise.all(
+      [firstInvite.code, secondInvite.code].map((code) =>
+        request(app)
+          .post("/auth/redeem")
+          .set("Host", config.filmframeHost)
+          .set("Cookie", bindingCookie)
+          .type("form")
+          .send({ code, nonce }),
+      ),
+    );
+
+    assert.deepEqual(responses.map((response) => response.status).sort(), [303, 400]);
+    assert.deepEqual(
+      database.prepare("SELECT sum(redemption_count) AS count FROM invites").get(),
+      { count: 1 },
+    );
   });
 
   it("uses the generic failure for invitations that have not started", async () => {
@@ -235,12 +441,17 @@ describe("public invitation gateway", () => {
     const response = await request(app)
       .post("/auth/redeem")
       .set("Host", config.filmframeHost)
+      .set("Cookie", cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")))
       .type("form")
       .send({ code: created.code, nonce: formNonce(access.text) });
 
     assert.equal(response.status, 400);
     assert.match(response.text, new RegExp(GENERIC_INVITE_ERROR));
-    assert.equal(response.headers["set-cookie"], undefined);
+    assert.equal(
+      setCookies(response.headers).some((cookie) =>
+        cookie.startsWith(`${config.sessionCookieName}=`)),
+      false,
+    );
     assert.deepEqual(database.prepare("SELECT count(*) AS count FROM sessions").get(), {
       count: 0,
     });
@@ -272,6 +483,10 @@ describe("public invitation gateway", () => {
         request(app)
           .post("/auth/redeem")
           .set("Host", config.filmframeHost)
+          .set(
+            "Cookie",
+            cookiePair(setCookieNamed(page.headers, "__Host-filmframe_redeem")),
+          )
           .type("form")
           .send({ code: created.code, nonce: formNonce(page.text) }),
       ),
@@ -471,6 +686,10 @@ describe("public invitation gateway", () => {
       const response = await request(app)
         .post("/auth/redeem")
         .set("Host", config.filmframeHost)
+        .set(
+          "Cookie",
+          cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")),
+        )
         .type("form")
         .send({ code: created.code, nonce: formNonce(access.text) });
       assert.equal(response.status, 500);

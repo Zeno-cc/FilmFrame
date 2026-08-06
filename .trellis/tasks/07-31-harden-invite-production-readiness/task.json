@@ -18,7 +18,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "08-06-invite-redeem-csrf-hardening"
+  ],
   "parent": "07-30-secure-invite-access",
   "relatedFiles": [],
   "notes": "",

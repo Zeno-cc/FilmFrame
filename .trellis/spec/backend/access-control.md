@@ -30,11 +30,12 @@ POST /api/sessions/:id/revoke
 ```
 
 ```ts
-NonceStore.issue(): string
-NonceStore.verify(nonce: string): boolean
+NonceStore.issue(binding: string): string
+NonceStore.consume(nonce: string, binding: string): boolean
 
 // Canonical wire format; Base64URL segments are unpadded.
 // <base36 timestamp>.<16 random bytes / 22 chars>.<HMAC-SHA256 / 43 chars>
+// binding is exactly 32 random bytes / 43 canonical Base64URL chars.
 ```
 
 ```sql
@@ -105,12 +106,33 @@ SECURE_COOKIES=true
 ### 3. Contracts
 
 - Generate invitation codes from 16 cryptographically random bytes and prefix the canonical Crockford Base32 value with `FF1-`. Persist only its SHA-256 hash.
-- Invitation-form nonces are stateless, bounded to 128 characters, and signed
-  with a process-local 256 bit HMAC key. Verification requires the exact
-  canonical unpadded Base64URL representation of both random and signature
-  segments before constant-time digest comparison. Node's permissive
-  Base64URL decoder is not itself a syntax validator: reject any signature
-  whose decode-then-encode value differs from the received text.
+- `GET /access` creates a 32-byte browser binding and stores only that value in
+  a short-lived, host-only, `HttpOnly`, `SameSite=Strict`, `Path=/` redemption
+  Cookie. Production uses `__Host-filmframe_redeem` with `Secure`; local HTTP
+  uses `filmframe_redeem` without `Secure`. Both omit `Domain` and expire with
+  the form nonce.
+- Invitation-form nonces are bounded to 128 characters and signed with a
+  process-local 256 bit HMAC key over the timestamp, random segment, and a
+  digest of the canonical browser binding. `NonceStore.consume` requires the
+  exact 43-character unpadded Base64URL binding, verifies canonical nonce
+  encoding and signature in constant time, then atomically records the nonce
+  as used before invitation redemption begins.
+- Consumed nonces live in a bounded, TTL-cleaned process-local replay map. A
+  replay, expired value, invalid binding, or full replay map fails closed. A
+  process restart invalidates outstanding forms. The current deployment is
+  single-instance; horizontal scaling requires shared replay/signing state or
+  verified sticky routing.
+- `POST /auth/redeem` rejects an Origin header unless it exactly equals the
+  request protocol and validated Host. `Origin: null` is rejected; a missing
+  Origin is allowed to continue to the required Cookie/nonce check. Origin is
+  checked before the redemption rate limiter so cross-site traffic cannot
+  spend another browser's quota.
+- Failed form or invitation validation never consumes an invitation and
+  renders a fresh form with a rotated binding. Successful redemption sets the
+  persistent device-session Cookie and clears the temporary redemption Cookie.
+  Opening another `/access` page rotates the one temporary Cookie, so an older
+  tab may receive the generic retry error; this is an accepted fail-closed
+  behavior.
 - Redemption is a `BEGIN IMMEDIATE` transaction. A one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry. The transaction accepts both the `redeem_from` and `redeem_by` boundary instants and rejects any instant outside them.
 - Invitation creation accepts optional timezone-qualified ISO 8601 `redeemFrom` and `redeemBy` values. Omitted values mean immediate start and a seven-day window; a start-only request ends seven days after its start, while an end-only request starts at creation. The end must be strictly later than the start.
 - Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
@@ -140,7 +162,10 @@ SECURE_COOKIES=true
 | Condition | Required result |
 | --- | --- |
 | Malformed, unknown, not-yet-active, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
-| Nonce with bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, future timestamp beyond skew, or expired timestamp | Reject nonce; no invitation or session mutation |
+| Missing/malformed redemption Cookie, nonce transfer to another binding, bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, replay, future timestamp beyond skew, expiry, or replay-map capacity exhaustion | Reject nonce, rotate the form binding, and perform no invitation or session mutation |
+| Redemption with a cross-site or `null` Origin | `403` before rate limiting, nonce consumption, or invitation mutation |
+| Redemption without Origin but with a matching Cookie/nonce pair | Continue normal validation; Origin is defense in depth, not the primary browser binding |
+| Two concurrent redemptions using the same nonce and binding | At most one reaches invitation redemption; the other receives the generic failure |
 | Start or end boundary instant | Redemption is allowed; one millisecond outside the window is rejected |
 | Missing, malformed, timezone-free, reversed, or zero-length creation window | `400`; no invitation, batch, or idempotency row |
 | Two or more concurrent redemptions of a one-use invitation | Exactly one success |
@@ -175,12 +200,16 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 ### 5. Good / Base / Bad Cases
 
 - Good: an anonymous asset URL redirects to `/access`; one valid invitation establishes a device session; each application visit renews it; revoking its invitation makes the next request fail.
-- Good: a freshly issued nonce round-trips through the exact canonical
-  Base64URL wire format and verifies until its exclusive expiry boundary.
+- Good: a freshly issued nonce works once with the exact browser binding, then
+  rejects replay even if the client retains both the old nonce and Cookie.
 - Base: the static site remains a browser-only renderer after authorization, while the sidecar stores only access metadata.
+- Base: a non-browser client without Origin can redeem only after preserving
+  the temporary Cookie from `/access`; the same nonce without that Cookie fails.
 - Bad: decode a signature with `Buffer.from(value, "base64url")` and compare
   only its bytes; permissive aliases can represent the same digest with a
   different final character.
+- Bad: treat a fresh signed nonce as transferable proof, or rely on
+  `SameSite=Strict` without cryptographically binding the form to its Cookie.
 - Bad: React checks an invitation against an environment variable or `localStorage`, then publicly serves the Vite bundle and overlay assets.
 - Bad: a visible “logout” control clears the only one-use invitation session and forces the same device to obtain a new code.
 - Bad: Cloudflare Access checks the admin UI at the edge, but the origin trusts the presence of `Cf-Access-Jwt-Assertion` without verifying its signature and claims.
@@ -188,13 +217,24 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 ### 6. Tests Required
 
 - Unit tests cover invitation format/normalization, hash-only persistence, configurable schedule defaults and inclusive boundaries, all five lifecycle states, 400-day rolling boundaries, atomic token rotation, concurrent refresh, tampering, single/cascade revocation, active-device counts, single and batch creation idempotency, batch atomic rollback/revocation, weighted limits, writable health probes, legacy schedule migration, migration idempotency, and database reopen.
-- Nonce tests assert a fresh token succeeds, a one-character signature mutation
-  fails even when a permissive decoder maps it to the same bytes, the last
-  valid millisecond succeeds, and the expiry boundary fails.
+- Nonce tests assert binding scope, canonical 32-byte binding syntax,
+  single-use atomic consumption, signature mutation rejection even when a
+  permissive decoder maps it to the same bytes, the last valid millisecond,
+  exclusive expiry, bounded replay capacity, and recovery after TTL cleanup.
 - Backup tests use a real named volume in WAL mode and assert that the maintenance job has no network, the long-running service has no backup mount, the CLI opens the source without migrations or SQL writes, the output is `0600`, and the normalized snapshot passes `integrity_check` from a read-only mount.
-- Concurrency coverage sends 20 redemption attempts and asserts exactly one success.
+- Concurrency coverage sends 20 invitation attempts and separately sends two
+  requests with the same nonce/binding, asserting exactly one request can
+  consume each one-use boundary.
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.
-- Route tests assert Cookie flags and 400-day `Max-Age`, generic redemption errors, refresh Origin/CSRF rules, rotated-token behavior, expired/revoked/tampered refresh rejection, single and batch idempotent creation, batch payload conflicts and weighted limits, redacted audit events, session listing/revocation, the absence of `/auth/logout`, body limits, Host allowlisting, and internal-route isolation.
+- Route tests assert temporary redemption-Cookie names/flags/TTL, production
+  and local HTTP behavior, missing/wrong binding, cross-site/`null`/same-site/
+  missing Origin behavior, replay and multi-tab rotation, invitation
+  non-consumption on validation failure, persistent Cookie flags and 400-day
+  `Max-Age`, generic redemption errors, refresh Origin/CSRF rules,
+  rotated-token behavior, expired/revoked/tampered refresh rejection, single
+  and batch idempotent creation, batch payload conflicts and weighted limits,
+  redacted audit events, session listing/revocation, absence of `/auth/logout`,
+  body limits, Host allowlisting, and internal-route isolation.
 - Browser tests assert one startup refresh request with the exact method/header contract, no visible logout command on desktop/mobile, and no interruption when renewal temporarily fails.
 - Deployment checks assert loopback port bindings, the private Compose network, persistent data, a dedicated host backup mount, resource/log limits, read-only root, dropped capabilities, protected-resource `no-store`, authenticated `/auth/refresh`, absence of `/auth/logout`, OpenResty `auth_request`, and internal route blocks.
 - Production validation additionally covers active `openresty -t`, Cloudflare cache bypass and purge, exact-email Google access without a separate application Passkey challenge, direct-origin rejection, access-service outage, public port refusal, and unrelated 1Panel vhosts.
@@ -219,6 +259,13 @@ if (request.headers["cf-access-jwt-assertion"]) showAdminPage();
 // Wrong: byte equality alone accepts non-canonical Base64URL aliases.
 const received = Buffer.from(signature, "base64url");
 return timingSafeEqual(received, expected);
+```
+
+```ts
+// Wrong: a signed but transferable nonce does not bind redemption to the
+// browser that loaded the form.
+const nonce = nonces.issue();
+if (nonces.verify(nonce)) redeemInvite(code);
 ```
 
 #### Correct
@@ -256,6 +303,15 @@ const received = Buffer.from(signature, "base64url");
 return received.toString("base64url") === signature
   && received.length === expected.length
   && timingSafeEqual(received, expected);
+```
+
+```ts
+// Correct: consume one browser-bound nonce before touching invitation state.
+const binding = readRedeemCookie(request, config);
+if (!binding || !nonces.consume(nonce, binding)) {
+  return renderFreshAccessForm();
+}
+redeemInvite(code);
 ```
 
 ```yaml

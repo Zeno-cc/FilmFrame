@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Defines public invitation nonce, Cookie, redemption, logging, and test contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Ensures the form, HTTP Cookie, route, service, and proxy boundaries remain consistent."}
+{"file":".trellis/tasks/08-06-invite-redeem-csrf-hardening/design.md","reason":"Records the approved threat model and browser-binding design."}

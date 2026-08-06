@@ -60,6 +60,14 @@ function nonceFrom(html) {
   return match[1];
 }
 
+function cookieNamed(response, name) {
+  const cookie = response.headers["set-cookie"]?.find((entry) =>
+    entry.startsWith(`${name}=`),
+  );
+  assert.ok(cookie, `response must set ${name}`);
+  return cookie.split(";", 1)[0];
+}
+
 function assertAccessRedirect(response, label) {
   assert.equal(response.status, 303, label);
   const location = new URL(response.headers.location, "http://filmframe.test");
@@ -216,15 +224,14 @@ try {
   const redeemed = await request("/auth/redeem", {
     method: "POST",
     headers: {
+      Cookie: cookieNamed(accessPage, "filmframe_redeem"),
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(form.toString())),
     },
     body: form.toString(),
   });
   assert.equal(redeemed.status, 303);
-  const setCookie = redeemed.headers["set-cookie"]?.[0];
-  assert.ok(setCookie?.startsWith("filmframe_session_dev="));
-  const cookie = setCookie.split(";", 1)[0];
+  const cookie = cookieNamed(redeemed, "filmframe_session_dev");
 
   const authorized = await request("/", { headers: { Cookie: cookie } });
   assert.equal(authorized.status, 200);
@@ -283,6 +290,7 @@ try {
       await request("/auth/redeem", {
         method: "POST",
         headers: {
+          Cookie: cookieNamed(secondPage, "filmframe_redeem"),
           "Content-Type": "application/x-www-form-urlencoded",
           "Content-Length": String(Buffer.byteLength(repeatedForm.toString())),
         },
@@ -371,14 +379,14 @@ try {
   const cascadeRedeem = await request("/auth/redeem", {
     method: "POST",
     headers: {
+      Cookie: cookieNamed(cascadePage, "filmframe_redeem"),
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(cascadeForm.toString())),
     },
     body: cascadeForm.toString(),
   });
   assert.equal(cascadeRedeem.status, 303);
-  const cascadeCookie = cascadeRedeem.headers["set-cookie"]?.[0]?.split(";", 1)[0];
-  assert.ok(cascadeCookie);
+  const cascadeCookie = cookieNamed(cascadeRedeem, "filmframe_session_dev");
   assert.equal((await request("/", { headers: { Cookie: cascadeCookie } })).status, 200);
   compose(
     "exec",
@@ -415,14 +423,14 @@ try {
   const outageRedeem = await request("/auth/redeem", {
     method: "POST",
     headers: {
+      Cookie: cookieNamed(outagePage, "filmframe_redeem"),
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(outageForm.toString())),
     },
     body: outageForm.toString(),
   });
   assert.equal(outageRedeem.status, 303);
-  const outageCookie = outageRedeem.headers["set-cookie"]?.[0]?.split(";", 1)[0];
-  assert.ok(outageCookie);
+  const outageCookie = cookieNamed(outageRedeem, "filmframe_session_dev");
   assert.equal((await request("/", { headers: { Cookie: outageCookie } })).status, 200);
 
   stage = "authentication outage";

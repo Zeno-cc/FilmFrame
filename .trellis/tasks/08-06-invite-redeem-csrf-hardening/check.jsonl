@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Verify the implementation against public redemption security and release gates."}
+{"file":".trellis/tasks/08-06-invite-redeem-csrf-hardening/prd.md","reason":"Verify every acceptance criterion and the strict task boundary."}
+{"file":".trellis/tasks/08-06-invite-redeem-csrf-hardening/design.md","reason":"Verify the browser binding is cryptographic, short-lived, and dependency-free."}

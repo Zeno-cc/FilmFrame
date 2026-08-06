@@ -1,4 +1,4 @@
-import { Router, type RequestHandler, urlencoded } from "express";
+import { Router, type RequestHandler, type Response, urlencoded } from "express";
 import { z } from "zod";
 
 import type { AccessConfig } from "../config.js";
@@ -6,6 +6,12 @@ import { GENERIC_INVITE_ERROR } from "../constants.js";
 import type { AccessDatabase } from "../db.js";
 import { requireHost, requireWriteCsrf } from "../middleware/requestSecurity.js";
 import { NonceStore } from "../nonceStore.js";
+import {
+  clearRedeemCookie,
+  createRedeemBinding,
+  readRedeemCookie,
+  setRedeemCookie,
+} from "../redeemCookie.js";
 import { readSessionCookie, setSessionCookie } from "../sessionCookie.js";
 import {
   InviteUnavailableError,
@@ -36,6 +42,29 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
   const now = options.now ?? Date.now;
   const filmHost = requireHost(options.config.filmframeHost);
 
+  function sendAccessPage(
+    response: Response,
+    status = 200,
+    error?: string,
+  ): void {
+    const binding = createRedeemBinding();
+    setRedeemCookie(response, options.config, binding);
+    const page = {
+      nonce: response.locals.cspNonce as string,
+      formNonce: options.nonceStore.issue(binding),
+      ...(error === undefined ? {} : { error }),
+    };
+    response.status(status).type("html").send(renderAccessPage(page));
+  }
+
+  function hasAllowedRedeemOrigin(request: Parameters<RequestHandler>[0]): boolean {
+    const origin = request.header("Origin");
+    if (origin === undefined) return true;
+    const host = request.get("host");
+    if (!host) return false;
+    return origin === `${request.protocol}://${host}`;
+  }
+
   router.get("/api/runtime-config", filmHost, (request, response) => {
     const token = readSessionCookie(request, options.config);
     if (!isSessionValid(options.database, token, now())) {
@@ -58,17 +87,19 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
       return;
     }
 
-    response.type("html").send(
-      renderAccessPage({
-        nonce: response.locals.cspNonce as string,
-        formNonce: options.nonceStore.issue(),
-      }),
-    );
+    sendAccessPage(response);
   });
 
   router.post(
     "/auth/redeem",
     filmHost,
+    (request, response, next) => {
+      if (!hasAllowedRedeemOrigin(request)) {
+        response.status(403).type("text/plain").send("Forbidden");
+        return;
+      }
+      next();
+    },
     options.redeemRateLimiter,
     (request, response, next) => {
       if (!request.is("application/x-www-form-urlencoded")) {
@@ -80,15 +111,13 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
     urlencoded({ extended: false, limit: "4kb", parameterLimit: 4 }),
     (request, response, next) => {
       const input = redeemSchema.safeParse(request.body);
-      const validNonce = input.success && options.nonceStore.verify(input.data.nonce);
+      const binding = readRedeemCookie(request, options.config);
+      const validNonce =
+        input.success
+        && binding !== null
+        && options.nonceStore.consume(input.data.nonce, binding);
       if (!input.success || !validNonce) {
-        response.status(400).type("html").send(
-          renderAccessPage({
-            nonce: response.locals.cspNonce as string,
-            formNonce: options.nonceStore.issue(),
-            error: GENERIC_INVITE_ERROR,
-          }),
-        );
+        sendAccessPage(response, 400, GENERIC_INVITE_ERROR);
         return;
       }
 
@@ -96,19 +125,14 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
         response.locals.operation = "invite_redeem";
         const session = redeemInvite(options.database, input.data.code, now());
         setSessionCookie(response, options.config, session.token);
+        clearRedeemCookie(response, options.config);
         response.redirect(303, "/");
       } catch (error) {
         if (!(error instanceof InviteUnavailableError)) {
           next(error);
           return;
         }
-        response.status(400).type("html").send(
-          renderAccessPage({
-            nonce: response.locals.cspNonce as string,
-            formNonce: options.nonceStore.issue(),
-            error: GENERIC_INVITE_ERROR,
-          }),
-        );
+        sendAccessPage(response, 400, GENERIC_INVITE_ERROR);
       }
     },
   );
