@@ -460,3 +460,24 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 17: 修复邀请码兑换登录 CSRF
+
+**Date**: 2026-08-06
+**Task**: 修复邀请码兑换登录 CSRF
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+为邀请码兑换加入浏览器绑定临时 Cookie、原子单次 nonce、防重放容量控制与 Origin 校验，并补齐代理 E2E、单元测试和访问控制规范。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `104b93c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
