@@ -33,9 +33,10 @@
 
 ## 5. Physical handoff
 
-- [ ] 向用户提供候选 URL、两枚临时邀请码的安全交付方式和真机步骤。
-- [ ] 等待 iPhone Safari 与 Android Chrome 的脱敏 PASS/FAIL 结果；本步骤不能自动化替代。
-- [ ] 两份证据通过前保持稳定标签、GitHub Release 和生产 updater 未触发。
+- [x] 向用户提供候选 URL、两枚临时邀请码的安全交付方式和真机步骤。
+- [x] 用户明确选择跳过 iPhone Safari 与 Android Chrome 真机执行；记录 waiver，
+      不生成或暗示虚假 PASS 证据。
+- [x] 在用户作出明确 waiver 决定前，稳定标签、GitHub Release 和生产 updater 均未触发。
 
 ## Validation Commands
 

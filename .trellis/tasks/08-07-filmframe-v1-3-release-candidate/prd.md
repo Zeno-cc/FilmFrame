@@ -20,6 +20,8 @@
   GitHub Release；候选构建不得伪装成稳定发布。
 - 项目规定 `v1.3.0` 标签、GitHub Release 和生产切换必须等待 iPhone Safari
   与 Android Chrome 两份脱敏真机证据通过。
+- 2026-08-10，用户明确要求跳过真机验证并直接发布。该决定只作为 `v1.3.0`
+  的一次性风险豁免，不得记录或暗示真机 PASS，也不改变后续版本的默认门禁。
 
 ## Requirements
 
@@ -66,14 +68,14 @@
 
 ## Acceptance Criteria
 
-- [ ] `filmframe-rc.astrocean.space` 通过 Cloudflare 橙云提供有效 HTTPS，匿名访问跳转到 `/access`。
-- [ ] 候选两个容器仅绑定独立回环端口，健康检查通过，revision 精确为 `838e4b0afcf5f35a285553c7e9a0cb8947e6af26`。
-- [ ] 候选 Access 使用独立 SQLite volume，禁用且无法连接 FilmFrame updater，不挂载任何生产数据目录。
-- [ ] 有效候选邀请码能建立设备会话，受邀用户可加载应用和 `/api/runtime-config`，无效或复用邀请码被拒绝。
-- [ ] 活动 OpenResty `-t`、本机回环、外网 HTTPS、Host/源站边界和 Cloudflare cache 检查全部通过。
-- [ ] 正式 FilmFrame 站、正式管理站、生产容器、生产 `current` 指针和抽查的无关 vhost 在部署前后保持健康且配置未被改写。
-- [ ] iPhone Safari 与 Android Chrome 可按现有真机 runbook 执行验证，且证据文件不会包含邀请码、Cookie、JWT、照片、EXIF、输出或原始抓包。
-- [ ] 在两份真机证据均为 PASS 之前，不创建或推送 `v1.3.0` 标签、不发布 GitHub Release、不触发正式 updater、不切换生产版本。
+- [x] `filmframe-rc.astrocean.space` 通过 Cloudflare 橙云提供有效 HTTPS，匿名访问跳转到 `/access`。
+- [x] 候选两个容器仅绑定独立回环端口，健康检查通过，revision 精确为 `838e4b0afcf5f35a285553c7e9a0cb8947e6af26`。
+- [x] 候选 Access 使用独立 SQLite volume，禁用且无法连接 FilmFrame updater，不挂载任何生产数据目录。
+- [x] 有效候选邀请码能建立设备会话，受邀用户可加载应用和 `/api/runtime-config`，无效或复用邀请码被拒绝。
+- [x] 活动 OpenResty `-t`、本机回环、外网 HTTPS、Host/源站边界和 Cloudflare cache 检查全部通过。
+- [x] 正式 FilmFrame 站、正式管理站、生产容器、生产 `current` 指针和抽查的无关 vhost 在候选部署后保持健康且配置未被改写。
+- [x] 真机验证仍有可执行的脱敏 runbook，但用户明确豁免 `v1.3.0` 的真机执行；仓库不记录虚假 PASS。
+- [x] 用户已明确批准在保留该豁免记录和剩余风险的前提下创建 `v1.3.0` Release 并切换生产。
 
 ## Out Of Scope
 
@@ -86,5 +88,6 @@
 
 ## Release Gate
 
-候选环境完成仅代表具备真机测试条件。只有两份脱敏真机证据均通过，才允许进入
-`v1.3.0` 稳定标签、可信 Release 构建和正式 updater 切换。
+默认门禁仍要求两份脱敏真机证据。对于 `v1.3.0`，用户于 2026-08-10 明确批准
+跳过该外部证据并承担移动端兼容性与内存压力未被真机覆盖的剩余风险。发布记录必须
+如实标注 waiver，不得把豁免写成 PASS。
