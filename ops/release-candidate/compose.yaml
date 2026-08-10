@@ -1,0 +1,125 @@
+name: filmframe-rc
+
+# This file is intentionally separate from the production compose.yaml. It is
+# only for the short-lived v1.3.0 release-candidate environment.
+services:
+  filmframe:
+    image: filmframe-static:1.3.0-rc.1
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        NODE_BUILD_IMAGE: "${FILMFRAME_NODE_BUILD_IMAGE:-node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46}"
+        NGINX_RUNTIME_IMAGE: "${FILMFRAME_NGINX_IMAGE:-nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883}"
+        FILMFRAME_REVISION: "838e4b0afcf5f35a285553c7e9a0cb8947e6af26"
+        FILMFRAME_VERSION: "1.3.0-rc.1"
+    restart: unless-stopped
+    init: true
+    labels:
+      org.opencontainers.image.channel: "release-candidate"
+      org.opencontainers.image.version: "1.3.0-rc.1"
+      org.opencontainers.image.revision: "838e4b0afcf5f35a285553c7e9a0cb8947e6af26"
+    ports:
+      - "127.0.0.1:18182:80"
+    networks:
+      - filmframe_rc_private
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=1m,mode=0755
+      - /tmp:size=4m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "${FILMFRAME_MEMORY_LIMIT:-128m}"
+    cpus: "${FILMFRAME_CPU_LIMIT:-0.50}"
+    pids_limit: "${FILMFRAME_PIDS_LIMIT:-100}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${FILMFRAME_LOG_MAX_SIZE:-10m}"
+        max-file: "${FILMFRAME_LOG_MAX_FILES:-5}"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  access:
+    image: filmframe-access:1.3.0-rc.1
+    build:
+      context: ../../server/access
+      dockerfile: Dockerfile
+      args:
+        ACCESS_NODE_IMAGE: "${FILMFRAME_ACCESS_NODE_IMAGE:-node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46}"
+        FILMFRAME_REVISION: "838e4b0afcf5f35a285553c7e9a0cb8947e6af26"
+        FILMFRAME_VERSION: "1.3.0-rc.1"
+    restart: unless-stopped
+    init: true
+    labels:
+      org.opencontainers.image.channel: "release-candidate"
+      org.opencontainers.image.version: "1.3.0-rc.1"
+      org.opencontainers.image.revision: "838e4b0afcf5f35a285553c7e9a0cb8947e6af26"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /data/access.sqlite
+      INTERNAL_HOSTS: access,localhost,127.0.0.1
+      SECURE_COOKIES: "true"
+      FILMFRAME_HOST: filmframe-rc.astrocean.space
+      ADMIN_HOST: filmframe-rc-admin.astrocean.space
+      CF_ACCESS_TEAM_DOMAIN: "${CF_ACCESS_TEAM_DOMAIN:-replace-with-cloudflare-team-domain.example}"
+      CF_ACCESS_AUDIENCE: "${CF_ACCESS_AUDIENCE:-replace-with-rc-access-audience}"
+      CF_ACCESS_ADMIN_EMAIL: "${CF_ACCESS_ADMIN_EMAIL:-admin@example.com}"
+      # The RC has no updater integration and deliberately has no socket mount.
+      FILMFRAME_UPDATER_ENABLED: "false"
+      FILMFRAME_UPDATER_SOCKET: /run/filmframe-rc-updater-disabled/updater.sock
+      FILMFRAME_UPDATER_TIMEOUT_MS: "3000"
+    ports:
+      - "127.0.0.1:18183:3000"
+    volumes:
+      - filmframe_rc_access_data:/data
+    networks:
+      - filmframe_rc_private
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: "${FILMFRAME_ACCESS_MEMORY_LIMIT:-256m}"
+    cpus: "${FILMFRAME_ACCESS_CPU_LIMIT:-1.00}"
+    pids_limit: "${FILMFRAME_ACCESS_PIDS_LIMIT:-128}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "${FILMFRAME_LOG_MAX_SIZE:-10m}"
+        max-file: "${FILMFRAME_LOG_MAX_FILES:-5}"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/healthz',{headers:{Host:'access'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+networks:
+  filmframe_rc_private:
+    name: filmframe_rc_private
+    driver: bridge
+
+volumes:
+  filmframe_rc_access_data:
+    name: filmframe_rc_access_data

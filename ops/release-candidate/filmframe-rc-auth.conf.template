@@ -1,0 +1,202 @@
+# Candidate-only FilmFrame public vhost. Render all __RC_*__ placeholders with
+# render-vhost.mjs before installing it in the active 1Panel conf.d directory.
+# This file must never be installed as-is.
+
+map $http_cookie $filmframe_rc_session_cookie {
+    default "";
+    "~*(?:^|;\s*)(?<filmframe_rc_session_match>__Host-filmframe_session=[^;]+)" $filmframe_rc_session_match;
+}
+
+map $http_cookie $filmframe_rc_redeem_cookie {
+    default "";
+    "~*(?:^|;\s*)(?<filmframe_rc_redeem_match>__Host-filmframe_redeem=[^;]+)" $filmframe_rc_redeem_match;
+}
+
+upstream filmframe_rc_static_backend {
+    server 127.0.0.1:18182;
+    keepalive 16;
+}
+
+upstream filmframe_rc_access_backend {
+    server 127.0.0.1:18183;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __RC_HOST__;
+    return 308 https://__RC_HOST__$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name __RC_HOST__;
+
+    ssl_certificate __RC_CERTIFICATE__;
+    ssl_certificate_key __RC_CERTIFICATE_KEY__;
+    include __RC_REAL_IP_INCLUDE__;
+
+    server_tokens off;
+    client_max_body_size 16k;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    if ($host != "__RC_HOST__") {
+        return 421;
+    }
+
+    location = /_filmframe_rc_session_check {
+        internal;
+        proxy_pass http://filmframe_rc_access_backend/internal/session-check;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Cookie $filmframe_rc_session_cookie;
+        proxy_set_header Host access;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_connect_timeout 1s;
+        proxy_read_timeout 3s;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+    }
+
+    location = /access {
+        limit_except GET {
+            deny all;
+        }
+
+        proxy_pass http://filmframe_rc_access_backend/access;
+        proxy_set_header Cookie $filmframe_rc_session_cookie;
+        proxy_set_header Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/redeem {
+        limit_except POST {
+            deny all;
+        }
+
+        proxy_pass http://filmframe_rc_access_backend/auth/redeem;
+        proxy_set_header Cookie $filmframe_rc_redeem_cookie;
+        proxy_set_header Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/refresh {
+        limit_except POST {
+            deny all;
+        }
+
+        auth_request /_filmframe_rc_session_check;
+        error_page 401 403 = @filmframe_rc_access_required;
+        error_page 500 502 503 504 = @filmframe_rc_auth_unavailable;
+
+        proxy_pass http://filmframe_rc_access_backend/auth/refresh;
+        proxy_set_header Cookie $filmframe_rc_session_cookie;
+        proxy_set_header Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /api/runtime-config {
+        limit_except GET {
+            deny all;
+        }
+
+        auth_request /_filmframe_rc_session_check;
+        error_page 401 403 = @filmframe_rc_access_required;
+        error_page 500 502 503 504 = @filmframe_rc_auth_unavailable;
+
+        proxy_pass http://filmframe_rc_access_backend/api/runtime-config;
+        proxy_set_header Cookie $filmframe_rc_session_cookie;
+        proxy_set_header Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /healthz {
+        return 404;
+    }
+
+    location ^~ /internal/ {
+        return 404;
+    }
+
+    location / {
+        auth_request /_filmframe_rc_session_check;
+        error_page 401 403 = @filmframe_rc_access_required;
+        error_page 500 502 503 504 = @filmframe_rc_auth_unavailable;
+
+        proxy_pass http://filmframe_rc_static_backend;
+        proxy_set_header Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Host __RC_HOST__;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cookie "";
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        proxy_hide_header ETag;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location @filmframe_rc_access_required {
+        add_header Cache-Control "private, no-store" always;
+        return 303 /access;
+    }
+
+    location @filmframe_rc_auth_unavailable {
+        default_type text/plain;
+        add_header Cache-Control "private, no-store" always;
+        add_header Retry-After "30" always;
+        return 503 "FilmFrame release candidate access service unavailable\n";
+    }
+}
