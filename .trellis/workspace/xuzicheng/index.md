@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 20
 - **Last Active**: 2026-08-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~537 | Active |
+| `journal-1.md` | ~559 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-08-14 | 修复生产邀请码兑换来源校验 | `b4b7409`, `f83575c` | `codex/filmframe-v1-3-hardening` |
 | 19 | 2026-08-14 | 验证并完成邀请码门禁任务收尾 | `2e45f3b`, `14e9a30` | `codex/filmframe-v1-3-hardening` |
 | 18 | 2026-08-14 | FilmFrame v1.4 Passkey 发布上线 | `2e45f3b` | `codex/filmframe-v1-3-hardening` |
 | 17 | 2026-08-06 | 修复邀请码兑换登录 CSRF | `104b93c` | `codex/filmframe-v1-3-hardening` |

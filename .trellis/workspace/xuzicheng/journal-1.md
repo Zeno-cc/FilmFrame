@@ -535,3 +535,25 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 20: 修复生产邀请码兑换来源校验
+
+**Date**: 2026-08-14
+**Task**: 修复生产邀请码兑换来源校验
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+定位生产 403 根因：旧 Access 容器依赖代理动态协议比对，且 OpenResty /auth/redeem 未转发 Origin。已通过正式更新器上线 v1.4.2，安装仅增加 Origin 转发的生产 vhost 配置并通过 OpenResty 检查与 reload；线上合法 HTTPS 来源均进入正常兑换校验返回 HTML 400，非法来源仍返回纯文本 403。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b4b7409` | (see git log) |
+| `f83575c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
