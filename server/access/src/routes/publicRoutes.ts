@@ -79,6 +79,10 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
   function hasAllowedRedeemOrigin(request: Parameters<RequestHandler>[0]): boolean {
     const origin = request.header("Origin");
     if (origin === undefined) return true;
+    if (origin === "null") {
+      // Some supported browsers use an opaque Origin for a same-origin native form.
+      return request.header("Sec-Fetch-Site") === "same-origin";
+    }
 
     const expectedOrigin = options.config.secureCookies
       ? normalizeOrigin(options.config.publicOrigin)

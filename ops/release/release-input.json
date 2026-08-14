@@ -1,5 +1,5 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -10,7 +10,7 @@
   "summaryZh": [
     {
       "kind": "fix",
-      "text": "补齐生产 Passkey 反代路由并增加活动 OpenResty 配置校验"
+      "text": "修复支持浏览器原生表单 Origin 为 null 时的邀请码兑换"
     }
   ]
 }

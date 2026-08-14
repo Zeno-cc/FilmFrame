@@ -97,6 +97,7 @@ server {
         proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Origin $http_origin;
+        proxy_set_header Sec-Fetch-Site $http_sec_fetch_site;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Forwarded "";

@@ -126,12 +126,16 @@ SECURE_COOKIES=true
   equals the configured `AccessConfig.publicOrigin` in production. The
   normalization accepts only URL-equivalent spellings (host case, a trailing
   slash, and the default HTTPS port); it rejects HTTP, paths, credentials,
-  query/fragment components, malformed values, other hosts, and `null`.
-  Development keeps the local HTTP host/port behavior. A missing Origin is
-  allowed to continue to the required Cookie/nonce check. Origin is checked
-  before the redemption rate limiter so cross-site traffic cannot spend
+  query/fragment components, malformed values, and other hosts. Some supported
+  browsers submit a same-origin native form with the opaque value `Origin:
+  null`; that value is accepted only when `Sec-Fetch-Site: same-origin` is also
+  present. A `null` Origin with another or missing Fetch Metadata value remains
+  forbidden. Development keeps the local HTTP host/port behavior. A missing
+  Origin is allowed to continue to the required Cookie/nonce check. Origin is
+  checked before the redemption rate limiter so cross-site traffic cannot spend
   another browser's quota. The public `/auth/redeem` OpenResty location must
-  explicitly forward `Origin $http_origin` and `X-Forwarded-Proto https`.
+  explicitly forward `Origin $http_origin`, `Sec-Fetch-Site $http_sec_fetch_site`,
+  and `X-Forwarded-Proto https`.
 - Failed form or invitation validation never consumes an invitation and
   renders a fresh form with a rotated binding. Successful redemption sets the
   persistent device-session Cookie and clears the temporary redemption Cookie.
@@ -169,7 +173,8 @@ SECURE_COOKIES=true
 | --- | --- |
 | Malformed, unknown, not-yet-active, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
 | Missing/malformed redemption Cookie, nonce transfer to another binding, bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, replay, future timestamp beyond skew, expiry, or replay-map capacity exhaustion | Reject nonce, rotate the form binding, and perform no invitation or session mutation |
-| Redemption with a cross-site or `null` Origin | `403` before rate limiting, nonce consumption, or invitation mutation |
+| Redemption with a cross-site Origin, or `Origin: null` without `Sec-Fetch-Site: same-origin` | `403` before rate limiting, nonce consumption, or invitation mutation |
+| Redemption with `Origin: null` and `Sec-Fetch-Site: same-origin` | Continue to the required Cookie/nonce and invitation validation |
 | Redemption without Origin but with a matching Cookie/nonce pair | Continue normal validation; Origin is defense in depth, not the primary browser binding |
 | Two concurrent redemptions using the same nonce and binding | At most one reaches invitation redemption; the other receives the generic failure |
 | Start or end boundary instant | Redemption is allowed; one millisecond outside the window is rejected |
@@ -236,7 +241,8 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
   and local HTTP behavior, configured-origin equivalence (including the
   default HTTPS port and trailing slash) without a forwarded protocol,
   missing/wrong binding, cross-site/HTTP/`null`/same-site/malformed/missing
-  Origin behavior, replay and multi-tab refresh stability, invitation
+  Origin behavior (including opaque same-origin `null` with Fetch Metadata),
+  replay and multi-tab refresh stability, invitation
   non-consumption on validation failure, persistent Cookie flags and 400-day
   `Max-Age`, generic redemption errors, refresh Origin/CSRF rules,
   rotated-token behavior, expired/revoked/tampered refresh rejection, single

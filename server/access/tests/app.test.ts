@@ -388,6 +388,40 @@ describe("public invitation gateway", () => {
     assert.doesNotMatch(response.text, /^Forbidden$/);
   });
 
+  it("accepts an opaque same-origin Origin when Fetch Metadata confirms same-origin", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "同源不透明来源", now);
+    const access = await request(app)
+      .get("/access")
+      .set("Host", config.filmframeHost);
+    const input = { code: created.code, nonce: formNonce(access.text) };
+    const bindingCookie = cookiePair(
+      setCookieNamed(access.headers, "__Host-filmframe_redeem"),
+    );
+    const crossSite = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Origin", "null")
+      .set("Sec-Fetch-Site", "cross-site")
+      .set("Cookie", bindingCookie)
+      .type("form")
+      .send(input);
+
+    assert.equal(crossSite.status, 403);
+
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Origin", "null")
+      .set("Sec-Fetch-Site", "same-origin")
+      .set("Cookie", bindingCookie)
+      .type("form")
+      .send(input);
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.location, "/access/passkey/setup");
+  });
+
   it("does not consume a nonce when the binding cookie is missing or belongs to another browser", async () => {
     const { app, config, database, now } = fixture();
     const created = createInvite(database, "浏览器绑定", now);
