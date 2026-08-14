@@ -557,3 +557,25 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: 发布 FilmFrame v1.4.3 到生产环境
+
+**Date**: 2026-08-14
+**Task**: 发布 FilmFrame v1.4.3 到生产环境
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+修复生产 Passkey 反代路由并增加活动 OpenResty 配置校验；准备并推送 v1.4.3 到 main，可信发布流水线通过，服务器更新器完成 v1.4.2 → v1.4.3，容器、OpenResty、回环和公网 HTTPS 验证通过。记录管理桥 3 秒预检超时导致误报的已知问题，后续应提高更新检查超时或改用已缓存预检结果。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `118e7c2` | (see git log) |
+| `b927d32` | (see git log) |
+
+### Status
+
+[OK] **Completed**
