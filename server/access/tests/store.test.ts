@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { INVITE_TTL_MS, SESSION_TTL_MS } from "../src/constants.js";
+import { INVITE_TTL_MS, SESSION_RETENTION_MS, SESSION_TTL_MS } from "../src/constants.js";
 import { openDatabase } from "../src/db.js";
 import { runMigrations } from "../src/migrate.js";
 import {
@@ -32,6 +32,16 @@ import {
   revokeBatch,
   revokeSession,
 } from "../src/store.js";
+import {
+  consumeChallenge,
+  recoverSessionWithPasskey,
+  registerPasskeyForSession,
+  pruneWebAuthnChallenges,
+  revokePasskey,
+  saveChallenge,
+  savePasskey,
+  WEBAUTHN_CHALLENGE_TTL_MS,
+} from "../src/passkeyStore.js";
 
 describe("invitation and session store", () => {
   it("persists hashes only and applies migrations idempotently", () => {
@@ -551,7 +561,7 @@ describe("invitation and session store", () => {
     database.close();
   });
 
-  it("atomically rotates a valid session token and renews its expiry", () => {
+  it("keeps a valid session token stable while renewing its expiry", () => {
     const database = openDatabase(":memory:");
     const created = createInvite(database, "续期测试", 30_000);
     const session = redeemInvite(database, created.code, 31_000);
@@ -560,13 +570,13 @@ describe("invitation and session store", () => {
     const refreshed = refreshSession(database, session.token, renewedAt);
     assert.ok(refreshed);
     assert.equal(refreshed.sessionId, session.sessionId);
-    assert.notEqual(refreshed.token, session.token);
+    assert.equal(refreshed.token, session.token);
     assert.equal(refreshed.expiresAt, renewedAt + SESSION_TTL_MS);
     assert.deepEqual(
       database.prepare("SELECT expires_at FROM sessions").get(),
       { expires_at: renewedAt + SESSION_TTL_MS },
     );
-    assert.equal(isSessionValid(database, session.token, renewedAt + 1), false);
+    assert.equal(isSessionValid(database, session.token, renewedAt + 1), true);
     assert.equal(isSessionValid(database, refreshed.token, renewedAt + SESSION_TTL_MS - 1), true);
     assert.deepEqual(
       database
@@ -577,7 +587,7 @@ describe("invitation and session store", () => {
     database.close();
   });
 
-  it("allows only one refresh for the same old token", () => {
+  it("allows repeated refreshes for the same token", () => {
     const database = openDatabase(":memory:");
     const created = createInvite(database, "并发续期", 30_000);
     const session = redeemInvite(database, created.code, 31_000);
@@ -585,9 +595,154 @@ describe("invitation and session store", () => {
     const first = refreshSession(database, session.token, 32_000);
     const second = refreshSession(database, session.token, 32_000);
     assert.ok(first);
-    assert.equal(second, null);
-    assert.equal(isSessionValid(database, session.token, 32_001), false);
-    assert.equal(isSessionValid(database, first.token, 32_001), true);
+    assert.ok(second);
+    assert.equal(first?.token, session.token);
+    assert.equal(second?.token, session.token);
+    assert.equal(isSessionValid(database, session.token, 32_001), true);
+    database.close();
+  });
+
+  it("consumes WebAuthn challenges once, enforces session scope, and prunes stale rows", () => {
+    const database = openDatabase(":memory:");
+    const invite = createInvite(database, "Passkey challenge", 10_000);
+    const session = redeemInvite(database, invite.code, 10_000);
+    const created = saveChallenge(database, {
+      challenge: "challenge-registration",
+      purpose: "registration",
+      sessionId: session.sessionId,
+      inviteId: invite.invite.id,
+      createdAt: 10_000,
+      expiresAt: 10_000 + WEBAUTHN_CHALLENGE_TTL_MS,
+    });
+    assert.equal(
+      consumeChallenge(database, created.challenge, "registration", 10_001, "other-session"),
+      null,
+    );
+    assert.ok(consumeChallenge(database, created.challenge, "registration", 10_001, session.sessionId));
+    assert.equal(
+      consumeChallenge(database, created.challenge, "registration", 10_002, "session-a"),
+      null,
+    );
+
+    saveChallenge(database, {
+      challenge: "expired-challenge",
+      purpose: "authentication",
+      sessionId: null,
+      inviteId: null,
+      createdAt: 20_000,
+      expiresAt: 20_100,
+    });
+    const used = saveChallenge(database, {
+      challenge: "used-challenge",
+      purpose: "authentication",
+      sessionId: null,
+      inviteId: null,
+      createdAt: 20_000,
+      expiresAt: 30_000,
+    });
+    assert.ok(consumeChallenge(database, used.challenge, "authentication", 20_001, null));
+    assert.equal(pruneWebAuthnChallenges(database, 20_000 + WEBAUTHN_CHALLENGE_TTL_MS + 1), 3);
+    database.close();
+  });
+
+  it("prunes session-bound challenges before their referenced sessions", () => {
+    const database = openDatabase(":memory:");
+    const invite = createInvite(database, "维护顺序", 10_000);
+    const session = redeemInvite(database, invite.code, 10_000);
+    saveChallenge(database, {
+      challenge: "retained-registration",
+      purpose: "registration",
+      sessionId: session.sessionId,
+      inviteId: invite.invite.id,
+      createdAt: 10_000,
+      expiresAt: 10_000 + WEBAUTHN_CHALLENGE_TTL_MS,
+    });
+    const pruneAt = 10_000 + SESSION_TTL_MS + SESSION_RETENTION_MS + 1;
+    assert.equal(pruneWebAuthnChallenges(database, pruneAt), 1);
+    assert.equal(pruneSessions(database, pruneAt), 1);
+    database.close();
+  });
+
+  it("rechecks live authorization while completing Passkey ceremonies", () => {
+    const database = openDatabase(":memory:");
+    const invite = createInvite(database, "Passkey 原子授权", 10_000);
+    const session = redeemInvite(database, invite.code, 10_000);
+    const registration = saveChallenge(database, {
+      challenge: "atomic-registration",
+      purpose: "registration",
+      sessionId: session.sessionId,
+      inviteId: invite.invite.id,
+      createdAt: 10_000,
+      expiresAt: 10_000 + WEBAUTHN_CHALLENGE_TTL_MS,
+    });
+    assert.equal(
+      registerPasskeyForSession(database, {
+        challengeId: registration.id,
+        challenge: registration.challenge,
+        sessionId: session.sessionId,
+        inviteId: invite.invite.id,
+        credentialId: "atomic-credential",
+        publicKey: new Uint8Array([1, 2, 3]),
+        counter: 0,
+        deviceType: "singleDevice",
+        backedUp: false,
+        transports: ["internal"],
+        now: 10_001,
+      }),
+      true,
+    );
+
+    const authentication = saveChallenge(database, {
+      challenge: "atomic-authentication",
+      purpose: "authentication",
+      sessionId: null,
+      inviteId: null,
+      createdAt: 10_002,
+      expiresAt: 10_002 + WEBAUTHN_CHALLENGE_TTL_MS,
+    });
+    const recovered = recoverSessionWithPasskey(database, {
+      challengeId: authentication.id,
+      challenge: authentication.challenge,
+      credentialId: "atomic-credential",
+      inviteId: invite.invite.id,
+      expectedCounter: 0,
+      newCounter: 1,
+      now: 10_003,
+    });
+    assert.ok(recovered);
+    assert.deepEqual(database.prepare("SELECT redemption_count FROM invites").get(), { redemption_count: 1 });
+
+    const revokedCredential = savePasskey(database, {
+      credentialId: "revoked-credential",
+      inviteId: invite.invite.id,
+      publicKey: new Uint8Array([4, 5, 6]),
+      counter: 0,
+      deviceType: "singleDevice",
+      backedUp: false,
+      transports: ["internal"],
+      now: 10_004,
+    });
+    assert.equal(revokePasskey(database, revokedCredential.id, 10_005), true);
+    const revokedAuthentication = saveChallenge(database, {
+      challenge: "revoked-authentication",
+      purpose: "authentication",
+      sessionId: null,
+      inviteId: null,
+      createdAt: 10_006,
+      expiresAt: 10_006 + WEBAUTHN_CHALLENGE_TTL_MS,
+    });
+    assert.equal(
+      recoverSessionWithPasskey(database, {
+        challengeId: revokedAuthentication.id,
+        challenge: revokedAuthentication.challenge,
+        credentialId: "revoked-credential",
+        inviteId: invite.invite.id,
+        expectedCounter: 0,
+        newCounter: 1,
+        now: 10_007,
+      }),
+      null,
+    );
     database.close();
   });
 

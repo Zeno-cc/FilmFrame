@@ -138,7 +138,7 @@ SECURE_COOKIES=true
 - Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
 - Invitation expiry blocks new redemption but does not end an already issued session. Revocation invalidates the invitation and all child sessions immediately.
 - The production cookie is `__Host-filmframe_session` with `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, and a bounded `Max-Age`.
-- `POST /auth/refresh` requires a valid unexpired session, the exact FilmFrame origin, and `X-FilmFrame-CSRF: 1`. In one immediate transaction it replaces the stored hash with a fresh 256 bit token hash, updates `last_seen_at` and the 400-day expiry, then sends the rotated token in the persistent Cookie. The old token becomes invalid as soon as the transaction commits.
+- `POST /auth/refresh` requires a valid unexpired session, the exact FilmFrame origin, and `X-FilmFrame-CSRF: 1`. In one immediate transaction it keeps the existing opaque token hash, updates `last_seen_at` and the 400-day expiry, then re-sends the same token in the persistent Cookie. A lost, aborted, or delayed refresh response therefore cannot invalidate the browser's still-valid Cookie. Expired, revoked, and tampered sessions remain rejected.
 - React calls the refresh endpoint once when the application starts. Do not expose a user logout command or public logout route: device authorization ends only when the administrator revokes the parent invitation, the session expires without another visit, or the user clears browser site data.
 - Internal health and session-check routes accept only the internal Host plus a loopback/private proxy address. Public vhosts return `404` for `/healthz` and `/internal/*`.
 - Every static application path, including known hashed assets, workers, overlays, and masks, passes through OpenResty `auth_request`. Access-service errors fail closed.
@@ -155,6 +155,7 @@ SECURE_COOKIES=true
 - Daily SQLite online backups are written to `/opt/filmframe/backups/access`, outside the database volume. The long-running access service never mounts this directory. A short-lived `maintenance` profile job runs with no network, opens the source database with `readonly: true` and `fileMustExist: true`, writes the snapshot, normalizes it to `journal_mode=DELETE`, and exits. The source volume remains filesystem-writable only because a live WAL database may need `-wal`/`-shm` coordination even for a read-only SQLite connection; the backup CLI must not run migrations or application writes. Each backup is integrity-checked, checksummed, mode `0600`, and retained for 30 days using a strict filename and directory boundary. Restore rehearsals always target a new named volume.
 - Restore validation opens the restored database read-only while leaving only that isolated target volume writable, because SQLite may create transient `-wal`/`-shm` coordination files during integrity checks. It must never mount or switch the production volume.
 - Cloudflare policy supplies Google authentication restricted to the exact approved administrator email. The application does not require a separate Passkey/MFA challenge; Google secrets remain only in Google/Cloudflare configuration.
+- Public device recovery uses server-bound WebAuthn challenges and stored Passkey credentials. Options and verification routes have independent source-IP rate limits; the maintenance command removes expired or consumed challenges so the challenge table cannot grow without bound. Passkey recovery creates a new session without incrementing invitation redemption count, and invitation or credential revocation immediately blocks recovery.
 - Both containers publish only on loopback. The access container runs as a non-root user with a read-only root filesystem, all capabilities dropped, and a persistent `/data` volume using `0700` directory and `0600` SQLite file permissions.
 
 ### 4. Validation & Error Matrix
@@ -170,8 +171,8 @@ SECURE_COOKIES=true
 | Missing, malformed, timezone-free, reversed, or zero-length creation window | `400`; no invitation, batch, or idempotency row |
 | Two or more concurrent redemptions of a one-use invitation | Exactly one success |
 | Missing, tampered, expired, or revoked session | Internal check returns `401` |
-| Valid session refresh with exact Origin and CSRF header | `204`; a fresh token is issued, the old token fails immediately, and database/Cookie expiry extend by 400 days |
-| Two concurrent refreshes using the same old token | Exactly one succeeds; the committed rotated token remains valid |
+| Valid session refresh with exact Origin and CSRF header | `204`; the same opaque token is re-sent and database/Cookie expiry extend by 400 days |
+| Two concurrent refreshes using the same token | Both may succeed; the token remains valid and the latest rolling expiry is authoritative |
 | Refresh with missing/wrong Origin or CSRF header | `403`; no database or Cookie mutation |
 | Refresh for expired/tampered session or revoked invitation | `401`; no `Set-Cookie` |
 | Request to legacy `/auth/logout` | `404`; device authorization remains server-controlled |
@@ -228,7 +229,7 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.
 - Route tests assert temporary redemption-Cookie names/flags/TTL, production
   and local HTTP behavior, missing/wrong binding, cross-site/`null`/same-site/
-  missing Origin behavior, replay and multi-tab rotation, invitation
+  missing Origin behavior, replay and multi-tab refresh stability, invitation
   non-consumption on validation failure, persistent Cookie flags and 400-day
   `Max-Age`, generic redemption errors, refresh Origin/CSRF rules,
   rotated-token behavior, expired/revoked/tampered refresh rejection, single
@@ -794,4 +795,120 @@ location = /api/runtime-config {
     auth_request /_filmframe_session_check;
     proxy_pass http://filmframe_access_backend/api/runtime-config;
 }
+```
+
+## Scenario: Stable Sessions And Passkey Device Recovery
+
+### 1. Scope / Trigger
+
+Apply this contract when changing session renewal, WebAuthn registration or
+recovery, Passkey administration, or migration `006`.
+
+### 2. Signatures
+
+```http
+POST /auth/passkeys/registration/options
+POST /auth/passkeys/registration/verify
+POST /auth/passkeys/authentication/options
+POST /auth/passkeys/authentication/verify
+GET  /access/passkey/setup
+GET  /auth/passkeys/client.js
+GET  /api/passkeys
+POST /api/passkeys/:id/revoke
+```
+
+```sql
+CREATE TABLE passkey_credentials (
+  id TEXT PRIMARY KEY,
+  credential_id TEXT NOT NULL UNIQUE,
+  invite_id TEXT NOT NULL REFERENCES invites(id),
+  public_key TEXT NOT NULL,
+  counter INTEGER NOT NULL,
+  device_type TEXT NOT NULL,
+  backed_up INTEGER NOT NULL,
+  transports TEXT,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER,
+  revoked_at INTEGER
+);
+
+CREATE TABLE webauthn_challenges (
+  id TEXT PRIMARY KEY,
+  challenge TEXT NOT NULL UNIQUE,
+  purpose TEXT NOT NULL,
+  session_id TEXT REFERENCES sessions(id),
+  invite_id TEXT REFERENCES invites(id),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER
+);
+```
+
+### 3. Contracts
+
+- `POST /auth/refresh` keeps the existing opaque session token hash and only
+  rolls `last_seen_at` and `expires_at`; the response re-sends the same token.
+  A lost refresh response therefore cannot invalidate the browser's Cookie.
+- Registration requires a valid session and exact public Origin/CSRF. The
+  server fixes the RP ID to `FILMFRAME_HOST`, the expected Origin to the
+  configured public Origin, resident credentials and required user
+  verification, and stores only the credential public metadata.
+- Authentication options are public but rate-limited. Authentication
+  verification checks the exact challenge, RP ID, Origin, user verification,
+  credential revocation, and parent invitation state before creating a new
+  session; it never increments invitation redemption count.
+- Challenges expire after five minutes and are atomically consumed once. The
+  registration challenge is bound to its session; maintenance deletes expired
+  or stale consumed challenges. Errors use fixed generic Passkey messages.
+- `@simplewebauthn/server` and the same-origin browser bundle perform WebAuthn
+  parsing and verification. Do not hand-roll CBOR, public-key, or signature
+  handling, and do not load authentication code from a CDN.
+- The administrator list exposes only a short credential ID, invite metadata,
+  device/sync type, timestamps, and status. Revocation is CSRF-protected and
+  cascades from invitation or batch revocation; public keys, challenges,
+  tokens, and Passkey secrets never enter HTML, JSON, or audit logs.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Missing/expired/revoked session on registration | `401` or redirect to `/access`; no challenge |
+| Wrong Host, Origin, CSRF, JSON, or body limit | fixed `4xx`; no state mutation |
+| Expired, reused, cross-session, or wrong-purpose challenge | generic verification failure; no credential/session |
+| Wrong RP ID, Origin, user verification, credential, or revoked invite | generic verification failure; no session |
+| Valid authentication | one new session Cookie; redemption count unchanged |
+| Admin Passkey revoke | `204`; subsequent recovery fails and list shows `revoked` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a valid invited session registers a platform Passkey, then a browser
+  with no session Cookie uses it to obtain a fresh session without another code.
+- Base: a browser without WebAuthn continues to use the invitation form.
+- Bad: storing authorization in `localStorage`, using a browser fingerprint,
+  accepting a credential without checking its challenge/origin, or rotating a
+  session token before the refresh response is known to have arrived.
+
+### 6. Tests Required
+
+- Store tests cover challenge single-use, session binding, expiry cleanup,
+  stable refresh tokens, Passkey metadata, revocation, and invite cascades.
+- Route tests cover public authentication options, protected setup and
+  registration, fixed errors, rate limits, CSRF/Host/Origin, and redacted
+  administrator responses.
+- Browser tests cover the normal no-prompt Cookie path and the invitation
+  fallback; real authenticator compatibility must be recorded separately from
+  Chromium virtual-authenticator evidence.
+- Deployment checks cover same-origin client bundle routing, protected setup,
+  no-store authentication responses, and the migration transition `5 -> 6`.
+
+### 7. Wrong vs Correct
+
+```ts
+// Wrong: a lost response leaves the old browser Cookie unusable.
+UPDATE sessions SET token_hash = :newHash WHERE token_hash = :oldHash;
+
+// Correct: the opaque token remains stable while its rolling expiry moves.
+UPDATE sessions
+SET last_seen_at = :now, expires_at = :expiresAt
+WHERE token_hash = :tokenHash AND revoked_at IS NULL;
 ```

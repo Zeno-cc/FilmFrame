@@ -12,7 +12,7 @@ import {
 } from "../src/runtimeConfig.js";
 
 describe("runtime render budget", () => {
-  it("seeds the existing 700 MiB behavior through migration 005", () => {
+  it("seeds the existing 700 MiB behavior through migration 006", () => {
     const database = openDatabase(":memory:");
     assert.deepEqual(readRenderBudgetSetting(database), {
       maxCanvasMiB: DEFAULT_MAX_CANVAS_MIB,
@@ -21,7 +21,7 @@ describe("runtime render budget", () => {
     });
     assert.deepEqual(
       database.prepare("SELECT version FROM schema_migrations ORDER BY version").all(),
-      [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }],
+      [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }],
     );
     database.close();
   });

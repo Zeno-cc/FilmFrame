@@ -651,14 +651,12 @@ export function refreshSession(
 ): RedeemedSession | null {
   if (!token || !validSessionToken(token)) return null;
 
-  const nextToken = randomBytes(32).toString("base64url");
   const expiresAt = now + SESSION_TTL_MS;
   const transaction = database.transaction(() => {
     const updated = database
       .prepare(
         `UPDATE sessions
-         SET token_hash = ?,
-             last_seen_at = ?,
+         SET last_seen_at = ?,
              expires_at = ?
          WHERE token_hash = ?
            AND revoked_at IS NULL
@@ -668,14 +666,14 @@ export function refreshSession(
              FROM invites
              WHERE invites.id = sessions.invite_id
                AND invites.revoked_at IS NULL
-           )
+             )
          RETURNING id`,
       )
-      .get(hashValue(nextToken), now, expiresAt, hashValue(token), now) as
+      .get(now, expiresAt, hashValue(token), now) as
       | { id: string }
       | undefined;
     return updated
-      ? { sessionId: updated.id, token: nextToken, expiresAt }
+      ? { sessionId: updated.id, token, expiresAt }
       : null;
   });
 
@@ -773,6 +771,13 @@ export function revokeInvite(
          WHERE invite_id = ?`,
       )
       .run(now, inviteId);
+    database
+      .prepare(
+        `UPDATE passkey_credentials
+         SET revoked_at = COALESCE(revoked_at, ?)
+         WHERE invite_id = ?`,
+      )
+      .run(now, inviteId);
     return true;
   });
 
@@ -807,6 +812,13 @@ export function revokeBatch(
     const sessionUpdate = database
       .prepare(
         `UPDATE sessions SET revoked_at = ?
+         WHERE revoked_at IS NULL
+           AND invite_id IN (SELECT id FROM invites WHERE batch_id = ?)`,
+      )
+      .run(now, batchId);
+    database
+      .prepare(
+        `UPDATE passkey_credentials SET revoked_at = ?
          WHERE revoked_at IS NULL
            AND invite_id IN (SELECT id FROM invites WHERE batch_id = ?)`,
       )

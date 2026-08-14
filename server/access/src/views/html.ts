@@ -1,4 +1,5 @@
 import type { BatchSummary, InviteSummary, SessionSummary } from "../store.js";
+import type { PasskeySummary } from "../passkeyStore.js";
 import {
   adminUpdateScript,
   adminUpdateStyles,
@@ -62,7 +63,10 @@ export function renderAccessPage(options: {
         <input id="invite-code" name="code" type="text" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="128" required placeholder="FF1-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX">
         <button class="button" type="submit">进入暗房</button>
       </div>
-    </form>${error}
+    </form>
+    <div class="passkey-divider"><span>或</span></div>
+    <button id="passkey-unlock" class="button secondary passkey-button" type="button">使用设备 Passkey 解锁</button>
+    <p id="passkey-status" class="muted" role="status" aria-live="polite"></p>${error}
   </section>
 </main>
 <style nonce="${escapeHtml(options.nonce)}">
@@ -70,9 +74,23 @@ export function renderAccessPage(options: {
   h1{margin:12px 0 14px;font-family:"Songti SC","STSong",serif;font-size:clamp(30px,6vw,52px);font-weight:500;line-height:1.2}.intro{max-width:540px;margin:0 0 36px;color:#bcb3a5;line-height:1.8}
   label{display:block;margin:0 0 9px;font-size:13px;color:#c9beae}.field-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
   input{width:100%;min-height:48px;border:1px solid #5b5347;border-radius:0;background:#15130f;color:#fff;padding:0 14px;text-transform:uppercase}
+  .passkey-divider{display:flex;align-items:center;gap:12px;margin:28px 0 16px;color:#81786d}.passkey-divider::before,.passkey-divider::after{content:"";height:1px;background:#3c362e;flex:1}.passkey-button{width:100%}.muted{color:#a59d91}.passkey-button:disabled{opacity:.55}
   @media(max-width:520px){.access{align-items:start;padding-top:18vh}.gate{padding:36px 0}.field-row{grid-template-columns:1fr}.button{width:100%}}
 </style>`;
-  return pageShell("进入 FilmFrame", options.nonce, body);
+  const script = `const passkeyButton=document.getElementById("passkey-unlock"),passkeyStatus=document.getElementById("passkey-status");if(passkeyButton){passkeyButton.addEventListener("click",async()=>{if(!window.PublicKeyCredential){passkeyStatus.textContent="当前浏览器不支持 Passkey，请输入邀请码。";return}passkeyButton.disabled=true;passkeyStatus.textContent="正在等待设备验证…";try{const optionsResponse=await fetch("/auth/passkeys/authentication/options",{method:"POST",headers:{"Content-Type":"application/json","X-FilmFrame-CSRF":"1"},body:"{}"});if(!optionsResponse.ok)throw new Error();const payload=await optionsResponse.json();const client=await import("/auth/passkeys/client.js");const authentication=await client.startAuthentication({optionsJSON:payload.options});const verify=await fetch("/auth/passkeys/authentication/verify",{method:"POST",headers:{"Content-Type":"application/json","X-FilmFrame-CSRF":"1"},body:JSON.stringify({challengeId:payload.challengeId,response:authentication})});if(!verify.ok)throw new Error();window.location.assign("/")}catch{passkeyStatus.textContent="Passkey 解锁未完成，请重试或输入邀请码。";passkeyButton.disabled=false}})}`;
+  return pageShell("进入 FilmFrame", options.nonce, body, script);
+}
+
+export function renderPasskeySetupPage(options: { nonce: string }): string {
+  const body = `<main class="shell access"><section class="gate" aria-labelledby="passkey-title">
+  <p class="eyebrow">FilmFrame · 设备授权</p><h1 id="passkey-title">记住此设备</h1>
+  <p class="intro">使用指纹、Face ID、Windows Hello 或设备 PIN 创建 Passkey。以后 Cookie 丢失时，可用它恢复访问，无需再次输入邀请码。</p>
+  <div class="field-row"><button id="register-passkey" class="button" type="button">设置设备 Passkey</button><a class="button secondary" href="/">稍后设置</a></div>
+  <p id="passkey-status" class="muted" role="status" aria-live="polite"></p>
+</section></main>
+<style nonce="${escapeHtml(options.nonce)}">.access{min-height:100vh;display:grid;place-items:center;padding:48px 0}.gate{width:min(100%,660px);border-top:1px solid #4c4438;border-bottom:1px solid #4c4438;padding:54px 0}.field-row{display:flex;flex-wrap:wrap;gap:10px}.intro{max-width:540px;margin:0 0 36px;color:#bcb3a5;line-height:1.8}.muted{margin-top:18px;color:#a59d91}@media(max-width:520px){.access{align-items:start;padding-top:18vh}.gate{padding:36px 0}.field-row>*{width:100%;text-align:center}}</style>`;
+  const script = `const button=document.getElementById("register-passkey"),status=document.getElementById("passkey-status");const setStatus=(text)=>status.textContent=text;button.addEventListener("click",async()=>{if(!window.PublicKeyCredential){setStatus("当前浏览器不支持 Passkey，请直接返回使用邀请码流程。");return}button.disabled=true;setStatus("正在等待设备验证…");try{const optionsResponse=await fetch("/auth/passkeys/registration/options",{method:"POST",headers:{"Content-Type":"application/json","X-FilmFrame-CSRF":"1"},body:"{}"});if(!optionsResponse.ok)throw new Error();const payload=await optionsResponse.json();const client=await import("/auth/passkeys/client.js");const registration=await client.startRegistration({optionsJSON:payload.options});const verify=await fetch("/auth/passkeys/registration/verify",{method:"POST",headers:{"Content-Type":"application/json","X-FilmFrame-CSRF":"1"},body:JSON.stringify({challengeId:payload.challengeId,response:registration})});if(!verify.ok)throw new Error();setStatus("设备 Passkey 已保存，今后可无感访问。");button.textContent="已设置"}catch{setStatus("Passkey 设置未完成，请重试或稍后使用邀请码。");button.disabled=false}});`;
+  return pageShell("记住 FilmFrame 设备", options.nonce, body, script);
 }
 
 const statusLabel: Record<InviteSummary["status"], string> = {
@@ -153,11 +171,27 @@ function sessionRows(sessions: readonly SessionSummary[]): string {
     .join("");
 }
 
+function passkeyRows(passkeys: readonly PasskeySummary[]): string {
+  if (passkeys.length === 0) {
+    return `<tr class="empty-row"><td colspan="7" class="empty">尚无设备 Passkey</td></tr>`;
+  }
+  return passkeys.map((passkey) => `<tr data-passkey-id="${escapeHtml(passkey.id)}">
+  <td data-label="邀请"><strong>${escapeHtml(passkey.inviteLabel)}</strong><small>${escapeHtml(passkey.inviteId)}</small></td>
+  <td data-label="凭证"><small class="standalone-id">${escapeHtml(passkey.credentialIdShort)}</small></td>
+  <td data-label="类型">${passkey.deviceType === "multiDevice" ? "可同步" : "单设备"}${passkey.backedUp ? " · 已备份" : ""}</td>
+  <td data-label="状态"><span class="status ${passkey.status === "active" ? "active" : "revoked"}">${passkey.status === "active" ? "有效" : "已撤销"}</span></td>
+  <td data-label="创建时间">${formatDateTime(passkey.createdAt)}</td>
+  <td data-label="最近使用">${formatDateTime(passkey.lastUsedAt)}</td>
+  <td data-label="操作"><button class="button danger revoke-passkey" type="button" data-id="${escapeHtml(passkey.id)}" ${passkey.status === "revoked" ? "disabled" : ""}>${passkey.status === "revoked" ? "已撤销" : "撤销 Passkey"}</button></td>
+</tr>`).join("");
+}
+
 export function renderAdminPage(options: {
   nonce: string;
   invites: readonly InviteSummary[];
   batches: readonly BatchSummary[];
   sessions: readonly SessionSummary[];
+  passkeys: readonly PasskeySummary[];
   renderBudget: RenderBudgetSetting;
 }): string {
   const body = `<main class="shell admin">
@@ -174,6 +208,7 @@ export function renderAdminPage(options: {
   <section class="list" aria-labelledby="batch-list-title"><h2 id="batch-list-title">批次管理</h2><div class="table-wrap"><table><thead><tr><th>批次</th><th>邀请码</th><th>有效设备</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="batch-list">${batchRows(options.batches)}</tbody></table></div></section>
   <section class="list" aria-labelledby="list-title"><div class="list-heading"><h2 id="list-title">邀请码记录</h2><div id="status-counters" class="counters"></div></div><p class="muted list-intro">“当前可兑换”表示邀请码此刻能否创建新设备授权；已激活设备是否可用以“有效设备”和下方会话记录为准。</p><div class="filters"><input id="invite-search" type="search" placeholder="搜索备注、ID 或批次"><select id="batch-filter" aria-label="批次筛选"><option value="all">全部批次</option><option value="standalone">历史单码</option>${options.batches.map((batch) => `<option value="${escapeHtml(batch.id)}">${escapeHtml(batch.name)}</option>`).join("")}</select><select id="status-filter" aria-label="状态筛选"><option value="all">全部状态</option><option value="scheduled">未生效</option><option value="active">待兑换</option><option value="redeemed">已兑换</option><option value="expired">已过期</option><option value="revoked">已撤销</option></select></div><div class="table-wrap"><table><thead><tr><th>备注 / ID</th><th>批次</th><th>状态</th><th>当前可兑换</th><th>有效设备</th><th>生效时间</th><th>兑换截止</th><th>最近兑换</th><th>操作</th></tr></thead><tbody id="invite-list">${inviteRows(options.invites)}</tbody></table></div></section>
   <section class="list" aria-labelledby="session-list-title"><h2 id="session-list-title">设备会话</h2><p class="muted list-intro">单独撤销只影响当前设备；撤销邀请码仍会终止该邀请下的全部设备会话。</p><div class="table-wrap"><table><thead><tr><th>邀请</th><th>会话 ID</th><th>状态</th><th>创建时间</th><th>最近使用</th><th>到期时间</th><th>操作</th></tr></thead><tbody id="session-list">${sessionRows(options.sessions)}</tbody></table></div></section>
+  <section class="list" aria-labelledby="passkey-list-title"><h2 id="passkey-list-title">设备 Passkey</h2><p class="muted list-intro">只显示凭证短标识和状态；私钥、公钥原文与挑战不会进入管理页面。</p><div class="table-wrap"><table><thead><tr><th>邀请</th><th>凭证</th><th>类型</th><th>状态</th><th>创建时间</th><th>最近使用</th><th>操作</th></tr></thead><tbody id="passkey-list">${passkeyRows(options.passkeys)}</tbody></table></div></section>
   </div>
   ${renderAdminSettingsView(options.renderBudget)}
   ${renderAdminUpdateView()}
@@ -191,7 +226,7 @@ export function renderAdminPage(options: {
   const script = `
 const csrfHeaders={"Content-Type":"application/json","X-FilmFrame-CSRF":"1"};
 const byId=(id)=>document.getElementById(id);
-const errorBox=byId("admin-error"),noticeBox=byId("admin-notice"),createForm=byId("create-form"),createButton=byId("create-button"),inviteList=byId("invite-list"),batchList=byId("batch-list"),sessionList=byId("session-list");
+const errorBox=byId("admin-error"),noticeBox=byId("admin-notice"),createForm=byId("create-form"),createButton=byId("create-button"),inviteList=byId("invite-list"),batchList=byId("batch-list"),sessionList=byId("session-list"),passkeyList=byId("passkey-list");
 const inviteStatusLabels={scheduled:"未生效",active:"待兑换",redeemed:"已兑换",expired:"已过期",revoked:"已撤销"};
 const sessionStatusLabels={active:"有效",expired:"已过期",revoked:"已撤销"};
 const dateFormatter=new Intl.DateTimeFormat("zh-CN",{dateStyle:"medium",timeStyle:"short"});
@@ -229,6 +264,7 @@ byId("clear-code").addEventListener("click",clearCreatedCodes);window.addEventLi
 inviteList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke");if(!button||button.disabled||!confirm("撤销后，该邀请码签发的会话也会立即失效。确定继续？"))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/invites/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const row=button.closest("tr");row.dataset.status="revoked";setStatus(row.querySelector(".record-status"),"revoked",inviteStatusLabels);setAvailability(row.querySelector(".record-redeemable"),false);row.querySelector(".invite-sessions").textContent="0";sessionList.querySelectorAll("tr[data-invite-id]").forEach((sessionRow)=>{if(sessionRow.dataset.inviteId===button.dataset.id)markSessionRevoked(sessionRow)});applyFilters();showNotice("邀请码及其设备会话已撤销。")}catch{button.disabled=false;showError("撤销失败，请稍后重试。")}});
 batchList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke-batch");if(!button||button.disabled)return;const message="确定撤销批次「"+button.dataset.name+"」？将影响 "+button.dataset.count+" 个邀请码和 "+button.dataset.sessions+" 个有效设备会话。";if(!confirm(message))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/invite-batches/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const result=await response.json();button.textContent="已撤销";button.dataset.sessions="0";button.closest("tr").querySelector(".batch-sessions").textContent="0";inviteList.querySelectorAll("tr[data-batch-id]").forEach((row)=>{if(row.dataset.batchId===button.dataset.id){row.dataset.status="revoked";setStatus(row.querySelector(".record-status"),"revoked",inviteStatusLabels);setAvailability(row.querySelector(".record-redeemable"),false);row.querySelector(".invite-sessions").textContent="0";row.querySelector(".revoke").disabled=true}});sessionList.querySelectorAll("tr[data-invite-id]").forEach((row)=>{const inviteRow=Array.from(inviteList.querySelectorAll("tr[data-record-id]")).find((item)=>item.dataset.recordId===row.dataset.inviteId);if(inviteRow?.dataset.batchId===button.dataset.id)markSessionRevoked(row)});applyFilters();showNotice("批次已撤销："+result.revokedInviteCount+" 个邀请码、"+result.revokedSessionCount+" 个设备会话已失效。")}catch{button.disabled=false;showError("批次撤销失败，请稍后重试。")}});
 sessionList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke-session");if(!button||button.disabled||!confirm("确定只撤销这个设备会话？"))return;clearFeedback();button.disabled=true;try{const response=await fetch("/api/sessions/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();const row=button.closest("tr");decrementActiveSessionCounts(row);markSessionRevoked(row);showNotice("设备会话已撤销。")}catch{button.disabled=false;showError("会话撤销失败，请稍后重试。")}});
+passkeyList.addEventListener("click",async(event)=>{if(!(event.target instanceof Element))return;const button=event.target.closest(".revoke-passkey");if(!button||button.disabled||!confirm("撤销后，该 Passkey 将不能恢复设备访问。确定继续？"))return;button.disabled=true;try{const response=await fetch("/api/passkeys/"+encodeURIComponent(button.dataset.id)+"/revoke",{method:"POST",headers:csrfHeaders,body:"{}"});if(!response.ok)throw new Error();button.textContent="已撤销";button.closest("tr").querySelector(".status").textContent="已撤销";showNotice("Passkey 已撤销。")}catch{button.disabled=false;showError("Passkey 撤销失败，请稍后重试。")}});
 ${adminSettingsScript}
 ${adminUpdateScript}`;
 

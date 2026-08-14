@@ -131,6 +131,112 @@ server {
         add_header Cache-Control "private, no-store" always;
     }
 
+    # Passkey recovery and setup are handled by the access sidecar. Recovery
+    # must remain reachable without auth_request so a lost session Cookie can
+    # still start WebAuthn; the sidecar performs the session check where one is
+    # required.
+    location = /access/passkey/setup {
+        limit_except GET { deny all; }
+        proxy_pass http://filmframe_access_backend/access/passkey/setup;
+        proxy_set_header Cookie $filmframe_session_cookie;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/passkeys/client.js {
+        limit_except GET { deny all; }
+        proxy_pass http://filmframe_access_backend/auth/passkeys/client.js;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering on;
+        proxy_hide_header Expires;
+    }
+
+    location = /auth/passkeys/registration/options {
+        limit_except POST { deny all; }
+        proxy_pass http://filmframe_access_backend/auth/passkeys/registration/options;
+        proxy_set_header Cookie $filmframe_session_cookie;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/passkeys/registration/verify {
+        limit_except POST { deny all; }
+        proxy_pass http://filmframe_access_backend/auth/passkeys/registration/verify;
+        proxy_set_header Cookie $filmframe_session_cookie;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/passkeys/authentication/options {
+        limit_except POST { deny all; }
+        proxy_pass http://filmframe_access_backend/auth/passkeys/authentication/options;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
+    location = /auth/passkeys/authentication/verify {
+        limit_except POST { deny all; }
+        proxy_pass http://filmframe_access_backend/auth/passkeys/authentication/verify;
+        proxy_set_header Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Host filmframe.astrocean.space;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_set_header Cf-Access-Jwt-Assertion "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        add_header Cache-Control "private, no-store" always;
+    }
+
     location = /api/runtime-config {
         limit_except GET {
             deny all;

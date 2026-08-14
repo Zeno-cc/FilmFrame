@@ -237,6 +237,39 @@ try {
   assert.equal(authorized.status, 200);
   assert.match(authorized.body, /<div id="root"><\/div>/);
 
+  stage = "passkey route proxying";
+  const setup = await request("/access/passkey/setup", { headers: { Cookie: cookie } });
+  assert.equal(setup.status, 200);
+  assert.match(setup.body, /设置设备 Passkey/);
+  const clientBundle = await request("/auth/passkeys/client.js");
+  assert.equal(clientBundle.status, 200);
+  assert.match(clientBundle.body, /startAuthentication/);
+  const registrationOptions = await request("/auth/passkeys/registration/options", {
+    method: "POST",
+    headers: {
+      Cookie: cookie,
+      Origin: "https://filmframe.test",
+      "X-FilmFrame-CSRF": "1",
+      "Content-Type": "application/json",
+      "Content-Length": "2",
+    },
+    body: "{}",
+  });
+  assert.equal(registrationOptions.status, 200);
+  assert.equal(typeof JSON.parse(registrationOptions.body).challengeId, "string");
+  const authenticationOptions = await request("/auth/passkeys/authentication/options", {
+    method: "POST",
+    headers: {
+      Origin: "https://filmframe.test",
+      "X-FilmFrame-CSRF": "1",
+      "Content-Type": "application/json",
+      "Content-Length": "2",
+    },
+    body: "{}",
+  });
+  assert.equal(authenticationOptions.status, 200);
+  assert.equal(typeof JSON.parse(authenticationOptions.body).challengeId, "string");
+
   const runtimeConfig = await request("/api/runtime-config", {
     headers: { Cookie: cookie },
   });
@@ -264,19 +297,14 @@ try {
     },
   });
   assert.equal(refresh.status, 204);
-  const rotatedSetCookie = refresh.headers["set-cookie"]?.[0];
-  assert.ok(rotatedSetCookie?.startsWith("filmframe_session_dev="));
-  const rotatedCookie = rotatedSetCookie.split(";", 1)[0];
-  assert.notEqual(rotatedCookie, cookie, "refresh must rotate the bearer token");
+  const refreshedSetCookie = refresh.headers["set-cookie"]?.[0];
+  assert.ok(refreshedSetCookie?.startsWith("filmframe_session_dev="));
+  const refreshedCookie = refreshedSetCookie.split(";", 1)[0];
+  assert.equal(refreshedCookie, cookie, "refresh must keep the bearer token stable");
   assert.equal(
     (await request("/", { headers: { Cookie: cookie } })).status,
-    303,
-    "the old cookie must be rejected immediately after refresh",
-  );
-  assert.equal(
-    (await request("/", { headers: { Cookie: rotatedCookie } })).status,
     200,
-    "the rotated cookie must remain authorized",
+    "the refreshed cookie must remain authorized",
   );
 
   stage = "single-use invite enforcement";
@@ -341,7 +369,7 @@ try {
   const activeSession = sessions.find(
     (session) => session.inviteId === created.id && session.status === "active",
   );
-  assert.ok(activeSession?.id, "the rotated session must be listed by public ID");
+  assert.ok(activeSession?.id, "the refreshed session must be listed by public ID");
   compose(
     "exec",
     "-T",
@@ -353,7 +381,7 @@ try {
     activeSession.id,
   );
   assert.equal(
-    (await request("/", { headers: { Cookie: rotatedCookie } })).status,
+    (await request("/", { headers: { Cookie: cookie } })).status,
     303,
     "single-session revocation must invalidate that device",
   );

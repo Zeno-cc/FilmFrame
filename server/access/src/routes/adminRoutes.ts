@@ -29,6 +29,7 @@ import {
   type BatchSummary,
   type SessionSummary,
 } from "../store.js";
+import { listPasskeys, revokePasskey } from "../passkeyStore.js";
 import { renderAdminPage } from "../views/html.js";
 import {
   UpdaterClientError,
@@ -223,6 +224,7 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
         invites: listInvites(options.database, requestNow),
         batches: listBatches(options.database, requestNow),
         sessions: listSessions(options.database, requestNow),
+        passkeys: listPasskeys(options.database),
         renderBudget: readRenderBudgetSetting(options.database),
       }),
     );
@@ -240,16 +242,54 @@ export function createAdminRoutes(options: AdminRouteOptions): Router {
     });
   });
 
+  const writeSecurity = [
+    requireWriteCsrf(options.config.adminOrigin),
+    requireJsonContentType,
+  ];
+
+  router.get("/api/passkeys", (_request, response) => {
+    response.json({
+      passkeys: listPasskeys(options.database).map((passkey) => ({
+        id: passkey.id,
+        credentialId: passkey.credentialIdShort,
+        inviteId: passkey.inviteId,
+        inviteLabel: passkey.inviteLabel,
+        deviceType: passkey.deviceType,
+        backedUp: passkey.backedUp,
+        createdAt: new Date(passkey.createdAt).toISOString(),
+        lastUsedAt: passkey.lastUsedAt === null ? null : new Date(passkey.lastUsedAt).toISOString(),
+        revokedAt: passkey.revokedAt === null ? null : new Date(passkey.revokedAt).toISOString(),
+        status: passkey.status,
+      })),
+    });
+  });
+
+  router.post(
+    "/api/passkeys/:id/revoke",
+    ...writeSecurity,
+    (request, response) => {
+      const id = z.uuid().safeParse(request.params.id);
+      if (!id.success || !revokePasskey(options.database, id.data, now())) {
+        response.status(404).json({ error: "not_found" });
+        return;
+      }
+      response.status(204).end();
+      emitAuditEvent(options.config.nodeEnv, {
+        requestId: String(response.locals.requestId),
+        action: "passkey.revoke",
+        targetType: "passkey",
+        targetId: id.data,
+        affected: { passkeys: 1 },
+        timestamp: now(),
+      });
+    },
+  );
+
   router.get("/api/invite-batches", (_request, response) => {
     response.json({
       batches: listBatches(options.database, now()).map(serializeBatch),
     });
   });
-
-  const writeSecurity = [
-    requireWriteCsrf(options.config.adminOrigin),
-    requireJsonContentType,
-  ];
 
   router.get("/api/runtime-settings/render-budget", (_request, response) => {
     response.json({

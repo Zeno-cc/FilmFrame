@@ -73,6 +73,8 @@
 | `src/accessJwt.ts` | 远程 JWKS 与 Cloudflare Access JWT 验证 |
 | `src/middleware/` | Host、私有来源、管理员断言、CSRF、Content-Type 和限速 |
 | `src/routes/publicRoutes.ts` | `/access`、`/auth/redeem`、`/auth/refresh` |
+| `src/routes/passkeyRoutes.ts` | Passkey 注册、恢复、同源客户端脚本和设备设置页 |
+| `src/passkeyStore.ts` | WebAuthn challenge、凭证和恢复会话存储 |
 | `src/routes/adminRoutes.ts` | 管理页、列表、创建和撤销 API |
 | `src/runtimeConfig.ts` | Persisted singleton Canvas budget validation and exact MiB/byte conversion |
 | `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–2,048 MiB Canvas budget |
@@ -80,6 +82,7 @@
 | `src/cli.ts` | SSH 应急 create/list/revoke/backup |
 | `migrations/001_initial.sql` | invites、sessions 和索引的初始 schema |
 | `migrations/005_render_budget.sql` | Additive singleton render-budget table seeded to 700 MiB |
+| `migrations/006_passkeys.sql` | Passkey credentials and one-time WebAuthn challenges |
 | `tests/all.test.ts` | 单进程聚合测试入口，避免原生 SQLite 多进程退出问题 |
 | `Dockerfile` | Node 22 多阶段构建；build stage 编译 `better-sqlite3`，非 root runtime |
 | `.env.example` | sidecar 配置示例，不包含真实身份或凭据 |

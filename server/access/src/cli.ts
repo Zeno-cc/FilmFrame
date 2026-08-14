@@ -11,6 +11,7 @@ import {
   revokeInvite,
   revokeSession,
 } from "./store.js";
+import { pruneWebAuthnChallenges } from "./passkeyStore.js";
 
 function usage(): never {
   console.error(
@@ -154,9 +155,13 @@ if (command === "backup") {
     }
     case "maintenance": {
       if (args.length > 0) usage();
-      process.stdout.write(
-        JSON.stringify({ deletedSessions: pruneSessions(database) }) + "\n",
-      );
+      const now = Date.now();
+      const deletedChallenges = pruneWebAuthnChallenges(database, now);
+      const deletedSessions = pruneSessions(database, now);
+      process.stdout.write(JSON.stringify({
+        deletedSessions,
+        deletedChallenges,
+      }) + "\n");
       break;
     }
     default:

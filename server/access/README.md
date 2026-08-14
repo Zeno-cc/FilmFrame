@@ -48,12 +48,15 @@ Local HTTP development must set both `NODE_ENV=development` and
 ## Route Contract
 
 - FilmFrame host: `GET /access`, `POST /auth/redeem`, `POST /auth/refresh`,
-  `GET /api/runtime-config`
+  `GET /api/runtime-config`, `GET /access/passkey/setup`,
+  `GET /auth/passkeys/client.js`, and the four Passkey options/verification
+  endpoints under `/auth/passkeys/*`
 - Internal host `access`: `GET /healthz`, `GET /internal/session-check`
 - Administrator host: `GET /`, `GET /api/invites`, `POST /api/invites`,
   `POST /api/invites/:id/revoke`, `GET /api/invite-batches`,
   `POST /api/invite-batches`, `POST /api/invite-batches/:id/revoke`,
   `GET /api/sessions`, `POST /api/sessions/:id/revoke`,
+  `GET /api/passkeys`, `POST /api/passkeys/:id/revoke`,
   `GET /api/system-update`, `POST /api/system-update/check`,
   `POST /api/system-update/jobs`, `GET /api/system-update/jobs/:id`,
   `GET /api/system-update/history`, `GET /api/runtime-settings/render-budget`,
@@ -111,11 +114,16 @@ session and exposes only the effective Canvas byte budget. It contains no
 administrator identity, invitation metadata, or photo data. Changes are read
 when a FilmFrame page is newly opened or refreshed; there is no live push.
 
-Device sessions use a 400-day rolling lifetime. `POST /auth/refresh` rotates
-the opaque token atomically and requires the exact public Origin plus the CSRF
-header. The public surface intentionally has no logout endpoint. Authorization
-ends when an administrator revokes the device session or parent invitation,
-the session expires without renewal, or the user clears browser site data.
+Device sessions use a 400-day rolling lifetime. `POST /auth/refresh` keeps the
+opaque token stable while updating its last-seen and expiry timestamps, then
+re-sends the same Cookie. A lost refresh response cannot invalidate the browser
+Cookie. After a successful invitation redemption, `/access/passkey/setup` can
+register a resident Passkey. If a Cookie is lost, the access page offers a
+Passkey recovery ceremony; recovery creates a fresh 400-day session and does
+not consume another invitation redemption. The public surface intentionally
+has no logout endpoint. Authorization ends when an administrator revokes the
+device session, Passkey, or parent invitation, the session expires without
+renewal, or the user clears browser site data.
 
 ## SSH Break-Glass Commands
 
@@ -135,8 +143,9 @@ docker compose --profile maintenance run --rm --no-deps access-backup \
 The database stores only SHA-256 hashes of invitation codes and session tokens.
 The `create` command prints invitation plaintext once, so its output must not be
 written to shell history or logs. Session listing never returns a token or hash.
-`maintenance` prunes old expired or revoked sessions and reports only the number
-deleted. The production daily backup service runs it before taking a backup.
+`maintenance` prunes old expired or revoked sessions and expired/consumed
+WebAuthn challenges, reporting only deletion counts. The production daily
+backup service runs it before taking a backup.
 The manual backup command runs in a short-lived, network-isolated Compose
 profile and targets the `/backups` bind mount outside the database named
 volume. The long-running access service cannot modify that directory. Prefer

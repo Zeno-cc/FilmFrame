@@ -4,6 +4,7 @@ export interface AuditEvent {
   targetType:
     | "invite"
     | "session"
+    | "passkey"
     | "invite_batch"
     | "system_update"
     | "runtime_setting";

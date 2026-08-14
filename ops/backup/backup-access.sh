@@ -75,7 +75,7 @@ require_backup_root() {
 
 run_session_maintenance() {
   local result pattern
-  pattern='^\{"deletedSessions":[0-9]+\}$'
+  pattern='^\{"deletedSessions":[0-9]+,"deletedChallenges":[0-9]+\}$'
   [[ -f "$COMPOSE_FILE" ]] || fail "Compose file not found"
   result=$(docker compose --project-directory "$APP_DIR" -f "$COMPOSE_FILE" exec -T access \
     node dist/src/cli.js maintenance) \

@@ -24,6 +24,7 @@ import {
   type UpdaterClient,
 } from "../src/updaterClient.js";
 import { updateRenderBudgetSetting } from "../src/runtimeConfig.js";
+import { savePasskey } from "../src/passkeyStore.js";
 
 const databases: AccessDatabase[] = [];
 afterEach(() => {
@@ -259,7 +260,7 @@ describe("public invitation gateway", () => {
       .send({ code: created.code, nonce: formNonce(access.text) });
 
     assert.equal(response.status, 303);
-    assert.equal(response.headers.location, "/");
+    assert.equal(response.headers.location, "/access/passkey/setup");
     const cookie = setCookieNamed(response.headers, config.sessionCookieName);
     assert.match(cookie, /^__Host-filmframe_session=/);
     assert.match(cookie, /Max-Age=34560000/);
@@ -538,7 +539,7 @@ describe("public invitation gateway", () => {
     assert.equal(response.status, 204);
     const renewedCookie = firstSetCookie(response.headers);
     const renewedToken = cookieToken(renewedCookie);
-    assert.notEqual(renewedToken, session.token);
+    assert.equal(renewedToken, session.token);
     assert.match(renewedCookie, /Max-Age=34560000/);
 
     const oldCheck = await request(app)
@@ -549,11 +550,11 @@ describe("public invitation gateway", () => {
       .get("/internal/session-check")
       .set("Host", "access")
       .set("Cookie", `${config.sessionCookieName}=${renewedToken}`);
-    assert.equal(oldCheck.status, 401);
+    assert.equal(oldCheck.status, 204);
     assert.equal(renewedCheck.status, 204);
   });
 
-  it("lets one concurrent refresh rotate the cookie without clearing the winner", async () => {
+  it("lets concurrent refreshes keep the same session cookie valid", async () => {
     const { app, config, database, now } = fixture();
     const created = createInvite(database, "多标签页", now);
     const session = redeemInvite(database, created.code, now);
@@ -568,12 +569,11 @@ describe("public invitation gateway", () => {
 
     const responses = await Promise.all([refresh(), refresh()]);
     const winner = responses.find((response) => response.status === 204);
-    const loser = responses.find((response) => response.status === 401);
     assert.ok(winner);
-    assert.ok(loser);
-    assert.equal(loser.headers["set-cookie"], undefined);
+    assert.equal(responses.every((response) => response.status === 204), true);
 
     const rotatedToken = cookieToken(firstSetCookie(winner.headers));
+    assert.equal(rotatedToken, session.token);
     const check = await request(app)
       .get("/internal/session-check")
       .set("Host", "access")
@@ -738,6 +738,78 @@ describe("public invitation gateway", () => {
     });
     assert.equal("adminEmail" in valid.body, false);
     assert.equal("invite" in valid.body, false);
+  });
+
+  it("keeps Passkey recovery public but protects setup and registration with a session", async () => {
+    const { app, config, database, now } = fixture(10_000);
+    const anonymousOptions = await request(app)
+      .post("/auth/passkeys/authentication/options")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .send({});
+    assert.equal(anonymousOptions.status, 200);
+    assert.equal(typeof anonymousOptions.body.challengeId, "string");
+
+    const setup = await request(app)
+      .get("/access/passkey/setup")
+      .set("Host", config.filmframeHost);
+    assert.equal(setup.status, 303);
+    assert.equal(setup.headers.location, "/access");
+
+    const invite = createInvite(database, "Passkey 路由", now);
+    const session = redeemInvite(database, invite.code, now);
+    const registeredOptions = await request(app)
+      .post("/auth/passkeys/registration/options")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .set("Cookie", `${config.sessionCookieName}=${session.token}`)
+      .send({});
+    assert.equal(registeredOptions.status, 200);
+    const setupWithSession = await request(app)
+      .get("/access/passkey/setup")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", `${config.sessionCookieName}=${session.token}`);
+    assert.equal(setupWithSession.status, 200);
+    assert.match(setupWithSession.text, /设置设备 Passkey/);
+  });
+
+  it("redacts Passkey metadata and requires admin CSRF to revoke", async () => {
+    const { app, config, database, now } = fixture(10_000);
+    const invite = createInvite(database, "管理 Passkey", now);
+    const credential = savePasskey(database, {
+      credentialId: "credential-public-id",
+      inviteId: invite.invite.id,
+      publicKey: new Uint8Array([1, 2, 3]),
+      counter: 0,
+      deviceType: "multiDevice",
+      backedUp: true,
+      transports: ["internal"],
+      now,
+    });
+    const list = await request(app)
+      .get("/api/passkeys")
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token");
+    assert.equal(list.status, 200);
+    assert.equal(list.body.passkeys[0].credentialId, "credential-p");
+    assert.equal(JSON.stringify(list.body).includes("publicKey"), false);
+    assert.equal(JSON.stringify(list.body).includes("AQID"), false);
+    const missingCsrf = await request(app)
+      .post(`/api/passkeys/${credential.id}/revoke`)
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .send({});
+    assert.equal(missingCsrf.status, 403);
+    const revoked = await request(app)
+      .post(`/api/passkeys/${credential.id}/revoke`)
+      .set("Host", config.adminHost)
+      .set("Cf-Access-Jwt-Assertion", "valid-access-token")
+      .set("Origin", config.adminOrigin)
+      .set("X-FilmFrame-CSRF", "1")
+      .send({});
+    assert.equal(revoked.status, 204);
   });
 });
 

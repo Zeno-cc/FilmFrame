@@ -21,6 +21,7 @@ import {
   createAdminRoutes,
 } from "./routes/adminRoutes.js";
 import { createPublicRoutes } from "./routes/publicRoutes.js";
+import { createPasskeyRoutes } from "./routes/passkeyRoutes.js";
 import { readSessionCookie } from "./sessionCookie.js";
 import { hasInviteBatchCreationRequest, isSessionValid } from "./store.js";
 import { UnixUpdaterClient, type UpdaterClient } from "./updaterClient.js";
@@ -116,6 +117,15 @@ export function createApp(options: CreateAppOptions): express.Express {
       database: options.database,
       nonceStore,
       redeemRateLimiter: createRateLimiter({ limit: 10, windowMs: 60_000 }),
+      now,
+    }),
+  );
+  app.use(
+    createPasskeyRoutes({
+      config: options.config,
+      database: options.database,
+      optionsRateLimiter: createRateLimiter({ limit: 12, windowMs: 60_000 }),
+      verifyRateLimiter: createRateLimiter({ limit: 8, windowMs: 60_000 }),
       now,
     }),
   );

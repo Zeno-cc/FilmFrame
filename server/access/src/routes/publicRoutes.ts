@@ -126,7 +126,7 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
         const session = redeemInvite(options.database, input.data.code, now());
         setSessionCookie(response, options.config, session.token);
         clearRedeemCookie(response, options.config);
-        response.redirect(303, "/");
+        response.redirect(303, "/access/passkey/setup");
       } catch (error) {
         if (!(error instanceof InviteUnavailableError)) {
           next(error);

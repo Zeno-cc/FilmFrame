@@ -1,10 +1,10 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "minUpdaterVersion": "1.0.2",
   "database": {
-    "schemaFrom": 4,
-    "schemaTo": 5,
-    "rollbackFloor": "1.2.0",
+    "schemaFrom": 5,
+    "schemaTo": 6,
+    "rollbackFloor": "1.3.0",
     "backwardCompatible": true
   },
   "summaryZh": [
@@ -23,6 +23,10 @@
     {
       "kind": "feature",
       "text": "拆分浏览器画布运行时并完善内存边界测试"
+    },
+    {
+      "kind": "feature",
+      "text": "支持 Passkey 设备授权恢复与稳定会话续期"
     }
   ]
 }
