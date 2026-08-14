@@ -319,6 +319,12 @@ async function verifyConfigFiles() {
     "public device-session refresh requires authentication",
   );
   check(
+    /location = \/auth\/redeem \{[\s\S]*?proxy_pass http:\/\/filmframe_access_backend\/auth\/redeem;[\s\S]*?proxy_set_header X-Forwarded-Proto https;[\s\S]*?proxy_set_header Origin \$http_origin;/.test(
+      publicVhost,
+    ),
+    "public redemption forwards the browser Origin with the HTTPS protocol",
+  );
+  check(
     /location = \/api\/runtime-config \{[\s\S]*?auth_request \/_filmframe_session_check;[\s\S]*?proxy_pass http:\/\/filmframe_access_backend\/api\/runtime-config;[\s\S]*?proxy_set_header Cookie \$filmframe_session_cookie;/.test(
       publicVhost,
     ),

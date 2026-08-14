@@ -310,7 +310,16 @@ describe("public invitation gateway", () => {
     );
     const input = { code: created.code, nonce: formNonce(access.text) };
 
-    for (const origin of ["https://evil.example", "null", ...Array(9).fill("https://evil.example")]) {
+    for (const origin of [
+      "https://evil.example",
+      `http://${config.filmframeHost}`,
+      `https://${config.filmframeHost}/path`,
+      `https://user@${config.filmframeHost}`,
+      `https://${config.filmframeHost}?probe=1`,
+      "not-an-origin",
+      "null",
+      ...Array(9).fill("https://evil.example"),
+    ]) {
       const rejected = await request(app)
         .post("/auth/redeem")
         .set("Host", config.filmframeHost)
@@ -325,7 +334,6 @@ describe("public invitation gateway", () => {
       .post("/auth/redeem")
       .set("Host", config.filmframeHost)
       .set("Origin", config.publicOrigin)
-      .set("X-Forwarded-Proto", "https")
       .set("Cookie", bindingCookie)
       .type("form")
       .send(input);
@@ -333,6 +341,51 @@ describe("public invitation gateway", () => {
     assert.deepEqual(database.prepare("SELECT redemption_count FROM invites").get(), {
       redemption_count: 1,
     });
+  });
+
+  it("normalizes equivalent configured HTTPS origins without trusting proxy protocol", async () => {
+    const { app, config, database, now } = fixture();
+    const origins = [
+      config.publicOrigin,
+      `${config.publicOrigin}/`,
+      `${config.publicOrigin}:443`,
+      `HTTPS://${config.filmframeHost.toUpperCase()}`,
+    ];
+
+    for (const [index, origin] of origins.entries()) {
+      const created = createInvite(database, `规范化来源 ${index}`, now);
+      const access = await request(app)
+        .get("/access")
+        .set("Host", config.filmframeHost);
+      const response = await request(app)
+        .post("/auth/redeem")
+        .set("Host", config.filmframeHost)
+        .set("Origin", origin)
+        .set("Cookie", cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")))
+        .type("form")
+        .send({ code: created.code, nonce: formNonce(access.text) });
+
+      assert.equal(response.status, 303);
+    }
+  });
+
+  it("passes the configured production Origin before normal invite validation", async () => {
+    const { app, config } = fixture();
+    const access = await request(app)
+      .get("/access")
+      .set("Host", config.filmframeHost);
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Origin", config.publicOrigin)
+      .set("Cookie", cookiePair(setCookieNamed(access.headers, "__Host-filmframe_redeem")))
+      .type("form")
+      .send({ code: "not-an-invite", nonce: formNonce(access.text) });
+
+    assert.equal(response.status, 400);
+    assert.match(response.headers["content-type"] ?? "", /text\/html/);
+    assert.match(response.text, new RegExp(GENERIC_INVITE_ERROR));
+    assert.doesNotMatch(response.text, /^Forbidden$/);
   });
 
   it("does not consume a nonce when the binding cookie is missing or belongs to another browser", async () => {

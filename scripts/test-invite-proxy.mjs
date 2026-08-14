@@ -225,6 +225,7 @@ try {
     method: "POST",
     headers: {
       Cookie: cookieNamed(accessPage, "filmframe_redeem"),
+      Origin: "https://filmframe.test",
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(form.toString())),
     },
@@ -319,6 +320,7 @@ try {
         method: "POST",
         headers: {
           Cookie: cookieNamed(secondPage, "filmframe_redeem"),
+          Origin: "https://filmframe.test",
           "Content-Type": "application/x-www-form-urlencoded",
           "Content-Length": String(Buffer.byteLength(repeatedForm.toString())),
         },
@@ -408,6 +410,7 @@ try {
     method: "POST",
     headers: {
       Cookie: cookieNamed(cascadePage, "filmframe_redeem"),
+      Origin: "https://filmframe.test",
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(cascadeForm.toString())),
     },
@@ -452,6 +455,7 @@ try {
     method: "POST",
     headers: {
       Cookie: cookieNamed(outagePage, "filmframe_redeem"),
+      Origin: "https://filmframe.test",
       "Content-Type": "application/x-www-form-urlencoded",
       "Content-Length": String(Buffer.byteLength(outageForm.toString())),
     },

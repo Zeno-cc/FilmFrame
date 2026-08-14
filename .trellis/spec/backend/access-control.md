@@ -122,11 +122,16 @@ SECURE_COOKIES=true
   process restart invalidates outstanding forms. The current deployment is
   single-instance; horizontal scaling requires shared replay/signing state or
   verified sticky routing.
-- `POST /auth/redeem` rejects an Origin header unless it exactly equals the
-  request protocol and validated Host. `Origin: null` is rejected; a missing
-  Origin is allowed to continue to the required Cookie/nonce check. Origin is
-  checked before the redemption rate limiter so cross-site traffic cannot
-  spend another browser's quota.
+- `POST /auth/redeem` rejects a present Origin unless its normalized URL origin
+  equals the configured `AccessConfig.publicOrigin` in production. The
+  normalization accepts only URL-equivalent spellings (host case, a trailing
+  slash, and the default HTTPS port); it rejects HTTP, paths, credentials,
+  query/fragment components, malformed values, other hosts, and `null`.
+  Development keeps the local HTTP host/port behavior. A missing Origin is
+  allowed to continue to the required Cookie/nonce check. Origin is checked
+  before the redemption rate limiter so cross-site traffic cannot spend
+  another browser's quota. The public `/auth/redeem` OpenResty location must
+  explicitly forward `Origin $http_origin` and `X-Forwarded-Proto https`.
 - Failed form or invitation validation never consumes an invitation and
   renders a fresh form with a rotated binding. Successful redemption sets the
   persistent device-session Cookie and clears the temporary redemption Cookie.
@@ -228,8 +233,10 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
   consume each one-use boundary.
 - JWT tests cover valid identity, unknown key, wrong issuer/audience/email, tampering, expiry, future `nbf`, and missing `exp`/`nbf`.
 - Route tests assert temporary redemption-Cookie names/flags/TTL, production
-  and local HTTP behavior, missing/wrong binding, cross-site/`null`/same-site/
-  missing Origin behavior, replay and multi-tab refresh stability, invitation
+  and local HTTP behavior, configured-origin equivalence (including the
+  default HTTPS port and trailing slash) without a forwarded protocol,
+  missing/wrong binding, cross-site/HTTP/`null`/same-site/malformed/missing
+  Origin behavior, replay and multi-tab refresh stability, invitation
   non-consumption on validation failure, persistent Cookie flags and 400-day
   `Max-Age`, generic redemption errors, refresh Origin/CSRF rules,
   rotated-token behavior, expired/revoked/tampered refresh rejection, single

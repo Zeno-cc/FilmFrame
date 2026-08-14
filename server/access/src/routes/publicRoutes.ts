@@ -57,12 +57,36 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
     response.status(status).type("html").send(renderAccessPage(page));
   }
 
+  function normalizeOrigin(value: string): string | null {
+    try {
+      const parsed = new URL(value);
+      if (
+        parsed.username ||
+        parsed.password ||
+        parsed.pathname !== "/" ||
+        parsed.search ||
+        parsed.hash ||
+        (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+      ) {
+        return null;
+      }
+      return parsed.origin;
+    } catch {
+      return null;
+    }
+  }
+
   function hasAllowedRedeemOrigin(request: Parameters<RequestHandler>[0]): boolean {
     const origin = request.header("Origin");
     if (origin === undefined) return true;
-    const host = request.get("host");
-    if (!host) return false;
-    return origin === `${request.protocol}://${host}`;
+
+    const expectedOrigin = options.config.secureCookies
+      ? normalizeOrigin(options.config.publicOrigin)
+      : (() => {
+          const host = request.get("host");
+          return host ? normalizeOrigin(`${request.protocol}://${host}`) : null;
+        })();
+    return expectedOrigin !== null && normalizeOrigin(origin) === expectedOrigin;
   }
 
   router.get("/api/runtime-config", filmHost, (request, response) => {
