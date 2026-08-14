@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -9,28 +9,8 @@
   },
   "summaryZh": [
     {
-      "kind": "feature",
-      "text": "管理员可配置单画布内存预算与安全范围"
-    },
-    {
-      "kind": "feature",
-      "text": "新增火狐与桌面苹果浏览器兼容性门禁"
-    },
-    {
       "kind": "fix",
-      "text": "可信发布流程新增更新器系统级验证"
-    },
-    {
-      "kind": "feature",
-      "text": "拆分浏览器画布运行时并完善内存边界测试"
-    },
-    {
-      "kind": "feature",
-      "text": "支持 Passkey 设备授权恢复与稳定会话续期"
-    },
-    {
-      "kind": "fix",
-      "text": "修复邀请码兑换在代理协议变化时误报 Forbidden"
+      "text": "补齐生产 Passkey 反代路由并增加活动 OpenResty 配置校验"
     }
   ]
 }
