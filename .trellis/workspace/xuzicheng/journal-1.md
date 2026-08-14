@@ -502,3 +502,36 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: 验证并完成邀请码门禁任务收尾
+
+**Date**: 2026-08-14
+**Task**: 验证并完成邀请码门禁任务收尾
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+核验邀请码门禁、生产代理链路、备份恢复和 v1.3 候选环境；本地核心门与浏览器回归通过，GitHub Trusted Release 的真实代理 E2E 和服务器 v1.3/v1.4 更新状态均成功。归档 07-30、07-31、08-07 三个 Trellis 任务。
+
+### Main Changes
+
+- 归档安全邀请码访问门禁及正式环境整改任务
+- 归档 v1.3 候选环境任务并保留移动端豁免记录
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2e45f3b` | (see git log) |
+| `14e9a30` | (see git log) |
+
+### Testing
+
+- [OK] npm run check:all、npm run test:e2e、备份边界、发布契约、更新器门禁和部署静态验证通过
+- [OK] GitHub v1.4.0 Trusted Release 44/44 浏览器与真实 auth_request 代理 E2E 通过
+- [OK] 生产 OpenResty -t、回环、公网 HTTPS、容器 revision/digest 和 updater succeeded 状态通过
+
+### Status
+
+[OK] **Completed**
