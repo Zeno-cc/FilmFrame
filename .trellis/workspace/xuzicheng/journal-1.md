@@ -481,3 +481,24 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: FilmFrame v1.4 Passkey 发布上线
+
+**Date**: 2026-08-14
+**Task**: FilmFrame v1.4 Passkey 发布上线
+**Branch**: `codex/filmframe-v1-3-hardening`
+
+### Summary
+
+完成 Passkey 设备授权恢复与稳定会话续期，提交并推送 v1.4.0；GitHub Actions 可信发布通过，生产按 v1.2.0→v1.3.0→v1.4.0 顺序升级，迁移、备份、回环、源站、公网和 OpenResty 验证均通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2e45f3b` | (see git log) |
+
+### Status
+
+[OK] **Completed**
