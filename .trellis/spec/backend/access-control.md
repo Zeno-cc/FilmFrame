@@ -874,6 +874,11 @@ CREATE TABLE webauthn_challenges (
   device/sync type, timestamps, and status. Revocation is CSRF-protected and
   cascades from invitation or batch revocation; public keys, challenges,
   tokens, and Passkey secrets never enter HTML, JSON, or audit logs.
+- Production verification must inspect the loaded OpenResty configuration, not
+  only the repository template or `openresty -t`. It must assert that all six
+  public setup, client, registration, and authentication locations proxy their
+  exact paths to `filmframe_access_backend`; this catches a valid but stale
+  1Panel vhost before a release is accepted.
 
 ### 4. Validation & Error Matrix
 
@@ -907,6 +912,9 @@ CREATE TABLE webauthn_challenges (
   Chromium virtual-authenticator evidence.
 - Deployment checks cover same-origin client bundle routing, protected setup,
   no-store authentication responses, and the migration transition `5 -> 6`.
+  The active-config regression check must fail against a syntactically valid
+  vhost that omits the six Passkey locations and pass against the reviewed
+  candidate returned by `openresty -T`.
 
 ### 7. Wrong vs Correct
 
@@ -918,4 +926,13 @@ UPDATE sessions SET token_hash = :newHash WHERE token_hash = :oldHash;
 UPDATE sessions
 SET last_seen_at = :now, expires_at = :expiresAt
 WHERE token_hash = :tokenHash AND revoked_at IS NULL;
+```
+
+```sh
+# Wrong: proves only that a stale active vhost is syntactically valid.
+openresty -t
+
+# Correct: test syntax, then inspect the loaded config and assert every exact
+# Passkey location and Access-sidecar proxy target.
+openresty -t && openresty -T
 ```

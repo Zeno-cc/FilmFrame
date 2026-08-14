@@ -14,6 +14,15 @@ let skipped = 0;
 let accessTeamDomain = "";
 let configuredFilmframeHost = "";
 
+const PASSKEY_PROXY_ROUTES = [
+  "/access/passkey/setup",
+  "/auth/passkeys/client.js",
+  "/auth/passkeys/registration/options",
+  "/auth/passkeys/registration/verify",
+  "/auth/passkeys/authentication/options",
+  "/auth/passkeys/authentication/verify",
+];
+
 await verifyCompose();
 await verifyConfigFiles();
 verifyInstalledOpenResty();
@@ -318,6 +327,7 @@ async function verifyConfigFiles() {
     ),
     "public device-session refresh requires authentication",
   );
+  verifyPasskeyProxyRoutes(publicVhost, "public vhost template");
   check(
     /location = \/auth\/redeem \{[\s\S]*?proxy_pass http:\/\/filmframe_access_backend\/auth\/redeem;[\s\S]*?proxy_set_header X-Forwarded-Proto https;[\s\S]*?proxy_set_header Origin \$http_origin;/.test(
       publicVhost,
@@ -434,18 +444,65 @@ function verifyInstalledOpenResty() {
     return;
   }
 
-  const result = options.openrestyContainer
-    ? spawnSync(
-        "docker",
-        ["exec", options.openrestyContainer, "openresty", "-t"],
-        { encoding: "utf8" },
-      )
-    : spawnSync(options.openrestyBin, ["-t"], { encoding: "utf8" });
+  const result = runOpenResty(["-t"]);
   if (result.error) {
     fail(`OpenResty config test could not start: ${result.error.message}`);
     return;
   }
   check(result.status === 0, "active OpenResty configuration passes -t");
+  if (result.status !== 0) return;
+
+  const dump = runOpenResty(["-T"]);
+  if (dump.error) {
+    fail(`OpenResty config dump could not start: ${dump.error.message}`);
+    return;
+  }
+  check(dump.status === 0, "active OpenResty configuration can be inspected");
+  if (dump.status !== 0) return;
+
+  verifyPasskeyProxyRoutes(
+    `${dump.stdout ?? ""}\n${dump.stderr ?? ""}`,
+    "active OpenResty configuration",
+  );
+}
+
+function runOpenResty(arguments_) {
+  return options.openrestyContainer
+    ? spawnSync(
+        "docker",
+        ["exec", options.openrestyContainer, "openresty", ...arguments_],
+        { encoding: "utf8" },
+      )
+    : spawnSync(options.openrestyBin, arguments_, { encoding: "utf8" });
+}
+
+function verifyPasskeyProxyRoutes(config, label) {
+  for (const route of PASSKEY_PROXY_ROUTES) {
+    const block = exactLocationBlock(config, route);
+    check(
+      block !== null &&
+        new RegExp(
+          `proxy_pass\\s+http:\\/\\/filmframe_access_backend${escapeRegex(route)};`,
+        ).test(block),
+      `${label} proxies ${route} to the Access service`,
+    );
+  }
+}
+
+function exactLocationBlock(config, route) {
+  const start = new RegExp(
+    `^\\s*location\\s*=\\s*${escapeRegex(route)}\\s*\\{`,
+    "m",
+  ).exec(config);
+  if (!start) return null;
+
+  const remainder = config.slice(start.index + start[0].length);
+  const nextLocation = remainder.search(/^\s*location(?:\s|=|\^~|~)/m);
+  return nextLocation === -1 ? remainder : remainder.slice(0, nextLocation);
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function verifyLocalServices() {
@@ -501,6 +558,27 @@ async function verifyPublicSite(baseUrl) {
     check(
       !/<script[^>]+src=["'][^"']*\/assets\//i.test(body),
       "invitation page does not preload the Vite application bundle",
+    );
+  }
+
+  const passkeyClientResponse = await request(
+    new URL("/auth/passkeys/client.js", siteUrl),
+  );
+  if (passkeyClientResponse) {
+    check(
+      passkeyClientResponse.status === 200,
+      "public Passkey client bundle is available",
+    );
+    check(
+      (responseHeader(passkeyClientResponse, "content-type") ?? "").includes(
+        "application/javascript",
+      ),
+      "public Passkey client bundle has a JavaScript content type",
+    );
+    const body = await passkeyClientResponse.text();
+    check(
+      body.includes("startAuthentication"),
+      "public Passkey client bundle exposes the recovery client",
     );
   }
 
