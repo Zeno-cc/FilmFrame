@@ -579,3 +579,25 @@ Updated project Trellis to 0.6.10 with Codex sub-agent context injection, workfl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: Validate Trellis 0.6.15 runtime upgrade
+
+**Date**: 2026-08-17
+**Task**: Validate Trellis 0.6.15 runtime upgrade
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+Validated the local Trellis 0.6.15 and Codex integration upgrade. Task/context commands, repository path containment, workflow and sub-agent hooks, AST/JSON/TOML checks, npm typecheck, tests, build, and diff hygiene all passed. No FilmFrame application changes or mechanical defects were found; an existing stale session-pointer concern remains outside this task scope. Committed the upgrade and planning artifacts, then archived the task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `151fbc3` | (see git log) |
+| `28aba09` | (see git log) |
+
+### Status
+
+[OK] **Completed**
