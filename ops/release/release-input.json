@@ -1,5 +1,5 @@
 {
-  "version": "1.4.9",
+  "version": "1.4.10",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -10,7 +10,7 @@
   "summaryZh": [
     {
       "kind": "fix",
-      "text": "更新弹窗复用已验证候选，避免重复检查超时阻断更新"
+      "text": "空暗房横向铺满主工作区边界，并补充桌面布局回归覆盖"
     }
   ]
 }

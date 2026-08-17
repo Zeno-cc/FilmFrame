@@ -57,6 +57,12 @@ test('desktop empty darkroom exposes the new shell and inspector', async ({ page
     expect.stringContaining('wikiquote.org'),
   );
 
+  const workspaceBounds = await page.locator('.ff-workspace').boundingBox();
+  const emptyDarkroomBounds = await page.locator('.ff-empty-darkroom').boundingBox();
+  if (!workspaceBounds || !emptyDarkroomBounds) throw new Error('Empty darkroom bounds are unavailable');
+  expect(emptyDarkroomBounds.x).toBeCloseTo(workspaceBounds.x, 1);
+  expect(emptyDarkroomBounds.width).toBeCloseTo(workspaceBounds.width, 1);
+
   const track = page.getByTestId('empty-darkroom-film-track');
   await expect(track).toBeVisible();
   await expect(track).toHaveCSS('animation-name', 'ff-empty-film-transport');

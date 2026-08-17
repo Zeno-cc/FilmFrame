@@ -1489,6 +1489,7 @@ const App: React.FC = () => {
           >
             {images.length === 0 ? (
               <EmptyDarkroom
+                className="-mx-3 sm:-mx-5 lg:-mx-8"
                 uploadDisabled={processing || exporting}
                 onChoosePhotos={() => fileInputRef.current?.click()}
               />
