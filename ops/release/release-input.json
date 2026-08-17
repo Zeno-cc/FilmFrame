@@ -1,5 +1,5 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -11,6 +11,10 @@
     {
       "kind": "fix",
       "text": "修复支持浏览器原生表单 Origin 为 null 时的邀请码兑换"
+    },
+    {
+      "kind": "fix",
+      "text": "新生成的邀请码默认立即生效，避免刚创建时被误判为无效"
     }
   ]
 }

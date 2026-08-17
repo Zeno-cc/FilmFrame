@@ -1934,6 +1934,11 @@ describe("administrator routes", () => {
     assert.match(response.text, /data-local-time/);
     assert.match(response.text, /Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone/);
     assert.match(response.text, /schedule=\{redeemFrom,redeemBy\}/);
+    assert.match(
+      response.text,
+      /function resetSchedule\(\)\{const from=new Date\(Math\.floor\(Date\.now\(\)\/60000\)\*60000\)/,
+    );
+    assert.doesNotMatch(response.text, /Math\.ceil\(Date\.now\(\)\/60000\)/);
     assert.match(response.text, /\^\[=\+\\-@\]/);
     assert.doesNotMatch(response.text, /localStorage|sessionStorage/);
     assert.match(response.text, /data-label="会话 ID"/);
