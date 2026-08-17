@@ -601,3 +601,24 @@ Validated the local Trellis 0.6.15 and Codex integration upgrade. Task/context c
 ### Status
 
 [OK] **Completed**
+
+
+## Session 23: Complete Passkey setup redirect and alignment
+
+**Date**: 2026-08-17
+**Task**: Complete Passkey setup redirect and alignment
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+Implemented automatic navigation to / after successful Passkey registration, centered the setup controls across desktop and mobile layouts, added regression coverage and documented the server-rendered access-control alignment convention. Access tests, typecheck, build, Playwright checks, and git diff --check passed.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `009a1b0` | (see git log) |
+
+### Status
+
+[OK] **Completed**
