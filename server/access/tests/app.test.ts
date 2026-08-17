@@ -1994,6 +1994,11 @@ describe("administrator routes", () => {
     assert.match(response.text, /总耗时/);
     assert.match(response.text, /completedBoundary/);
     assert.match(response.text, /updateFinalStates\.has\(job\.state\)\?30000/);
+    assert.match(response.text, /byId\("preflight-source"\)\.textContent="可信稳定版"/);
+    assert.doesNotMatch(
+      response.text,
+      /function openUpdateConfirmation\(\)[\s\S]*?\/api\/system-update\/check/,
+    );
     assert.doesNotMatch(response.text, /console\.(?:log|error|warn)/);
     assert.doesNotMatch(response.text, /docker\.sock|\/opt\/filmframe|stdout|stderr/);
     assert.doesNotMatch(response.text, new RegExp(session.token));

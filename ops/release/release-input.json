@@ -1,5 +1,5 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.9",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -10,27 +10,7 @@
   "summaryZh": [
     {
       "kind": "fix",
-      "text": "修复支持浏览器原生表单 Origin 为 null 时的邀请码兑换"
-    },
-    {
-      "kind": "fix",
-      "text": "新生成的邀请码默认立即生效，避免刚创建时被误判为无效"
-    },
-    {
-      "kind": "fix",
-      "text": "重复打开访问页时复用兑换绑定，避免浏览器图标请求导致表单失效"
-    },
-    {
-      "kind": "fix",
-      "text": "登录页内联图标并在边缘终止图标探测，减少额外回源跳转"
-    },
-    {
-      "kind": "fix",
-      "text": "Passkey 设置成功后自动返回 FilmFrame 主页面"
-    },
-    {
-      "kind": "fix",
-      "text": "修正 Passkey 设置页稍后设置按钮文字的垂直居中"
+      "text": "更新弹窗复用已验证候选，避免重复检查超时阻断更新"
     }
   ]
 }

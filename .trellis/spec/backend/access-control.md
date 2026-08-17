@@ -429,6 +429,14 @@ CacheDirectoryMode=0700
 Environment=XDG_CACHE_HOME=/var/cache/filmframe-updater
 ```
 
+The administrator update dialog uses the already verified candidate from
+`GET /api/system-update` without issuing a second forced `check` request. The
+actual `POST /api/system-update/jobs` call remains the final server-side gate;
+it reuses the verified cached manifest when available and still enforces
+release trust, updater compatibility, database compatibility, and the global
+update lock. This avoids making the UI wait for a duplicate attestation pass
+through the short Access-to-updater socket timeout.
+
 Public releases verify without giving credentials to the GitHub CLI. The
 updater fetches attestations from the fixed repository API, writes only the
 returned Sigstore v0.3 `bundle` objects to a mode `0600` JSONL file, and runs
