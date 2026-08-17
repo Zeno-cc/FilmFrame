@@ -7,6 +7,7 @@
 | Guide | Description | Status |
 | --- | --- | --- |
 | [Access Control](./access-control.md) | Invitation, session, admin JWT, SQLite, reverse-proxy, and trusted host-update boundaries | Current |
+| [Release and Push Process](./release-process.md) | Versioned product pushes, stable tags, GitHub Releases, and updater discovery | Current |
 
 ## Pre-Development Checklist
 
