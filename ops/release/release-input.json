@@ -1,5 +1,5 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.8",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -23,6 +23,14 @@
     {
       "kind": "fix",
       "text": "登录页内联图标并在边缘终止图标探测，减少额外回源跳转"
+    },
+    {
+      "kind": "fix",
+      "text": "Passkey 设置成功后自动返回 FilmFrame 主页面"
+    },
+    {
+      "kind": "fix",
+      "text": "修正 Passkey 设置页稍后设置按钮文字的垂直居中"
     }
   ]
 }
