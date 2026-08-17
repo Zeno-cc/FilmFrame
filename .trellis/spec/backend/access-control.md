@@ -106,11 +106,14 @@ SECURE_COOKIES=true
 ### 3. Contracts
 
 - Generate invitation codes from 16 cryptographically random bytes and prefix the canonical Crockford Base32 value with `FF1-`. Persist only its SHA-256 hash.
-- `GET /access` creates a 32-byte browser binding and stores only that value in
-  a short-lived, host-only, `HttpOnly`, `SameSite=Strict`, `Path=/` redemption
-  Cookie. Production uses `__Host-filmframe_redeem` with `Secure`; local HTTP
-  uses `filmframe_redeem` without `Secure`. Both omit `Domain` and expire with
-  the form nonce.
+- `GET /access` creates a 32-byte browser binding when no valid binding Cookie
+  exists and stores only that value in a short-lived, host-only, `HttpOnly`,
+  `SameSite=Strict`, `Path=/` redemption Cookie. Production uses
+  `__Host-filmframe_redeem` with `Secure`; local HTTP uses `filmframe_redeem`
+  without `Secure`. Both omit `Domain` and expire with the form nonce. When a
+  valid binding Cookie is already present, repeated `/access` renders reuse it
+  and issue a fresh nonce, so browser favicon requests, refreshes, and multiple
+  tabs cannot invalidate an already-rendered form.
 - Invitation-form nonces are bounded to 128 characters and signed with a
   process-local 256 bit HMAC key over the timestamp, random segment, and a
   digest of the canonical browser binding. `NonceStore.consume` requires the
@@ -137,11 +140,11 @@ SECURE_COOKIES=true
   explicitly forward `Origin $http_origin`, `Sec-Fetch-Site $http_sec_fetch_site`,
   and `X-Forwarded-Proto https`.
 - Failed form or invitation validation never consumes an invitation and
-  renders a fresh form with a rotated binding. Successful redemption sets the
-  persistent device-session Cookie and clears the temporary redemption Cookie.
-  Opening another `/access` page rotates the one temporary Cookie, so an older
-  tab may receive the generic retry error; this is an accepted fail-closed
-  behavior.
+  renders a fresh form with a fresh nonce. A valid existing binding is reused;
+  missing or malformed bindings receive a new binding. Successful redemption
+  sets the persistent device-session Cookie and clears the temporary redemption
+  Cookie. Opening another `/access` page therefore cannot invalidate an older
+  tab's form while the browser still has the same valid binding.
 - Redemption is a `BEGIN IMMEDIATE` transaction. A one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry. The transaction accepts both the `redeem_from` and `redeem_by` boundary instants and rejects any instant outside them.
 - Invitation creation accepts optional timezone-qualified ISO 8601 `redeemFrom` and `redeemBy` values. Omitted values mean immediate start and a seven-day window; a start-only request ends seven days after its start, while an end-only request starts at creation. The end must be strictly later than the start.
 - Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
@@ -172,7 +175,7 @@ SECURE_COOKIES=true
 | Condition | Required result |
 | --- | --- |
 | Malformed, unknown, not-yet-active, expired, revoked, or consumed invitation | Same generic failure; no session cookie |
-| Missing/malformed redemption Cookie, nonce transfer to another binding, bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, replay, future timestamp beyond skew, expiry, or replay-map capacity exhaustion | Reject nonce, rotate the form binding, and perform no invitation or session mutation |
+| Missing/malformed redemption Cookie, nonce transfer to another binding, bad segment count, invalid timestamp/random syntax, non-canonical Base64URL signature, digest mismatch, replay, future timestamp beyond skew, expiry, or replay-map capacity exhaustion | Reject nonce, render a fresh nonce, replace the binding only when the existing binding is missing or malformed, and perform no invitation or session mutation |
 | Redemption with a cross-site Origin, or `Origin: null` without `Sec-Fetch-Site: same-origin` | `403` before rate limiting, nonce consumption, or invitation mutation |
 | Redemption with `Origin: null` and `Sec-Fetch-Site: same-origin` | Continue to the required Cookie/nonce and invitation validation |
 | Redemption without Origin but with a matching Cookie/nonce pair | Continue normal validation; Origin is defense in depth, not the primary browser binding |
@@ -213,6 +216,8 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 - Good: an anonymous asset URL redirects to `/access`; one valid invitation establishes a device session; each application visit renews it; revoking its invitation makes the next request fail.
 - Good: a freshly issued nonce works once with the exact browser binding, then
   rejects replay even if the client retains both the old nonce and Cookie.
+- Good: repeated `/access` renders, favicon redirects, refreshes, and multiple
+  tabs reuse one valid binding while each form receives its own one-time nonce.
 - Base: the static site remains a browser-only renderer after authorization, while the sidecar stores only access metadata.
 - Base: a non-browser client without Origin can redeem only after preserving
   the temporary Cookie from `/access`; the same nonce without that Cookie fails.

@@ -234,6 +234,31 @@ describe("public invitation gateway", () => {
     assert.equal(response.status, 303);
   });
 
+  it("reuses a valid redemption binding across repeated access renders", async () => {
+    const { app, config, database, now } = fixture();
+    const created = createInvite(database, "重复页面", now);
+    const firstPage = await request(app).get("/access").set("Host", config.filmframeHost);
+    const binding = cookiePair(setCookieNamed(firstPage.headers, "__Host-filmframe_redeem"));
+    const secondPage = await request(app)
+      .get("/access")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", binding);
+
+    assert.equal(
+      cookiePair(setCookieNamed(secondPage.headers, "__Host-filmframe_redeem")),
+      binding,
+    );
+    const response = await request(app)
+      .post("/auth/redeem")
+      .set("Host", config.filmframeHost)
+      .set("Cookie", binding)
+      .type("form")
+      .send({ code: created.code, nonce: formNonce(secondPage.text) });
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.location, "/access/passkey/setup");
+  });
+
   it("redirects an authorized device without issuing a redemption binding", async () => {
     const { app, config, database, now } = fixture();
     const created = createInvite(database, "已授权设备", now);

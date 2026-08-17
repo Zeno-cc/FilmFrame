@@ -1,4 +1,10 @@
-import { Router, type RequestHandler, type Response, urlencoded } from "express";
+import {
+  Router,
+  type Request,
+  type RequestHandler,
+  type Response,
+  urlencoded,
+} from "express";
 import { z } from "zod";
 
 import type { AccessConfig } from "../config.js";
@@ -43,15 +49,23 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
   const filmHost = requireHost(options.config.filmframeHost);
 
   function sendAccessPage(
+    request: Request,
     response: Response,
     status = 200,
     error?: string,
   ): void {
-    const binding = createRedeemBinding();
+    let binding = readRedeemCookie(request, options.config) ?? createRedeemBinding();
+    let formNonce: string;
+    try {
+      formNonce = options.nonceStore.issue(binding);
+    } catch {
+      binding = createRedeemBinding();
+      formNonce = options.nonceStore.issue(binding);
+    }
     setRedeemCookie(response, options.config, binding);
     const page = {
       nonce: response.locals.cspNonce as string,
-      formNonce: options.nonceStore.issue(binding),
+      formNonce,
       ...(error === undefined ? {} : { error }),
     };
     response.status(status).type("html").send(renderAccessPage(page));
@@ -115,7 +129,7 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
       return;
     }
 
-    sendAccessPage(response);
+    sendAccessPage(request, response);
   });
 
   router.post(
@@ -145,7 +159,7 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
         && binding !== null
         && options.nonceStore.consume(input.data.nonce, binding);
       if (!input.success || !validNonce) {
-        sendAccessPage(response, 400, GENERIC_INVITE_ERROR);
+        sendAccessPage(request, response, 400, GENERIC_INVITE_ERROR);
         return;
       }
 
@@ -160,7 +174,7 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
           next(error);
           return;
         }
-        sendAccessPage(response, 400, GENERIC_INVITE_ERROR);
+        sendAccessPage(request, response, 400, GENERIC_INVITE_ERROR);
       }
     },
   );
