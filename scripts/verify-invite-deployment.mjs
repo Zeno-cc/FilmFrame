@@ -322,6 +322,19 @@ async function verifyConfigFiles() {
     "public application paths require a session subrequest",
   );
   check(
+    [
+      "/favicon\\.ico",
+      "/favicon\\.png",
+      "/apple-touch-icon\\.png",
+      "/apple-touch-icon-precomposed\\.png",
+    ].every((path) =>
+      new RegExp(
+        `location = ${path} \\{[\\s\\S]*?return 204;\\s*\\}`,
+      ).test(publicVhost),
+    ),
+    "public vhost terminates browser icon probes without an auth redirect",
+  );
+  check(
     /location = \/auth\/refresh \{[\s\S]*?auth_request \/_filmframe_session_check;[\s\S]*?proxy_pass http:\/\/filmframe_access_backend\/auth\/refresh;/.test(
       publicVhost,
     ),

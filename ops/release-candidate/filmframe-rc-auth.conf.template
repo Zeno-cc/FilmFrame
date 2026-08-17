@@ -50,6 +50,29 @@ server {
         return 421;
     }
 
+    # Browser chrome probes are not application resources. Terminate them
+    # locally so a missing icon cannot fall through to the dynamic /access
+    # redirect and add another public round trip.
+    location = /favicon.ico {
+        add_header Cache-Control "public, max-age=86400" always;
+        return 204;
+    }
+
+    location = /favicon.png {
+        add_header Cache-Control "public, max-age=86400" always;
+        return 204;
+    }
+
+    location = /apple-touch-icon.png {
+        add_header Cache-Control "public, max-age=86400" always;
+        return 204;
+    }
+
+    location = /apple-touch-icon-precomposed.png {
+        add_header Cache-Control "public, max-age=86400" always;
+        return 204;
+    }
+
     location = /_filmframe_rc_session_check {
         internal;
         proxy_pass http://filmframe_rc_access_backend/internal/session-check;

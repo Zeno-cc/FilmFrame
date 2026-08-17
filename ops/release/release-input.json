@@ -1,5 +1,5 @@
 {
-  "version": "1.4.6",
+  "version": "1.4.7",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -19,6 +19,10 @@
     {
       "kind": "fix",
       "text": "重复打开访问页时复用兑换绑定，避免浏览器图标请求导致表单失效"
+    },
+    {
+      "kind": "fix",
+      "text": "登录页内联图标并在边缘终止图标探测，减少额外回源跳转"
     }
   ]
 }

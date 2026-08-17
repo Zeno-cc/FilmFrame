@@ -145,6 +145,10 @@ SECURE_COOKIES=true
   sets the persistent device-session Cookie and clears the temporary redemption
   Cookie. Opening another `/access` page therefore cannot invalidate an older
   tab's form while the browser still has the same valid binding.
+- Browser chrome icon probes (`/favicon.ico`, `/favicon.png`, and the two
+  common Apple touch-icon paths) terminate at the public vhost with `204` and
+  a short public cache lifetime. They are not application resources and must
+  never fall through to the protected catch-all or redirect to `/access`.
 - Redemption is a `BEGIN IMMEDIATE` transaction. A one-use invitation creates one 256 bit opaque device session whose SHA-256 hash is stored with a 400-day rolling expiry. The transaction accepts both the `redeem_from` and `redeem_by` boundary instants and rejects any instant outside them.
 - Invitation creation accepts optional timezone-qualified ISO 8601 `redeemFrom` and `redeemBy` values. Omitted values mean immediate start and a seven-day window; a start-only request ends seven days after its start, while an end-only request starts at creation. The end must be strictly later than the start.
 - Invitation lifecycle is derived at read time in the order `revoked`, `redeemed`, `scheduled`, `expired`, `active`. Administrator metadata exposes `redeemable` only when the derived state is `active`, plus the number of unexpired, non-revoked child sessions. No time-dependent availability boolean is persisted.
@@ -216,8 +220,9 @@ Production must confirm that the real Cloudflare Access assertion contains `nbf`
 - Good: an anonymous asset URL redirects to `/access`; one valid invitation establishes a device session; each application visit renews it; revoking its invitation makes the next request fail.
 - Good: a freshly issued nonce works once with the exact browser binding, then
   rejects replay even if the client retains both the old nonce and Cookie.
-- Good: repeated `/access` renders, favicon redirects, refreshes, and multiple
-  tabs reuse one valid binding while each form receives its own one-time nonce.
+- Good: repeated `/access` renders, icon probes, refreshes, and multiple tabs
+  reuse one valid binding while each form receives its own one-time nonce; icon
+  probes do not create another dynamic `/access` request.
 - Base: the static site remains a browser-only renderer after authorization, while the sidecar stores only access metadata.
 - Base: a non-browser client without Origin can redeem only after preserving
   the temporary Cookie from `/access`; the same nonce without that Cookie fails.

@@ -12,6 +12,9 @@ import {
 } from "./adminSettingsView.js";
 import type { RenderBudgetSetting } from "../runtimeConfig.js";
 
+const INLINE_FAVICON =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d0c0a'/%3E%3Ccircle cx='32' cy='32' r='20' fill='%23d9973e'/%3E%3C/svg%3E";
+
 export function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -28,6 +31,8 @@ function pageShell(title: string, nonce: string, body: string, script = ""): str
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
+  <link rel="icon" href="${INLINE_FAVICON}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="${INLINE_FAVICON}">
   <title>${escapeHtml(title)}</title>
   <style nonce="${escapeHtml(nonce)}">
     :root{color-scheme:dark;font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;background:#0d0c0a;color:#f0eadf}

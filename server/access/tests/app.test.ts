@@ -188,6 +188,8 @@ describe("public invitation gateway", () => {
 
     assert.equal(response.status, 200);
     assert.match(response.text, /进入暗房/);
+    assert.match(response.text, /rel="icon"[^>]+data:image\/svg\+xml/);
+    assert.match(response.text, /rel="apple-touch-icon"[^>]+data:image\/svg\+xml/);
     assert.match(response.text, /width:min\(calc\(100% - 32px\),960px\)/);
     assert.doesNotMatch(response.text, /<script[^>]+src=/);
     assert.match(response.headers["cache-control"], /private, no-store/);
