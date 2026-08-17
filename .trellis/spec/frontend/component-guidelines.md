@@ -47,6 +47,11 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 - Preserve `focus-visible` styles, `aria-live` status feedback, and `prefers-reduced-motion` behavior.
 - Touch actions must remain at least 44px high where the current mobile UI guarantees it.
 
+### Server-Rendered Access Controls
+
+- When an access-page anchor is styled with the shared `.button` class, make the control itself `display:inline-flex;align-items:center;justify-content:center`; aligning only the parent row does not vertically center the anchor text inside its min-height box.
+- Keep the anchor and its companion button at the same clickable height, and verify both the desktop and 390px mobile layouts.
+
 ### Dialog Keyboard Shortcuts
 
 - Keep a visible, named button for every shortcut command; the shortcut accelerates the command and never replaces its discoverable control.

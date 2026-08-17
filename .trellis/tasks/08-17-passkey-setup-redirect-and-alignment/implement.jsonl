@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared thinking guides for scoped UI changes and evidence-based validation"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Frontend interaction, responsive alignment, accessibility, and native control conventions"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Required browser, responsive, and diff validation for user-facing behavior changes"}
+{"file": ".trellis/spec/backend/access-control.md", "reason": "Access-service and Passkey route contracts that must remain unchanged"}

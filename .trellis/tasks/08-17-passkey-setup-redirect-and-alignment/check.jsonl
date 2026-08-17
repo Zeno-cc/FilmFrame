@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality gate for frontend/access-page behavior and responsive validation"}
+{"file": ".trellis/spec/backend/access-control.md", "reason": "Review access-service contract preservation and browser-only boundary"}

@@ -887,6 +887,15 @@ describe("public invitation gateway", () => {
       .set("Cookie", `${config.sessionCookieName}=${session.token}`);
     assert.equal(setupWithSession.status, 200);
     assert.match(setupWithSession.text, /设置设备 Passkey/);
+    assert.match(setupWithSession.text, /window\.location\.assign\("\/"\)/);
+    assert.match(
+      setupWithSession.text,
+      /\.field-row>\.button\{display:inline-flex;align-items:center;justify-content:center\}/,
+    );
+    assert.match(
+      setupWithSession.text,
+      /<a class="button secondary" href="\/">稍后设置<\/a>/,
+    );
   });
 
   it("redacts Passkey metadata and requires admin CSRF to revoke", async () => {
