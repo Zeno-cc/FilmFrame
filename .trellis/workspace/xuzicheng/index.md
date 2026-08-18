@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 23
-- **Last Active**: 2026-08-17
+- **Total Sessions**: 24
+- **Last Active**: 2026-08-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~624 | Active |
+| `journal-1.md` | ~648 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 24 | 2026-08-18 | Release and workspace reliability follow-up | `e1b8ce6`, `ca7a10d`, `ab11b21`, `4d9c046` | `codex/fix-invite-immediate-start` |
 | 23 | 2026-08-17 | Complete Passkey setup redirect and alignment | `009a1b0` | `codex/fix-invite-immediate-start` |
 | 22 | 2026-08-17 | Validate Trellis 0.6.15 runtime upgrade | `151fbc3`, `28aba09` | `codex/fix-invite-immediate-start` |
 | 21 | 2026-08-14 | 发布 FilmFrame v1.4.3 到生产环境 | `118e7c2`, `b927d32` | `codex/filmframe-v1-3-hardening` |

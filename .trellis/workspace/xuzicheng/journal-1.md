@@ -622,3 +622,27 @@ Implemented automatic navigation to / after successful Passkey registration, cen
 ### Status
 
 [OK] **Completed**
+
+
+## Session 24: Release and workspace reliability follow-up
+
+**Date**: 2026-08-18
+**Task**: Release and workspace reliability follow-up
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+Recorded the completed release-push contract and v1.4.8 preparation, avoided duplicate updater preflight timeouts, and made the empty darkroom layout full bleed. The repository was clean and no active task required archiving.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e1b8ce6` | (see git log) |
+| `ca7a10d` | (see git log) |
+| `ab11b21` | (see git log) |
+| `4d9c046` | (see git log) |
+
+### Status
+
+[OK] **Completed**
