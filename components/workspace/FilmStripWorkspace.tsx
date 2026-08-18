@@ -1,6 +1,6 @@
 import type { DragEvent } from 'react';
 import type { RenderArtifact } from '../../services/renderResult';
-import { DownloadIcon, EyeIcon, FilmIcon, LoaderIcon, RefreshIcon } from '../icons/FilmFrameIcons';
+import { ApertureIcon, DownloadIcon, EyeIcon, FilmIcon, RefreshIcon } from '../icons/FilmFrameIcons';
 import { Button } from '../ui/Button';
 import { FilmSequenceRail, type FilmSequenceItem } from './FilmSequenceRail';
 
@@ -98,9 +98,12 @@ export function FilmStripWorkspace({
 
         <div className="relative flex min-h-[320px] items-center justify-center overflow-x-auto bg-[var(--ff-bg-deep)] p-5 sm:min-h-[420px]" aria-live="polite">
           {stage.kind === 'processing' ? (
-            <div className="flex flex-col items-center gap-3 text-center text-[var(--ff-paper-muted)]" role="status">
-              <LoaderIcon className="animate-spin text-[var(--ff-safelight)]" size={30} />
-              <p className="text-sm">{stage.message ?? '正在拼合胶片长条...'}</p>
+            <div className="ff-film-strip-bath flex flex-col items-center gap-3 text-center text-[var(--ff-paper-muted)]" role="status">
+              <span className="ff-film-strip-bath__icon text-[var(--ff-safelight)]" aria-hidden="true">
+                <ApertureIcon size={30} />
+              </span>
+              <p className="text-sm">{stage.message ?? '长条盘中拼合...'}</p>
+              <p className="font-mono text-[10px] tracking-[0.14em] text-[var(--ff-paper-dim)]">CONTACT STRIP</p>
             </div>
           ) : stage.kind === 'current' ? (
             <img

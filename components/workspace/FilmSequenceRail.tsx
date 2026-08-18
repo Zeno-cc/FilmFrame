@@ -45,7 +45,7 @@ export function FilmSequenceRail({
   className = '',
 }: FilmSequenceRailProps) {
   return (
-    <section className={`border-y border-[var(--ff-line-soft)] bg-[var(--ff-panel)] py-4 ${className}`} aria-labelledby="film-sequence-title">
+    <section className={`ff-film-sequence-rail border-y border-[var(--ff-line-soft)] py-4 ${className}`} aria-labelledby="film-sequence-title">
       <div className="mb-3 flex items-center justify-between gap-3 px-4 sm:px-5">
         <div>
           <h2 id="film-sequence-title" className="text-sm font-medium text-[var(--ff-paper)]">叙事顺序</h2>
@@ -65,7 +65,7 @@ export function FilmSequenceRail({
             onDragEnter={event => onDragEnter?.(event, index)}
             onDragOver={event => onDragOver?.(event, index)}
             onDragEnd={event => onDragEnd?.(event, index)}
-            className={`relative w-40 shrink-0 snap-start rounded-[4px] border bg-[var(--ff-bg)] p-2 ${
+            className={`ff-film-sequence-rail__cell relative w-40 shrink-0 snap-start border p-2 ${
               view.dropTarget ? 'border-[var(--ff-amber)]' : view.selected ? 'border-[var(--ff-line-strong)]' : 'border-[var(--ff-line-soft)]'
             } ${included ? '' : 'opacity-75'} ${draggable ? 'md:cursor-move md:active:cursor-grabbing' : ''}`}
           >

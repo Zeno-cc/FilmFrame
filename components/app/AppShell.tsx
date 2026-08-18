@@ -18,7 +18,7 @@ export function AppShell({
   className = '',
 }: AppShellProps) {
   return (
-    <div className={`ff-app-shell min-h-dvh bg-[var(--ff-bg-deep)] text-[var(--ff-paper)] ${className}`}>
+    <div className={`ff-app-shell min-h-dvh bg-[var(--ff-bg-deep)] text-[var(--ff-paper)] ${className}`} data-atmosphere="on">
       {header}
       <div className="ff-app-body mx-auto grid w-full max-w-[1900px] grid-cols-1 min-[1180px]:grid-cols-[minmax(0,1fr)_344px] min-[1536px]:grid-cols-[minmax(0,1fr)_368px]">
         <main

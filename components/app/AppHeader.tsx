@@ -44,14 +44,14 @@ export function AppHeader({
   const controlsDisabled = processing || exporting;
 
   return (
-    <header className={`ff-app-header sticky top-0 z-40 border-b border-[var(--ff-line-soft)] bg-[var(--ff-bg)] ${className}`}>
+    <header className={`ff-app-header sticky top-0 z-40 border-b border-[var(--ff-line-soft)] ${className}`}>
       <div className="mx-auto flex h-14 max-w-[1900px] items-center gap-3 px-3 sm:px-4 md:h-16 md:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5 text-[var(--ff-amber)]">
           <FilmLogoIcon size={30} />
           <div className="min-w-0">
             <div className="truncate font-[var(--ff-font-display)] text-lg leading-none text-[var(--ff-paper)]">FilmFrame</div>
-            <div className="mt-1 hidden text-[10px] font-medium text-[var(--ff-paper-dim)] sm:block" aria-hidden="true">
-              LOCAL DIGITAL DARKROOM
+            <div className="ff-app-header__brand-mark mt-1 hidden sm:block" aria-hidden="true">
+              本地数字暗房
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@ export function AppHeader({
             type="button"
             onClick={onAddPhotos}
             disabled={controlsDisabled}
-            className="inline-flex min-h-11 items-center gap-2 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel)] px-3.5 text-sm font-medium text-[var(--ff-paper)] transition-colors hover:border-[var(--ff-line-strong)] hover:bg-[var(--ff-panel-raised)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="ff-header-control inline-flex min-h-11 items-center gap-2 px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <UploadIcon />
             添加照片
@@ -80,7 +80,7 @@ export function AppHeader({
               type="button"
               onClick={onExport}
               disabled={controlsDisabled}
-              className="inline-flex min-h-11 items-center gap-2 rounded-[4px] bg-[var(--ff-amber)] px-3.5 text-sm font-semibold text-[var(--ff-ink)] transition-colors hover:bg-[var(--ff-amber-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="ff-header-control ff-header-control--primary inline-flex min-h-11 items-center gap-2 px-3.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <DownloadIcon />
               {exporting ? '正在导出' : '导出成片'}
@@ -91,7 +91,7 @@ export function AppHeader({
             onClick={event => onOpenSettings(event.currentTarget)}
             aria-expanded={settingsOpen}
             aria-controls="mobile-settings-sheet"
-            className="inline-flex min-h-11 items-center gap-2 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel)] px-3 text-sm text-[var(--ff-paper-muted)] hover:border-[var(--ff-line-strong)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[1180px]:hidden"
+            className="ff-header-control inline-flex min-h-11 items-center gap-2 px-3 text-sm text-[var(--ff-paper-muted)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[1180px]:hidden"
           >
             <SettingsIcon />
             配方
@@ -112,7 +112,7 @@ export function AppHeader({
           title="暗房配方"
           aria-expanded={settingsOpen}
           aria-controls="mobile-settings-sheet"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[4px] border border-[var(--ff-line-soft)] bg-[var(--ff-panel)] text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[768px]:hidden"
+          className="ff-header-control inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[768px]:hidden"
         >
           <SettingsIcon />
         </button>

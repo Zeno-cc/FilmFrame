@@ -25,7 +25,7 @@ export function Workspace({
 }: WorkspaceProps) {
   return (
     <section
-      className={`ff-workspace relative min-h-[calc(100dvh-4rem)] bg-[var(--ff-bg)] ${className}`}
+      className={`ff-workspace relative min-h-[calc(100dvh-4rem)] ${className}`}
       data-drag-active={isDragActive}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
@@ -37,7 +37,7 @@ export function Workspace({
         {children}
       </div>
       {isDragActive ? (
-        <div className="pointer-events-none absolute inset-3 z-30 flex items-center justify-center rounded-[6px] border border-[var(--ff-amber)] bg-[color:var(--ff-bg)]/95" role="status">
+        <div className="pointer-events-none absolute inset-3 z-30 flex items-center justify-center rounded-[4px] border border-[var(--ff-amber)] bg-[color:var(--ff-bg)]/95 shadow-[var(--ff-shadow-contact)]" role="status">
           <span className="font-[var(--ff-font-display)] text-xl text-[var(--ff-amber)]">{dragMessage}</span>
         </div>
       ) : null}

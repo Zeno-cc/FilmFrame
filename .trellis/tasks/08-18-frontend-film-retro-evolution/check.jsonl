@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"执行 npm check、E2E、响应式与无障碍验收"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"复核组件改动、token 使用与稳定选择器"}

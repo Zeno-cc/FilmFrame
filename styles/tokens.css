@@ -1,23 +1,23 @@
 :root {
   color-scheme: dark;
 
-  --ff-bg-deep: #0b0a08;
-  --ff-bg: #100f0c;
+  --ff-bg-deep: #090807;
+  --ff-bg: #100e0b;
   --ff-panel: #17140f;
-  --ff-panel-raised: #1e1a14;
-  --ff-panel-soft: #242019;
+  --ff-panel-raised: #1f1b14;
+  --ff-panel-soft: #262117;
 
-  --ff-line: #3a3328;
-  --ff-line-soft: #29241c;
-  --ff-line-strong: #5a4d3a;
+  --ff-line: #403628;
+  --ff-line-soft: #2c261c;
+  --ff-line-strong: #6a5740;
 
-  --ff-paper: #f0e8d6;
-  --ff-paper-muted: #b9ae98;
-  --ff-paper-dim: #877d6b;
+  --ff-paper: #f2ead7;
+  --ff-paper-muted: #b7ac95;
+  --ff-paper-dim: #8a7f6c;
   --ff-ink: #17130e;
 
   --ff-amber: #d89a2b;
-  --ff-amber-hover: #eeae37;
+  --ff-amber-hover: #eeb040;
   --ff-amber-soft: rgba(216, 154, 43, 0.14);
   --ff-amber-line: rgba(216, 154, 43, 0.56);
   --ff-safelight: #8c312b;
@@ -60,11 +60,26 @@
   --ff-space-12: 48px;
   --ff-space-16: 64px;
 
-  --ff-radius-control: 4px;
-  --ff-radius-card: 6px;
-  --ff-radius-dialog: 8px;
+  --ff-radius-control: 3px;
+  --ff-radius-card: 5px;
+  --ff-radius-dialog: 7px;
   --ff-radius-round: 999px;
-  --ff-shadow-short: 0 12px 32px rgba(0, 0, 0, 0.28);
+
+  --ff-shadow-short: 0 10px 28px rgba(0, 0, 0, 0.34);
+  --ff-shadow-press: inset 0 1px 0 rgba(242, 234, 215, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  --ff-shadow-photo: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(242, 234, 215, 0.04);
+
+  --ff-grain-opacity: 0.045;
+  --ff-vignette-strength: 0.42;
+  --ff-safelight-wash: rgba(140, 49, 43, 0.045);
+  --ff-surface-sheen: linear-gradient(180deg, rgba(242, 234, 215, 0.035), transparent 34%, rgba(0, 0, 0, 0.12));
+  --ff-noise-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  --ff-noise-tile: var(--ff-noise-image);
+  --ff-surface-inset: inset 0 1px 0 rgba(242, 234, 215, 0.045), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --ff-surface-press: inset 0 1px 2px rgba(0, 0, 0, 0.32), inset 0 -1px 0 rgba(242, 234, 215, 0.04);
+  --ff-shadow-contact: 0 8px 22px rgba(0, 0, 0, 0.28);
+  --ff-shadow-paper: 0 6px 18px rgba(0, 0, 0, 0.24);
+  --ff-shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.42);
 
   --ff-motion-fast: 120ms;
   --ff-motion-base: 180ms;

@@ -4,7 +4,7 @@ import {
   CheckCircleIcon,
   CircleDashedIcon,
   ErrorIcon,
-  LoaderIcon,
+  ApertureIcon,
   RefreshIcon,
   WarningIcon,
 } from '../icons/FilmFrameIcons';
@@ -23,7 +23,7 @@ const STATUS_META: Record<ImageWorkflowStatusKind, StatusMeta> = {
   unprocessed: { label: '待冲洗', englishLabel: 'WAITING', tone: 'neutral', icon: <CircleDashedIcon size={16} /> },
   stale: { label: '需重洗', englishLabel: 'RE-DEVELOP', tone: 'amber', icon: <RefreshIcon size={16} /> },
   queued: { label: '排队中', englishLabel: 'QUEUED', tone: 'info', icon: <CircleDashedIcon size={16} /> },
-  processing: { label: '冲洗中', englishLabel: 'DEVELOPING', tone: 'processing', icon: <LoaderIcon size={16} /> },
+  processing: { label: '冲洗中', englishLabel: 'DEVELOPING', tone: 'processing', icon: <ApertureIcon size={16} /> },
   complete: { label: '已出片', englishLabel: 'READY', tone: 'success', icon: <CheckCircleIcon size={16} /> },
   failed: { label: '冲洗失败', englishLabel: 'ERROR', tone: 'danger', icon: <ErrorIcon size={16} /> },
 };

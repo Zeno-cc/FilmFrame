@@ -39,6 +39,15 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 - Keep cards at the existing restrained radius and do not nest decorative cards.
 - Icons come from `components/icons/FilmFrameIcons.tsx` and normally use `currentColor`.
 
+### Darkroom atmosphere and materials
+
+- Global grain / vignette / safelight wash live on body pseudo-elements and atmosphere tokens; prefer tuning tokens over page-local overlays.
+- Prefer shared surface utilities (.ff-surface*) or existing panel/button classes; avoid one-off floating SaaS card shadows.
+- Atmosphere is decorative: pointer-events none, keep photo content readable, weaker/static grain under prefers-reduced-motion.
+- Empty-darkroom film geometry and data-testid hooks are E2E contracts; do not break dimensions without updating tests.
+- PhotoCard develop phases use `data-develop` (`idle` | `bath` | `reveal` | `print`): wet-tray atmosphere while processing/queued; reveal only when the real print URL arrives (result-driven, not a fake spinner timer).
+- Keep develop overlays decorative (`pointer-events: none`); dual-layer images stay inside `.ff-photo-card__mat` and must not alter export/render pipelines.
+
 ## Accessibility
 
 - Icon-only controls require an accessible name and usually a `title` tooltip.

@@ -9,6 +9,12 @@ import {
 
 const DECORATIVE_FRAME_COUNT = 16;
 
+const PROCESS_NOTES = [
+  '01 选片入卷',
+  '02 配方微调',
+  '03 显影收卷',
+] as const;
+
 export interface EmptyDarkroomProps {
   isDragActive?: boolean;
   uploadDisabled?: boolean;
@@ -58,9 +64,6 @@ export function EmptyDarkroom({
 
       <div className="ff-empty-darkroom__content relative mx-auto w-full max-w-2xl text-center">
         <div className="ff-empty-darkroom__focus flex flex-col items-center">
-          <div className="mb-4 flex size-10 items-center justify-center rounded-[4px] border border-[var(--ff-line-strong)] bg-[var(--ff-bg)] text-[var(--ff-amber)]" aria-hidden="true">
-            <UploadIcon size={20} />
-          </div>
           <h2 id="empty-darkroom-title" className="font-[var(--ff-font-display)] text-2xl leading-8 text-[var(--ff-paper)] sm:text-[28px] sm:leading-9">
             让这一卷，慢慢显影
           </h2>
@@ -101,16 +104,16 @@ export function EmptyDarkroom({
               </cite>
             </div>
           </div>
-          <ol className="mt-4 grid w-full grid-cols-3 border-y border-[var(--ff-line-soft)] py-3 font-mono text-[10px] text-[var(--ff-paper-dim)] sm:text-xs" aria-label="暗房流程">
-            <li>01 选片</li>
-            <li className="border-x border-[var(--ff-line-soft)]">02 调配</li>
-            <li>03 显影与收卷</li>
+          <ol className="ff-empty-darkroom__process" aria-label="暗房流程">
+            {PROCESS_NOTES.map(note => (
+              <li key={note}>{note}</li>
+            ))}
           </ol>
         </div>
       </div>
 
       {isDragActive ? (
-        <div className="absolute inset-3 z-10 flex items-center justify-center rounded-[6px] border border-[var(--ff-amber)] bg-[color:var(--ff-bg)]/95" role="status">
+        <div className="absolute inset-3 z-10 flex items-center justify-center rounded-[4px] border border-[var(--ff-amber)] bg-[color:var(--ff-bg)]/95 shadow-[var(--ff-shadow-contact)]" role="status">
           <span className="font-[var(--ff-font-display)] text-xl text-[var(--ff-amber)]">松开以加入这一卷</span>
         </div>
       ) : null}

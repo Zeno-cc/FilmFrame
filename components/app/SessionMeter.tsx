@@ -23,7 +23,7 @@ export function SessionMeter({
     ? `ROLL ${String(rollNumber).padStart(2, '0')}`
     : 'NEW ROLL';
   const frameLabel = `${imageCount} ${imageCount === 1 ? 'FRAME' : 'FRAMES'}`;
-  const modeLabel = outputMode === 'strip' ? 'FILM STRIP' : 'CONTACT SHEET';
+  const modeLabel = outputMode === 'strip' ? 'STRIP' : 'SHEET';
   const summary = imageCount === 0
     ? '新胶卷，本地处理'
     : `${imageCount} 张，${processedCount} 张已出片${localOnly ? '，仅本地处理' : ''}`;
@@ -34,18 +34,16 @@ export function SessionMeter({
       role="group"
       aria-label={summary}
     >
-      <div className="hidden items-center gap-2 overflow-hidden text-[11px] font-medium text-[var(--ff-paper-dim)] min-[1180px]:flex" aria-hidden="true">
-        <span className="font-mono text-[var(--ff-paper-muted)]">{rollLabel}</span>
-        <span className="text-[var(--ff-line-strong)]">/</span>
-        <span className="font-mono">{frameLabel}</span>
-        <span className="text-[var(--ff-line-strong)]">/</span>
-        <span>{modeLabel}</span>
-        {localOnly && (
-          <>
-            <span className="text-[var(--ff-line-strong)]">/</span>
-            <span>LOCAL ONLY</span>
-          </>
-        )}
+      <div className="ff-session-meter__dial hidden min-[1180px]:flex" aria-hidden="true">
+        <span className="ff-session-meter__chip ff-session-meter__chip--live">{rollLabel}</span>
+        <span className="ff-session-meter__chip">{frameLabel}</span>
+        <span className="ff-session-meter__chip">{modeLabel}</span>
+        {localOnly ? <span className="ff-session-meter__chip">LOCAL</span> : null}
+        {imageCount > 0 ? (
+          <span className="ff-session-meter__chip">
+            OUT {processedCount}/{imageCount}
+          </span>
+        ) : null}
       </div>
       <div className="truncate text-xs text-[var(--ff-paper-muted)] min-[1180px]:hidden" aria-hidden="true">
         {imageCount > 0 ? `${imageCount} 张 · 本地处理` : '新胶卷 · 本地处理'}

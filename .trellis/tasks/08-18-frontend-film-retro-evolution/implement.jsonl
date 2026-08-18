@@ -1,0 +1,5 @@
+{"file":"components/workspace/PhotoCard.tsx","reason":"核心卡片双层图 + data-develop 属性"}
+{"file":"styles/components.css","reason":"latent / bath / reveal 动画"}
+{"file":"components/workspace/FilmStripWorkspace.tsx","reason":"去掉居中 LoaderIcon spin"}
+{"file":"components/ui/StatusStamp.tsx","reason":"processing 图标改为非旋转符号"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"补充暗房氛围 surface 约定"}

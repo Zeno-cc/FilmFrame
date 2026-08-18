@@ -10,17 +10,64 @@ html {
   background: var(--ff-bg-deep);
 }
 
+html.ff-atmosphere,
+html {
+  /* atmosphere toggle hook; default on */
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: var(--ff-bg-deep);
+  background:
+    radial-gradient(
+      120% 80% at 50% -10%,
+      var(--ff-safelight-wash),
+      transparent 55%
+    ),
+    var(--ff-bg-deep);
   color: var(--ff-paper);
   font-family: var(--ff-font-ui);
   font-size: 14px;
   line-height: 1.55;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+/* Global grain — fixed, non-interactive, content stays brighter */
+body::before {
+  background-image: var(--ff-noise-tile);
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  content: "";
+  inset: 0;
+  opacity: var(--ff-grain-opacity);
+  pointer-events: none;
+  position: fixed;
+  z-index: 50;
+}
+
+/* Warm vignette — lamp-edge falloff */
+body::after {
+  background:
+    radial-gradient(
+      ellipse 78% 70% at 50% 42%,
+      transparent 42%,
+      rgba(0, 0, 0, calc(var(--ff-vignette-strength) * 0.42)) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.18) 0%,
+      transparent 14%,
+      transparent 78%,
+      rgba(0, 0, 0, 0.28) 100%
+    );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 49;
 }
 
 button,
@@ -82,4 +129,44 @@ canvas {
   letter-spacing: .1em;
   line-height: 1.4;
   text-transform: uppercase;
+}
+
+/* Shared material utilities */
+.ff-surface {
+  background: var(--ff-panel);
+  border: 1px solid var(--ff-line-soft);
+  border-radius: var(--ff-radius-card);
+  box-shadow: var(--ff-surface-inset);
+}
+
+.ff-surface--raised {
+  background: var(--ff-panel-raised);
+  border-color: var(--ff-line);
+  box-shadow: var(--ff-surface-inset), var(--ff-shadow-contact);
+}
+
+.ff-surface--paper {
+  background:
+    linear-gradient(180deg, rgba(240, 232, 214, 0.04), transparent 40%),
+    var(--ff-panel-raised);
+  border-color: var(--ff-line);
+  box-shadow: var(--ff-shadow-paper), var(--ff-surface-inset);
+}
+
+.ff-surface--metal {
+  background:
+    linear-gradient(180deg, rgba(240, 232, 214, 0.06), transparent 30%, rgba(0, 0, 0, 0.12)),
+    var(--ff-panel);
+  border-color: var(--ff-line-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(240, 232, 214, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    /* Keep static grain; no animated noise path exists */
+    opacity: calc(var(--ff-grain-opacity) * 0.85);
+  }
 }

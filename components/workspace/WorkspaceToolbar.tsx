@@ -71,10 +71,10 @@ export function WorkspaceToolbar({
   };
 
   return (
-    <header className={`border-b border-[var(--ff-line-soft)] px-4 py-5 sm:px-6 lg:px-8 ${className}`}>
+    <header className={`ff-workspace-toolbar border-b border-[var(--ff-line-soft)] px-4 py-5 sm:px-6 lg:px-8 ${className}`}>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold text-[var(--ff-amber)]" aria-hidden="true">
+          <p className="ff-lab-label text-[var(--ff-amber)]" aria-hidden="true">
             {copy.eyebrow}
           </p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -114,7 +114,7 @@ export function WorkspaceToolbar({
       </div>
 
       <div
-        className="mt-5 inline-grid min-h-11 w-full grid-cols-2 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel)] p-1 sm:w-auto"
+        className="mt-5 inline-grid min-h-11 w-full grid-cols-2 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-bg)] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] sm:w-auto"
         role="tablist"
         aria-label="输出工作区"
       >
