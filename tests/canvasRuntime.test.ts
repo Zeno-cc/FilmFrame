@@ -72,7 +72,10 @@ describe('canvas export', () => {
       { toBlob } as unknown as HTMLCanvasElement,
       'image/webp',
       0.82,
-    )).resolves.toBe('blob:rendered');
+    )).resolves.toEqual({
+      url: 'blob:rendered',
+      byteSize: blob.size,
+    });
     expect(createObjectURL).toHaveBeenCalledWith(blob);
   });
 

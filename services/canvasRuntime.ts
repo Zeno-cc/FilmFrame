@@ -15,12 +15,17 @@ export function loadCanvasImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+export type CanvasObjectUrlResult = {
+  url: string;
+  byteSize: number;
+};
+
 export function exportCanvasToObjectUrl(
   canvas: HTMLCanvasElement,
   outputFormat: string,
   outputQuality: number,
   errorMessage = 'Failed to export canvas blob',
-): Promise<string> {
+): Promise<CanvasObjectUrlResult> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -28,7 +33,10 @@ export function exportCanvasToObjectUrl(
           reject(new Error(errorMessage));
           return;
         }
-        resolve(URL.createObjectURL(blob));
+        resolve({
+          url: URL.createObjectURL(blob),
+          byteSize: blob.size,
+        });
       },
       outputFormat,
       outputQuality,

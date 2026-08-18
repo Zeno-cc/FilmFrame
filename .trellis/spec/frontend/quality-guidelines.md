@@ -23,6 +23,72 @@ git diff --check
 - Check resource ownership for every new Object URL, timer, Worker request, or event listener.
 - Check desktop, tablet, and 390px mobile behavior for layout changes.
 
+### Scenario: Canvas Object URL Result Metadata
+
+#### 1. Scope / Trigger
+
+Apply this contract whenever a main-thread Canvas renderer exports a Blob-backed artifact consumed by the batch workflow, preview, download, or ZIP pipeline.
+
+#### 2. Signatures
+
+```ts
+type CanvasObjectUrlResult = {
+  url: string;
+  byteSize: number;
+};
+
+function exportCanvasToObjectUrl(
+  canvas: HTMLCanvasElement,
+  outputFormat: string,
+  outputQuality: number,
+  errorMessage?: string,
+): Promise<CanvasObjectUrlResult>;
+```
+
+#### 3. Contracts
+
+- `exportCanvasToObjectUrl` creates one Blob and returns both its Object URL and `blob.size`.
+- Main-thread single-image and strip renderers preserve this result unchanged through `filmEngine` and `filmWorkerClient`.
+- Worker rendering keeps creating the Object URL from the Blob received in the Worker response and uses that same Blob's `size`.
+- The artifact owner remains responsible for revoking the returned URL when it is replaced, deleted, rejected, or unmounted.
+- Do not fetch a generated Object URL only to recover metadata already available on its source Blob.
+
+#### 4. Validation & Error Matrix
+
+- `canvas.toBlob` returns `null` -> reject with the renderer's export error; create no Object URL.
+- Blob export succeeds -> return `{ url, byteSize: blob.size }`.
+- Empty strip input -> return `{ url: '', byteSize: 0 }` without allocating a Canvas.
+- Worker response succeeds -> return the Worker Blob URL and byte size.
+- Main-thread fallback succeeds -> return the Canvas export result directly; do not perform a `fetch(blobUrl)`.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: a PNG Blob of 321 bytes returns `{ url: 'blob:...', byteSize: 321 }` and proceeds to the developed state.
+- Base: an empty strip returns an empty URL with zero bytes.
+- Bad: the renderer creates an Object URL, then calls `fetch(url)` to measure it; browsers that reject that fetch report a false processing failure even though the artifact already exists.
+
+#### 6. Tests Required
+
+- Canvas unit tests assert the URL and exact `blob.size` are returned together.
+- Main-thread fallback tests assert single and strip results retain their byte size and never call `fetch`.
+- Worker-client tests continue to assert Worker Blob metadata and fallback routing.
+- Browser workflow tests upload, develop, preview, and generate a strip without a processing error.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: adds a second browser-dependent read after a successful export.
+const url = URL.createObjectURL(blob);
+const byteSize = (await (await fetch(url)).blob()).size;
+return { url, byteSize };
+
+// Correct: metadata travels with the artifact created from the same Blob.
+return {
+  url: URL.createObjectURL(blob),
+  byteSize: blob.size,
+};
+```
+
 ### Flattened Real-135 Template Assets
 
 - Every flattened real-135 template must be an RGB `1307x1203` PNG with a fully black aperture at `x=92`, `y=211`, `width=1123`, `height=800`.

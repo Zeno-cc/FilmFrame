@@ -2,6 +2,7 @@ import type { FilmSettings, ImageItem, RenderTransform } from '../types';
 import * as mainThreadEngine from './filmEngine';
 import { supportsReal135Template } from './filmOverlay';
 import type { RenderBudgetLimits } from './renderBudget';
+import type { CanvasObjectUrlResult } from './canvasRuntime';
 
 type WorkerResponse =
   | { id: number; ok: true; blob: Blob }
@@ -47,10 +48,7 @@ export type WorkerRenderer = {
   dispose: () => void;
 };
 
-export type RenderOutput = {
-  url: string;
-  byteSize: number;
-};
+export type RenderOutput = CanvasObjectUrlResult;
 
 export type WorkerRendererDependencies = {
   hasCapabilities: () => boolean;
@@ -254,17 +252,6 @@ const withImageSourceUrl = async <T>(
   }
 };
 
-const readRenderOutput = async (url: string, errorMessage: string): Promise<RenderOutput> => {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(errorMessage);
-    return { url, byteSize: (await response.blob()).size };
-  } catch (error) {
-    URL.revokeObjectURL(url);
-    throw error;
-  }
-};
-
 export const processImage = async (
   fileOrSource: File | string,
   settings: FilmSettings,
@@ -293,14 +280,13 @@ export const processImage = async (
   }
 
   return withImageSourceUrl(fileOrSource, previewUrlFallback, async (sourceUrl) => {
-    const url = await mainThreadEngine.processImage(
+    return mainThreadEngine.processImage(
       sourceUrl,
       settings,
       dateOverride,
       transform,
       renderBudgetLimits,
     );
-    return readRenderOutput(url, 'Failed to read generated image');
   });
 };
 
@@ -321,6 +307,5 @@ export const generateFilmStrip = async (
     }
   }
 
-  const url = await mainThreadEngine.generateFilmStrip(images, settings, renderBudgetLimits);
-  return readRenderOutput(url, 'Failed to read generated film strip');
+  return mainThreadEngine.generateFilmStrip(images, settings, renderBudgetLimits);
 };

@@ -50,6 +50,7 @@ import {
 } from './filmResolution';
 import { assertCanvasBudget, type RenderBudgetLimits } from './renderBudget';
 import {
+  type CanvasObjectUrlResult,
   createLuminanceAlphaMask,
   exportCanvasToObjectUrl,
   loadCanvasImage,
@@ -469,7 +470,7 @@ export const processImageReal135 = async (
   dateOverride?: string,
   transform?: RenderTransform,
   renderBudgetLimits: RenderBudgetLimits = {},
-): Promise<string> => {
+): Promise<CanvasObjectUrlResult> => {
   const img = await loadCanvasImage(imageSource);
   const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
   const layout = create135SidePerforationLayout(targetImageWidthPx);
@@ -524,7 +525,7 @@ const processImageWithTemplateOverlay = async (
   settings: FilmSettings,
   transform?: RenderTransform,
   renderBudgetLimits: RenderBudgetLimits = {},
-): Promise<string | null> => {
+): Promise<CanvasObjectUrlResult | null> => {
   if (settings.useFilmOverlayTemplate === false) return null;
   const registeredOverlayUrl = getReal135OverlayUrl(settings.brandText);
   if (!registeredOverlayUrl) return null;
@@ -933,7 +934,7 @@ const generateReal135FilmStrip = async (
   images: ImageItem[],
   settings: FilmSettings,
   renderBudgetLimits: RenderBudgetLimits = {},
-): Promise<string | null> => {
+): Promise<CanvasObjectUrlResult | null> => {
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) return null;
   if (settings.brandText !== FilmType.KODAK_GOLD_200) {
     const overlayUrl = getReal135OverlayUrl(settings.brandText);
@@ -1060,7 +1061,7 @@ export const processImage = async (
   dateOverride?: string,
   transform?: RenderTransform,
   renderBudgetLimits: RenderBudgetLimits = {},
-): Promise<string> => {
+): Promise<CanvasObjectUrlResult> => {
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
     const templatedResult = await processImageWithTemplateOverlay(
       imageSource,
@@ -1255,8 +1256,8 @@ export const generateFilmStrip = async (
   images: ImageItem[],
   settings: FilmSettings,
   renderBudgetLimits: RenderBudgetLimits = {},
-): Promise<string> => {
-  if (images.length === 0) return '';
+): Promise<CanvasObjectUrlResult> => {
+  if (images.length === 0) return { url: '', byteSize: 0 };
 
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
     const realStrip = await generateReal135FilmStrip(images, settings, renderBudgetLimits);

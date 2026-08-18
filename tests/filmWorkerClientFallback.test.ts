@@ -51,21 +51,18 @@ afterEach(() => {
 });
 
 describe('main-thread render output metadata', () => {
-  it('revokes an unreturned image URL when reading its Blob fails', async () => {
-    engine.processImage.mockResolvedValue('blob:image-result');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('read failed')));
+  it('uses Blob metadata returned by the canvas export without refetching its object URL', async () => {
+    const output = { url: 'blob:image-result', byteSize: 321 };
+    engine.processImage.mockResolvedValue(output);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
 
-    await expect(processImage('blob:source', settings)).rejects.toThrow('read failed');
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:image-result');
+    await expect(processImage('blob:source', settings)).resolves.toEqual(output);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('passes the render budget to the main-thread fallback', async () => {
-    engine.processImage.mockResolvedValue('blob:image-result');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      blob: vi.fn().mockResolvedValue(new Blob(['result'])),
-    }));
+    engine.processImage.mockResolvedValue({ url: 'blob:image-result', byteSize: 6 });
     const renderBudgetLimits = { maxPixels: 32_000_000 };
 
     await processImage(
@@ -86,15 +83,13 @@ describe('main-thread render output metadata', () => {
     );
   });
 
-  it('revokes an unreturned strip URL when its response body cannot be read', async () => {
-    engine.generateFilmStrip.mockResolvedValue('blob:strip-result');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      blob: vi.fn().mockRejectedValue(new Error('body failed')),
-    }));
+  it('returns strip Blob metadata without refetching its object URL', async () => {
+    const output = { url: 'blob:strip-result', byteSize: 654 };
+    engine.generateFilmStrip.mockResolvedValue(output);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
 
-    await expect(generateFilmStrip([image], settings)).rejects.toThrow('body failed');
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:strip-result');
+    await expect(generateFilmStrip([image], settings)).resolves.toEqual(output);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
