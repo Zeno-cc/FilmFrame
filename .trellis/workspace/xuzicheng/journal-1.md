@@ -646,3 +646,25 @@ Recorded the completed release-push contract and v1.4.8 preparation, avoided dup
 ### Status
 
 [OK] **Completed**
+
+
+## Session 25: 前端胶片显影与冲洗失败修复
+
+**Date**: 2026-08-18
+**Task**: 前端胶片显影与冲洗失败修复
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+完成接触印相盘式真实成片渐显；修复主线程 Canvas 成片通过 fetch(blob URL) 回读大小导致的冲洗失败，改为直接传递 Blob size；真实浏览器冲洗成功，196 项单测、类型检查、生产构建与 44 项 Playwright 端到端测试通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4614735` | (see git log) |
+| `0198676` | (see git log) |
+
+### Status
+
+[OK] **Completed**
