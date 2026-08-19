@@ -668,3 +668,24 @@ Recorded the completed release-push contract and v1.4.8 preparation, avoided dup
 ### Status
 
 [OK] **Completed**
+
+
+## Session 26: 显影动画优化并发布 v1.4.11
+
+**Date**: 2026-08-19
+**Task**: 显影动画优化并发布 v1.4.11
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+完成中央向上下柔和扩散的显影动画、真实冲洗流程回归覆盖与版本 1.4.11 发布；本地和 GitHub Actions 质量门禁均通过，正式 Release 资产及部署包 checksum 已复核。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `12c14af` | (see git log) |
+
+### Status
+
+[OK] **Completed**
