@@ -114,13 +114,13 @@ export function PhotoCard({
     if (developPhase !== 'reveal') return;
     const timer = window.setTimeout(() => {
       setDevelopPhase(current => (current === 'reveal' ? 'print' : current));
-    }, 2200);
+    }, 2500);
     return () => window.clearTimeout(timer);
   }, [developPhase]);
 
   const handlePrintAnimationEnd = (event: AnimationEvent<HTMLImageElement>) => {
     if (event.target !== event.currentTarget) return;
-    if (!event.animationName.includes('ff-contact-reveal')) return;
+    if (!event.animationName.includes('ff-contact-print')) return;
     setDevelopPhase(current => (current === 'reveal' ? 'print' : current));
   };
 
@@ -181,14 +181,17 @@ export function PhotoCard({
           draggable={false}
         />
         {printUrl ? (
-          <img
-            src={printUrl}
-            alt={item.file.name}
-            className="ff-photo-card__print size-full select-none object-contain"
-            loading="lazy"
-            draggable={false}
-            onAnimationEnd={handlePrintAnimationEnd}
-          />
+          <div className="ff-photo-card__reveal-surface">
+            <span className="ff-photo-card__print-bed" aria-hidden="true" />
+            <img
+              src={printUrl}
+              alt={item.file.name}
+              className="ff-photo-card__print size-full select-none object-contain"
+              loading="lazy"
+              draggable={false}
+              onAnimationEnd={handlePrintAnimationEnd}
+            />
+          </div>
         ) : (
           <img
             src={item.previewUrl}

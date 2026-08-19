@@ -281,6 +281,32 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   await expect(page.getByText('待冲洗', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
+  const developMat = page.locator('.ff-photo-card__mat').first();
+  await expect(developMat).toHaveAttribute('data-develop', 'reveal', { timeout: 30_000 });
+  const revealLayers = await developMat.evaluate(element => {
+    const surface = element.querySelector<HTMLElement>('.ff-photo-card__reveal-surface');
+    const bed = element.querySelector<HTMLElement>('.ff-photo-card__print-bed');
+    if (!surface || !bed) throw new Error('Develop reveal layers are missing');
+    const matBounds = element.getBoundingClientRect();
+    const surfaceBounds = surface.getBoundingClientRect();
+    return {
+      bedBackground: getComputedStyle(bed).backgroundColor,
+      heightDelta: Math.abs(matBounds.height - surfaceBounds.height),
+      surfaceAnimationDuration: getComputedStyle(surface).animationDuration,
+      surfaceAnimation: getComputedStyle(surface).animationName,
+      surfaceAnimationTiming: getComputedStyle(surface).animationTimingFunction,
+      surfaceMask: getComputedStyle(surface).maskImage
+        || getComputedStyle(surface).webkitMaskImage,
+      widthDelta: Math.abs(matBounds.width - surfaceBounds.width),
+    };
+  });
+  expect(revealLayers.surfaceAnimation).toBe('ff-contact-reveal');
+  expect(revealLayers.surfaceAnimationDuration).toBe('2.1s');
+  expect(revealLayers.surfaceAnimationTiming).toBe('cubic-bezier(0.22, 0.61, 0.36, 1)');
+  expect(revealLayers.surfaceMask).not.toBe('none');
+  expect(revealLayers.bedBackground).not.toBe('rgba(0, 0, 0, 0)');
+  expect(revealLayers.widthDelta).toBeLessThan(0.5);
+  expect(revealLayers.heightDelta).toBeLessThan(0.5);
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
   const processedImage = page.getByRole('img', { name: path.basename(fixture) });
   const sprocketPixel = await processedImage.evaluate((image: HTMLImageElement) => {
