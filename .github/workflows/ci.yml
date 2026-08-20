@@ -1,0 +1,45 @@
+name: Pre-tag quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Release-relevant checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/access/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix server/access ci
+
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Assert updater Linux peer-credential support
+        run: |
+          set -euo pipefail
+          python3 -c 'import socket, sys; assert sys.platform.startswith("linux") and hasattr(socket, "SO_PEERCRED"), "Linux peer credentials required"'
+
+      - name: Run reusable release gate
+        run: npm run check:release

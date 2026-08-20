@@ -62,15 +62,15 @@ Header 的“更多操作”内“恢复默认设置”会恢复默认 FilmSetti
 
 处理规则：
 
-1. 文件 MIME 必须是 JPEG、PNG 或 WebP。
-2. 立即为接受的文件创建预览 Object URL。
-3. 用浏览器 `Image` 尝试读取尺寸。
-4. 大于 25 MiB 或任一边超过 8000 px 时显示警告，但仍加入。
-5. 用 `exif-js` 读取 `DateTimeOriginal`，最长等待 1 秒。
-6. EXIF 日期转为 `YYYY/MM/DD`。
-7. 尺寸解码失败会拒绝并回收 URL；EXIF 失败只影响日期。
+1. JPEG、PNG、WebP 直接进入现有路径；标准 HEIC/HEIF MIME 或 `.heic`/`.heif` 扩展名进入本地转换候选路径。
+2. HEIC/HEIF 通过延迟加载的 `heic-to/csp` 1.5.2 在当前页面转换为单个 JPEG render File，固定中间质量 0.95；只取主静态画面，不处理 Live Photo、视频或多帧输出。
+3. 原始 File 仅用于文件名、ID 与 `exif-js` 的 best-effort `DateTimeOriginal` 读取；转换后的 JPEG File 用于预览 URL、尺寸、警告、准入、Worker/主线程渲染与清理。
+4. 转换成功后才创建预览 Object URL，再用浏览器 `Image` 读取尺寸。
+5. 转换后文件大于 25 MiB 或任一边超过 8000 px 时显示警告，但仍加入。
+6. EXIF 最长等待 1 秒并转为 `YYYY/MM/DD`；HEIC EXIF 无法读取时日期为空，不影响加入。
+7. 转换失败只拒绝该文件且不创建 URL；转换后尺寸解码失败会拒绝并回收 URL。其他同批文件继续处理。
 
-大图 warning 非阻塞；拒绝原因进入可行动错误 dialog。SVG、GIF、HEIC、空 MIME 和损坏图片不会加入列表。
+大图 warning 非阻塞；拒绝原因进入可行动错误 dialog。SVG、GIF、文本、未知格式、无法转换的 HEIC/HEIF 和损坏图片不会加入列表。照片字节与转换结果不上传、不持久化，也不改变 Worker 协议或 Canvas 预算。
 
 ### 2. 排序与删除
 

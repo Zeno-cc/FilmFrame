@@ -49,7 +49,7 @@
 | `filmTexture.ts` / `filmMarkings.ts` / `filmFrameNumber.ts` | 片基纹理、标记与帧号 |
 | `renderTransform.ts` / `previewRenderController.ts` | 构图归一化与即时预览生命周期 |
 | `renderResult.ts` / `imageBatch.ts` / `workflowState.ts` | 结果签名、generation gate、批次和 UI 状态推导 |
-| `uploadFiles.ts` | MIME、尺寸解码、大图提示和 EXIF 编排 |
+| `heicConversion.ts` / `uploadFiles.ts` | CSP-compatible 本地 HEIC/HEIF→JPEG、输入/render File 分工、尺寸解码、大图提示和 EXIF 编排 |
 | `settingsStorage.ts` / `recipeStorage.ts` | 白名单本地偏好和配方 |
 | `runtimeConfig.ts` | Strict same-origin runtime-config decoding, 700 MiB fallback, and MiB-to-budget conversion |
 | `renderAdmission.ts` / `renderBudget.ts` / `batchAdmission.ts` | App-local estimates and feedback, single-Canvas limits, and independent source/work-set/strip admission |

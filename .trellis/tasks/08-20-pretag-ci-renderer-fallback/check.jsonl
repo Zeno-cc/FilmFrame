@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/release-process.md","reason":"Verify pre-tag checks remain complete and publication stays tag-only."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review unit, real-browser Canvas, Worker fallback, and completion gates."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/research/pretag-ci-release-gates.md","reason":"Check CI permissions, environment parity, reusable gate composition, and pre-artifact ordering."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/research/main-thread-canvas-fallback.md","reason":"Check that automation enters an eligible started-Worker failure path and proves real main-thread Canvas recovery."}

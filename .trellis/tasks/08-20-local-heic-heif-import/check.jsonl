@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check that MIME/dimension validation and the original-versus-render File type boundary remain explicit and strictly typed."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check unit coverage, desktop browser coverage, privacy preservation, and Object URL cleanup."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check preview/result ownership and cleanup after conversion, rejection, removal, and unmount."}
+{"file":".trellis/tasks/08-20-local-heic-heif-import/research/local-heic-heif-import.md","reason":"Check the implementation against the researched CSP import, dependency cost/license, conversion semantics, and deferred fixture boundary."}

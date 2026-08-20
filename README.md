@@ -21,7 +21,8 @@ FilmFrame 是一间运行在浏览器里的数字暗房。它把本地照片排�
 
 ### 选片与冲洗
 
-- 支持 JPG、PNG、WebP，既可选择文件，也可拖入工作区。
+- 支持 JPG、PNG、WebP，以及静态 HEIC/HEIF；既可选择文件，也可拖入工作区。
+- HEIC/HEIF 会在当前浏览器会话中转换为 JPEG 后进入同一套预览与冲洗流程，不会上传；当前只取单个主静态画面，不处理 Live Photo、视频或多帧导出。
 - 接触印样支持排序、逐张入选、全部入选、清空入选和一键删除整卷。
 - 只冲洗待处理或设置已变化的照片，失败项可单独重试。
 - 冲洗期间可以停止后续任务，已完成的结果会保留。
@@ -79,7 +80,7 @@ npm run dev -- --host 127.0.0.1 --port 5174
 
 ## 使用流程
 
-1. 添加 JPG、PNG 或 WebP 照片。
+1. 添加 JPG、PNG、WebP、HEIC 或 HEIF 照片。
 2. 在接触印样中排序并选择需要冲洗的照片。
 3. 在暗房配方中选择胶片、真实 135 或经典片边，以及输出设置。
 4. 需要时打开单张预览调整构图。
@@ -98,6 +99,7 @@ npm run test:e2e     # 运行 Playwright 浏览器测试
 npm run check        # 单元测试 + 类型检查 + 生产构建
 npm run check:access # 鉴权服务测试 + 类型检查 + 构建
 npm run check:all    # 前端与鉴权服务完整检查
+npm run check:release # 完整 pre-tag 发布门禁
 npm run build        # 构建 dist 静态站点
 npm run preview      # 本地预览生产构建
 npm run sync:quotes  # 从 Wikiquote 生成待人工审核的名言候选
@@ -127,6 +129,7 @@ Cloudflare / OpenResty
 - Canvas / OffscreenCanvas 图像合成
 - Web Worker 可选渲染路径
 - `exif-js` 本地读取拍摄日期
+- `heic-to/csp` 1.5.2 按首次 HEIC/HEIF 导入延迟加载并在本地转换静态画面；该依赖体积较大（npm 解包约 24.4 MB），许可证为 LGPL-3.0
 - Express 5 + SQLite 邀请码与服务端会话
 - Cloudflare Access JWT 源站校验
 - Vitest 单元测试与 Playwright 浏览器测试
@@ -141,7 +144,7 @@ Cloudflare / OpenResty
 
 ## 隐私与数据边界
 
-应用没有普通用户账户、图片上传接口、云同步或遥测。用户照片只通过浏览器 `File`、Canvas、Worker 和 Blob URL 在当前页面会话中流转。
+应用没有普通用户账户、图片上传接口、云同步或遥测。用户照片只通过浏览器 `File`、Canvas、Worker 和 Blob URL 在当前页面会话中流转。HEIC/HEIF 转换同样发生在页面内；首次使用只加载同源发布的转换代码，不会把照片发送给转换服务。
 
 可选的生产门禁使用 SQLite 保存邀请码与会话 token 的 SHA-256 哈希、有效期和撤销状态。数据库不保存邀请码明文、照片、EXIF、胶片设置或渲染结果。
 
@@ -198,4 +201,4 @@ Worker 或 OffscreenCanvas 不可用时，应用会回退到主线程 Canvas。�
 
 ## 许可证
 
-仓库目前没有许可证文件。在添加明确许可证之前，请不要假定代码或胶片素材可以自由复制、修改或商用。
+仓库目前没有许可证文件。在添加明确许可证之前，请不要假定代码或胶片素材可以自由复制、修改或商用。第三方 `heic-to` 1.5.2 使用 LGPL-3.0；其许可证与项目自身代码/素材的授权状态应分别审阅。

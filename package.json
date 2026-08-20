@@ -20,12 +20,13 @@
     "test:e2e": "playwright test",
     "test:backup": "node scripts/test-backup-boundaries.mjs",
     "test:release-contract": "node --test ops/release/tests/*.test.mjs",
+    "test:updater": "PYTHONPATH=ops/updater python3 -m unittest discover -s ops/updater/tests -p 'test_*.py' -v && bash ops/updater/tests/test-install-layout.sh",
     "test:e2e:access-proxy": "node scripts/test-invite-proxy.mjs",
     "sync:quotes": "node scripts/sync-photography-quotes.mjs",
     "check": "npm run test && npm run typecheck && npm run build",
     "check:access": "npm --prefix server/access run check",
     "check:all": "npm run check && npm run check:access",
-    "check:release": "npm run check:all && npm run test:e2e && npm run test:backup && npm run test:e2e:access-proxy && npm run verify:deployment",
+    "check:release": "npm run verify:release-input && npm run test:release-contract && npm run check:all && npm run test:updater && npm run test:e2e && npm run test:backup && npm run test:e2e:access-proxy && npm run verify:deployment",
     "verify:deployment": "node scripts/verify-invite-deployment.mjs",
     "verify:release-input": "node ops/release/validate-release-input.mjs ops/release/release-input.json",
     "verify:release-manifest": "node ops/release/validate-manifest.mjs",
@@ -34,6 +35,7 @@
   },
   "dependencies": {
     "exif-js": "^2.3.0",
+    "heic-to": "1.5.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

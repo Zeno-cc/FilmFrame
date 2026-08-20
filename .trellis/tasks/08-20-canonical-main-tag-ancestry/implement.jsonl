@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/index.md","reason":"Routes release workflow work to the maintained release-process contract."}
+{"file":".trellis/spec/backend/release-process.md","reason":"Defines stable-tag, immutable-release, and release verification requirements that the implementation must extend."}
+{"file":".trellis/tasks/08-20-canonical-main-tag-ancestry/research/canonical-main-tag-ancestry.md","reason":"Records the observed Git lineage, affected workflow/test files, minimal guard design, and safe fast-forward sequence."}

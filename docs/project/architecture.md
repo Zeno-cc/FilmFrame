@@ -99,8 +99,9 @@ Google Client Secret 只进入 Google Cloud 与 Cloudflare Zero Trust 配置。�
 
 ```text
 FileList / DataTransfer.files
-  -> MIME 校验与尺寸解码
-  -> EXIF 本地读取
+  -> JPEG/PNG/WebP 直接使用
+  -> HEIC/HEIF 由 heic-to/csp 本地转换为单张 JPEG render File
+  -> 原始 File 做 best-effort EXIF；render File 做尺寸解码
   -> ImageItem + Object URL
   -> Worker / OffscreenCanvas（满足能力和策略时）
        -> 失败或不支持 -> 主线程 Canvas
@@ -126,7 +127,7 @@ UI 通过 `filmWorkerClient` 门面选择 Worker 或主线程。classic 当前�
 
 设置偏好使用 `filmFrame.preferences.v1`，本地配方使用 `filmFrame.recipes.v1`。两者只保存白名单设置，不保存图片、EXIF、Blob、Object URL、邀请码、会话 token 或构图中的临时草稿。
 
-应用没有图片上传、云同步或遥测接口。access sidecar 也没有接收图片的路由，只处理邀请码、会话和管理员断言。正常运行时的网络请求限于同源 HTML、JS、Worker、胶片模板、齿孔蒙版与本地发布的摄影名言快照；只有用户主动点击出处链接时才访问 Wikiquote。
+应用没有图片上传、云同步或遥测接口。access sidecar 也没有接收图片的路由，只处理邀请码、会话和管理员断言。HEIC/HEIF 转换模块在首次候选导入时从同源静态包延迟加载，照片 Blob、EXIF、JPEG 中间结果与成片始终留在当前页面会话。正常运行时的网络请求限于同源 HTML、JS/转换代码、Worker、胶片模板、齿孔蒙版与本地发布的摄影名言快照；只有用户主动点击出处链接时才访问 Wikiquote。
 
 ## 缓存与部署边界
 

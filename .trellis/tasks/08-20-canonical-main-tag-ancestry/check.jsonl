@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/release-process.md","reason":"Review the implementation against the authoritative release and immutable-tag contract."}
+{"file":".trellis/tasks/08-20-canonical-main-tag-ancestry/research/canonical-main-tag-ancestry.md","reason":"Verify workflow ordering, ancestry operands, documentation coverage, and non-forcing delivery behavior against repository evidence."}

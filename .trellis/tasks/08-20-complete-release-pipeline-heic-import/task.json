@@ -1,0 +1,30 @@
+{
+  "id": "complete-release-pipeline-heic-import",
+  "name": "complete-release-pipeline-heic-import",
+  "title": "Complete release pipeline and HEIC import",
+  "description": "Integrate the three approved priorities: canonical main/tag ancestry, pre-tag CI and unified release gates with Canvas fallback automation, and local HEIC/HEIF import. Physical-device testing, release tagging, deployment, and version bump are excluded.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-08-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-20-canonical-main-tag-ancestry",
+    "08-20-pretag-ci-renderer-fallback",
+    "08-20-local-heic-heif-import"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

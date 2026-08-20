@@ -17,8 +17,19 @@ manifest. It does not publish `latest`.
    one-click updater.
 4. Add one to six concise Chinese summary entries. Plaintext, URLs, HTML, and
    non-Chinese-only summaries are rejected.
-5. Run `npm run verify:release-input` and `npm run test:release-contract`.
-6. Create and push the protected tag. Do not rerun a release by moving a tag.
+5. Run `npm run check:release`, the reusable pre-tag gate for release input and
+   contracts, frontend/Access, updater, desktop browsers, backup, access proxy,
+   and deployment configuration.
+6. Fetch the live remote and verify the release commit is contained in
+   canonical `main`. Do not select a tag target from a stale tracking ref.
+7. Create and push the protected tag. Do not rerun a release by moving a tag.
+
+The trusted tag workflow fetches `origin/main` again and rejects a tagged SHA
+outside canonical `main` before installing dependencies or publishing. Repair
+lineage only through an ordinary fast-forward or the protected-branch review
+path; never force-push `main` or move an existing stable tag. Pull requests and
+pushes to `main` run the same reusable gate in read-only CI, but only a stable
+tag can enter the publication steps below.
 
 The repository must protect version tags and restrict changes to the release
 workflow. GitHub Actions uses OIDC artifact attestations; no signing key is

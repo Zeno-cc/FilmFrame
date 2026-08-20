@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Routes the upload, App, browser, and resource-ownership work to the frontend spec layers."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Defines the service and component boundaries for adding a local conversion module and wiring it into App.tsx."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Defines App.tsx async upload ownership, Object URL lifecycle, and stale-result behavior that the converted File must preserve."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Requires explicit input/render File contracts, MIME validation, browser decode validation, and no ad hoc any-based bypass."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Requires focused upload tests, real-browser Canvas/workflow verification, local-only privacy, and resource cleanup."}
+{"file":".trellis/tasks/08-20-local-heic-heif-import/research/local-heic-heif-import.md","reason":"Records the verified HEIC dependency, CSP constraint, File-role split, privacy boundary, and fixture risk."}

@@ -14,6 +14,8 @@
 
 Access 包含原生 Node 模块，不能把在 Node 22 下安装的 `server/access/node_modules` 交给 Node 26 运行，反之亦然。切换 Node major 后必须在 Node 22 环境重新执行 `npm --prefix server/access ci`。
 
+前端的 `heic-to` 1.5.2 只通过 `heic-to/csp` 入口按首次 HEIC/HEIF 导入延迟加载，用于浏览器本地单静态画面转换。其 npm 解包体积约 24.4 MB，属于明确的首次使用成本，许可证为 LGPL-3.0；不得用 CDN、远程转换或放宽 CSP 来绕过该边界。
+
 ## 本地安装与开发
 
 前端：
@@ -45,6 +47,7 @@ npm run check:access            # sidecar 测试 + 类型检查 + 构建
 npm run check:all               # 前端和 sidecar 完整检查
 
 npm run test:e2e                # Playwright 浏览器流程
+npm run check:release           # 可复用的完整 pre-tag 发布门禁
 git diff --check
 ```
 
@@ -52,7 +55,9 @@ git diff --check
 
 根 `tsconfig.json` 明确排除 `server/access`；根构建不会误用浏览器 TypeScript 配置检查 Express 代码，`check:all` 会显式检查两边。
 
-The 2026-08-05 browser gate passed 42 Chromium tests plus the focused Firefox and WebKit journey. The trusted Release workflow runs the same matrix. Before artifact construction it also runs the updater Python suite and Linux install-layout checks on Ubuntu, including the `SO_PEERCRED` boundary. Desktop WebKit is automation evidence only; physical iPhone Safari and Android Chrome records remain mandatory before authorizing the `v1.3.0` tag.
+`npm run check:release` 是本地、PR/`main` CI 和 trusted tag workflow 共用的 pre-tag 门禁，覆盖 release input/contract、frontend/Access、updater、桌面浏览器、backup、access proxy 与 deployment 校验。GitHub 的 PR/`main` job 使用 Ubuntu 24.04、Node 22.23.2 和只读权限；tag workflow 额外校验仓库/ref/tag/HEAD、实时 `origin/main` 祖先关系与精确 tag 输入，之后才进入制品构建和发布。
+
+The 2026-08-05 browser gate passed 42 Chromium tests plus the focused Firefox and WebKit journey. The trusted Release workflow runs the same matrix and explicitly asserts the Linux `SO_PEERCRED` boundary. Desktop WebKit is automation evidence only; physical iPhone Safari and Android Chrome records remain mandatory before authorizing a future stable tag. The August 20, 2026 pipeline/HEIC delivery intentionally adds desktop automation only and contains no physical-device evidence.
 
 ## Docker 构建
 

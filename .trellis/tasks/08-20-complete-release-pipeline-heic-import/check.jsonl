@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/release-process.md","reason":"Check that integrated release behavior remains tag-only, immutable, version-consistent, and safe to reconcile."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check integrated upload, Worker fallback, Canvas, privacy, browser, and resource-ownership behavior."}
+{"file":".trellis/tasks/08-20-canonical-main-tag-ancestry/implement.md","reason":"Review final ancestry guard placement and non-rewriting main delivery evidence."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/implement.md","reason":"Review reusable gate composition, read-only CI boundaries, and Worker fallback evidence."}
+{"file":".trellis/tasks/08-20-local-heic-heif-import/implement.md","reason":"Review HEIC File-role routing, converter/CSP choice, fixture boundary, and desktop-only validation."}
+{"file":".trellis/tasks/08-20-complete-release-pipeline-heic-import/research/integration-boundaries.md","reason":"Review cross-child sequencing, shared privacy/publication invariants, and final remote reconciliation boundary."}

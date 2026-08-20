@@ -137,20 +137,70 @@ test("release workflow pins actions and never publishes a mutable latest tag", a
   }
 });
 
-test("release workflow blocks artifact construction on the Ubuntu updater gates", async () => {
+test("release workflow rejects tags outside freshly fetched canonical main before setup", async () => {
   const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
-  const pythonGate = "PYTHONPATH=ops/updater python3 -m unittest discover";
-  const layoutGate = "bash ops/updater/tests/test-install-layout.sh";
+  const fetchMain = "git fetch --no-tags origin main:refs/remotes/origin/main";
+  const ancestryGate = 'git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main';
+  const setupNode = "actions/setup-node@";
+  const installDependencies = "npm ci";
+
+  assert.match(workflow, new RegExp(fetchMain));
+  assert.match(workflow, /git merge-base --is-ancestor "\$GITHUB_SHA" refs\/remotes\/origin\/main/);
+  assert.match(workflow, /release tag \$GITHUB_REF_NAME points to \$GITHUB_SHA, which is not contained in origin\/main/);
+  assert.ok(workflow.indexOf(fetchMain) < workflow.indexOf(ancestryGate));
+  assert.ok(workflow.indexOf(ancestryGate) < workflow.indexOf(setupNode));
+  assert.ok(workflow.indexOf(ancestryGate) < workflow.indexOf(installDependencies));
+});
+
+test("package scripts compose one portable reusable release gate", async () => {
+  const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+  const updaterGate = packageJson.scripts["test:updater"];
+  const releaseGate = packageJson.scripts["check:release"];
+
+  assert.match(updaterGate, /PYTHONPATH=ops\/updater python3 -m unittest discover -s ops\/updater\/tests -p 'test_\*\.py' -v/);
+  assert.match(updaterGate, /bash ops\/updater\/tests\/test-install-layout\.sh/);
+  assert.equal(releaseGate, [
+    "npm run verify:release-input",
+    "npm run test:release-contract",
+    "npm run check:all",
+    "npm run test:updater",
+    "npm run test:e2e",
+    "npm run test:backup",
+    "npm run test:e2e:access-proxy",
+    "npm run verify:deployment",
+  ].join(" && "));
+});
+
+test("release workflow reuses the gate after identity checks and before artifacts", async () => {
+  const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
+  const identityCheck = "validate-release-input.mjs ops/release/release-input.json --tag";
+  const releaseGate = "npm run check:release";
   const bundleBuild = "ops/release/build-deploy-bundle.sh";
 
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.match(workflow, /sys\.platform\.startswith\("linux"\).*SO_PEERCRED/);
-  assert.match(workflow, new RegExp(pythonGate));
-  assert.match(workflow, /-s ops\/updater\/tests -p 'test_\*\.py' -v/);
-  assert.match(workflow, new RegExp(layoutGate));
-  assert.ok(workflow.indexOf(pythonGate) < workflow.indexOf(layoutGate));
-  assert.ok(workflow.indexOf(layoutGate) < workflow.indexOf(bundleBuild));
-  assert.doesNotMatch(workflow, /(?:unittest discover|test-install-layout\.sh).*\|\|\s*true/);
+  assert.equal(workflow.match(/npm run check:release/g)?.length, 1);
+  assert.ok(workflow.indexOf(identityCheck) < workflow.indexOf(releaseGate));
+  assert.ok(workflow.indexOf(releaseGate) < workflow.indexOf(bundleBuild));
+});
+
+test("PR and main CI is read-only and stops at the reusable release gate", async () => {
+  const workflow = await readFile(path.join(root, ".github/workflows/ci.yml"), "utf8");
+
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /push:\n\s+branches:\n\s+- main/);
+  assert.match(workflow, /permissions:\n\s+contents: read/);
+  assert.doesNotMatch(workflow, /\b(?:contents|packages|id-token|attestations): write\b/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.match(workflow, /node-version: 22\.23\.2/);
+  assert.match(workflow, /npm ci\n\s+npm --prefix server\/access ci/);
+  assert.match(workflow, /playwright install --with-deps chromium firefox webkit/);
+  assert.match(workflow, /sys\.platform\.startswith\("linux"\).*SO_PEERCRED/);
+  assert.match(workflow, /npm run check:release/);
+  assert.doesNotMatch(workflow, /(?:docker\/build-push-action|docker\/login-action|attest-build-provenance|build-deploy-bundle|create-manifest|verify-attestations|upload-artifact|gh release create|push:\s*true)/);
+  for (const line of workflow.split("\n").filter((entry) => entry.includes("uses:"))) {
+    assert.match(line, /@[0-9a-f]{40}(?:\s|$)/, `action is not commit-pinned: ${line}`);
+  }
 });
 
 test("both runtime images expose immutable release identity labels", async () => {

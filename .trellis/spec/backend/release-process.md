@@ -13,8 +13,7 @@ host updater reads the latest stable GitHub Release, not ordinary branches.
 ### 2. Signatures
 
 ```bash
-npm run verify:release-input
-npm run test:release-contract
+npm run check:release
 git tag -a v<version> <commit>
 git push origin <branch>
 git push origin v<version>
@@ -33,6 +32,12 @@ only by a pushed `vMAJOR.MINOR.PATCH` tag.
   - `ops/release/release-input.json` → `version`.
 - Push the stable tag for that exact version to the same commit as the release
   changes. Do not move an existing tag.
+- Create a stable tag only for a commit contained in the freshly fetched
+  canonical `main` history. The trusted workflow re-fetches `origin/main` and
+  rejects an off-main tagged SHA before dependency installation or publication.
+- Treat `npm run check:release` as the reusable pre-tag quality gate. Pull
+  requests and pushes to `main` run the same portable checks with read-only
+  permissions; repository/ref/tag/HEAD identity remains tag-workflow-only.
 - A formal update is complete only after GitHub Actions creates the immutable
   GitHub Release, canonical manifest, deploy bundle, and versioned GHCR image
   tags. The updater then discovers it through GitHub's `releases/latest` API.
@@ -46,6 +51,7 @@ only by a pushed `vMAJOR.MINOR.PATCH` tag.
 | Any of the three version sources differ | Stop before push; synchronize them |
 | Version was not incremented from the previous product version | Stop and choose the next SemVer version |
 | Release input does not match the pushed tag | Stop; `validate-release-input` must pass with that tag |
+| Stable tag commit is not contained in freshly fetched `origin/main` | Stop before dependency installation or publication; reintegrate through an ordinary fast-forward/protected-branch path and never move the tag |
 | Product branch pushed without the matching stable tag | Treat as branch delivery only; do not call it a published update |
 | Stable tag pushed and workflow fails | Report the failed workflow; do not claim the update is available |
 | GitHub Release exists with a canonical manifest and required assets | Formal update is published and eligible for updater discovery |
@@ -63,9 +69,12 @@ only by a pushed `vMAJOR.MINOR.PATCH` tag.
 
 ### 6. Tests Required
 
-- Run `npm run verify:release-input` and assert all three version fields and
-  the expected tag agree.
-- Run `npm run test:release-contract` before the tag push.
+- Run `npm run check:release` before the tag push. It includes release-input,
+  release-contract, frontend/Access, updater, desktop browser, backup,
+  access-proxy, and deployment checks.
+- Immediately before delivery or tagging, fetch the live remote and prove the
+  candidate descends from `origin/main`; stale local tracking refs are not
+  sufficient evidence.
 - After the network operation, verify the remote tag and GitHub Release expose
   the new version and required manifest/bundle assets.
 - Confirm the final branch is clean and record the pushed branch, tag, release,
@@ -84,8 +93,7 @@ Then claim that the updater can install the new version.
 #### Correct
 
 ```bash
-npm run verify:release-input
-npm run test:release-contract
+npm run check:release
 git push origin codex/fix-invite-immediate-start
 git push origin v1.4.8
 ```

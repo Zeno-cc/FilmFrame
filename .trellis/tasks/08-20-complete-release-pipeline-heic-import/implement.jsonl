@@ -1,0 +1,11 @@
+{"file":".trellis/spec/backend/index.md","reason":"Routes the parent release and deployment integration review to the backend spec layers."}
+{"file":".trellis/spec/backend/release-process.md","reason":"Defines tag-only publication, immutable tags, version identity, and the final main/tag reconciliation boundary."}
+{"file":".trellis/spec/frontend/index.md","reason":"Routes the parent HEIC, browser, Worker, and local privacy integration review to frontend specs."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines desktop unit/browser checks, Canvas/Worker evidence, Object URL ownership, and the local-only photo contract."}
+{"file":".trellis/tasks/08-20-canonical-main-tag-ancestry/prd.md","reason":"Provides the first child contract for canonical-main ancestry and non-rewriting delivery."}
+{"file":".trellis/tasks/08-20-canonical-main-tag-ancestry/implement.md","reason":"Provides the first child execution order and fresh remote ancestry review gates."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/prd.md","reason":"Provides the second child contract for reusable gates, read-only CI, and renderer fallback automation."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/implement.md","reason":"Provides the second child execution order and release/renderer validation gates."}
+{"file":".trellis/tasks/08-20-local-heic-heif-import/prd.md","reason":"Provides the third child contract for browser-local HEIC/HEIF import and privacy behavior."}
+{"file":".trellis/tasks/08-20-local-heic-heif-import/implement.md","reason":"Provides the third child execution order, fixture boundary, and desktop-only validation plan."}
+{"file":".trellis/tasks/08-20-complete-release-pipeline-heic-import/research/integration-boundaries.md","reason":"Records cross-child ordering, shared invariants, and the no-publication/no-device-test boundary."}

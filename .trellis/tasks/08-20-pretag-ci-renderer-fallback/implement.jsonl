@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Routes trusted release and deployment validation work to the maintained backend contracts."}
+{"file":".trellis/spec/backend/release-process.md","reason":"Defines tag-only publication and required pre-tag release checks."}
+{"file":".trellis/spec/frontend/index.md","reason":"Routes browser, service, and quality work to the relevant frontend guidance."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines required unit/E2E checks, browser Canvas proof, Worker fallback, and release-quality expectations."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines service-local dependency seams and strict browser test typing."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/research/pretag-ci-release-gates.md","reason":"Provides the verified gate topology, CI environment, affected files, and release-only boundary."}
+{"file":".trellis/tasks/08-20-pretag-ci-renderer-fallback/research/main-thread-canvas-fallback.md","reason":"Provides the exact eligible Worker failure seams and focused unit/browser test strategy."}

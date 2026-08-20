@@ -15,6 +15,10 @@ import {
 import { loadPreferences, mergeSettings, savePreferences } from './services/settingsStorage';
 import { buildPreviewDownload } from './services/previewDownload';
 import { prepareUploadedImages } from './services/uploadFiles';
+import {
+  isHeicOrHeifCandidate,
+  prepareHeicRenderFile,
+} from './services/heicConversion';
 import { acceptImageRenderResult } from './services/imageBatch';
 import {
   deriveImageWorkflowStatus,
@@ -383,6 +387,8 @@ const App: React.FC = () => {
 
   const addFiles = useCallback(async (files: Iterable<File>) => {
     const { images: newImages, errors: uploadErrors, warnings: uploadWarnings } = await prepareUploadedImages(files, {
+      isHeicCandidate: isHeicOrHeifCandidate,
+      prepareRenderFile: prepareHeicRenderFile,
       createId: () => Math.random().toString(36).substr(2, 9),
       createObjectUrl: file => URL.createObjectURL(file),
       revokeObjectUrl,
@@ -1432,7 +1438,7 @@ const App: React.FC = () => {
         type="file"
         aria-label="选择照片"
         multiple
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         onChange={handleFileUpload}
         className="sr-only"
         tabIndex={-1}

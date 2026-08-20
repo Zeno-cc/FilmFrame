@@ -23,6 +23,95 @@ git diff --check
 - Check resource ownership for every new Object URL, timer, Worker request, or event listener.
 - Check desktop, tablet, and 390px mobile behavior for layout changes.
 
+### Scenario: Local Static HEIC/HEIF Import
+
+#### 1. Scope / Trigger
+
+Apply this contract whenever upload acceptance, HEIC/HEIF conversion, preview
+creation, source metadata lookup, or render-file routing changes. This contract
+covers static still images only.
+
+#### 2. Signatures
+
+```ts
+const HEIC_JPEG_QUALITY = 0.95;
+
+function isHeicOrHeifCandidate(
+  file: Pick<File, 'name' | 'type'>,
+): boolean;
+
+function prepareHeicRenderFile(file: File): Promise<File>;
+```
+
+The file input accepts:
+
+```text
+image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif
+```
+
+#### 3. Contracts
+
+- Recognize HEIC/HEIF by standard MIME type or a case-insensitive `.heic` /
+  `.heif` extension because browsers may provide an empty or generic MIME type.
+- Dynamically import `heic-to/csp` only for candidates, verify the file with its
+  `isHeic` check, and convert locally to a JPEG `File` at quality `0.95`. Keep
+  the original name and `lastModified` value on the converted file.
+- Use the original input for stable identity, display naming, and best-effort
+  EXIF lookup. Use the converted JPEG for Object URL creation, browser dimension
+  decoding, large-file admission warnings, Worker routing, and Canvas rendering.
+- Isolate conversion failures per file before allocating an Object URL. If the
+  converted JPEG later fails dimension decoding, revoke its preview URL at the
+  upload ownership boundary. Other valid files in the same selection continue.
+- Conversion remains browser-local: do not upload photo bytes, call a remote
+  converter, add telemetry, persist the original or converted photo, or add a
+  separate HEIC Worker/render protocol.
+- Do not imply Live Photo, video, animation, multi-frame selection, or metadata
+  round-trip support. `heic-to` remains a pinned, LGPL-3.0, first-use dependency.
+
+#### 4. Validation & Error Matrix
+
+- JPEG/PNG/WebP input -> return the original file without loading the converter.
+- HEIC/HEIF MIME or extension with valid static contents -> return a JPEG render
+  file and continue through the ordinary upload/render path.
+- Candidate whose contents fail `isHeic`, or whose conversion rejects -> report
+  one actionable file error, allocate no preview URL, and keep processing peers.
+- Converted JPEG with invalid or unsafe decoded dimensions -> reject through the
+  existing image validation path and revoke the allocated preview URL.
+- Unsupported non-HEIC type -> reject without attempting conversion.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: a `.HEIF` file with an empty MIME type converts locally, retains original
+  EXIF lookup, previews from a JPEG Blob URL, and develops through the existing
+  renderer without an external request.
+- Base: JPEG, PNG, and WebP files remain byte-for-byte passthrough inputs.
+- Bad: upload the HEIC file to a conversion API, or replace the original before
+  EXIF/identity work so metadata and naming silently change.
+
+#### 6. Tests Required
+
+- Unit tests cover MIME and extension recognition, fixed conversion quality,
+  passthrough formats, original-versus-render file routing, per-file conversion
+  isolation, and URL revocation after converted-image decode failure.
+- Chromium Playwright coverage uses a real static HEIC fixture, asserts the input
+  accept contract, preview and develop success, and no external/photo-bearing
+  mutation request.
+- Keep Worker fallback tests format-neutral; HEIC must enter that path as the
+  converted JPEG without changing Worker messages.
+
+#### 7. Wrong vs Correct
+
+```ts
+// Wrong: loses original metadata and introduces a remote photo boundary.
+const jpeg = await uploadForConversion(originalHeic);
+const exifDate = await readExifDate(jpeg);
+
+// Correct: conversion is local and each file role stays explicit.
+const renderFile = await prepareHeicRenderFile(originalHeic);
+const exifDate = await readExifDate(originalHeic);
+const previewUrl = URL.createObjectURL(renderFile);
+```
+
 ### Scenario: Canvas Object URL Result Metadata
 
 #### 1. Scope / Trigger

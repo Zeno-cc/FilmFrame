@@ -10,35 +10,52 @@ export const SUPPORTED_IMAGE_MIME_TYPES = new Set([
 
 type UploadFile = Pick<File, 'name' | 'size' | 'type'>;
 
-type PrepareUploadDeps<TFile extends UploadFile> = {
-  createId: (file: TFile) => string;
-  createObjectUrl: (file: TFile) => string;
+type PrepareUploadDeps<TInputFile extends UploadFile, TRenderFile extends UploadFile> = {
+  isHeicCandidate: (file: TInputFile) => boolean;
+  prepareRenderFile: (file: TInputFile) => Promise<TRenderFile>;
+  createId: (file: TInputFile) => string;
+  createObjectUrl: (file: TRenderFile) => string;
   revokeObjectUrl: (url: string) => void;
   readImageSize: (url: string) => Promise<{ width: number; height: number }>;
-  readExifDate: (file: TFile) => Promise<string>;
+  readExifDate: (file: TInputFile) => Promise<string>;
 };
 
-export type PreparedUpload<TFile extends UploadFile = File> = {
-  images: Array<Pick<ImageItem, 'id' | 'previewUrl' | 'exifDate' | 'included' | 'sourceWidth' | 'sourceHeight'> & { file: TFile }>;
+export type PreparedUpload<TRenderFile extends UploadFile = File> = {
+  images: Array<Pick<ImageItem, 'id' | 'previewUrl' | 'exifDate' | 'included' | 'sourceWidth' | 'sourceHeight'> & { file: TRenderFile }>;
   errors: string[];
   warnings: string[];
 };
 
-export async function prepareUploadedImages<TFile extends UploadFile>(
-  files: Iterable<TFile>,
-  deps: PrepareUploadDeps<TFile>
-): Promise<PreparedUpload<TFile>> {
-  const images: PreparedUpload<TFile>['images'] = [];
+export async function prepareUploadedImages<
+  TInputFile extends UploadFile,
+  TRenderFile extends UploadFile = TInputFile,
+>(
+  files: Iterable<TInputFile>,
+  deps: PrepareUploadDeps<TInputFile, TRenderFile>
+): Promise<PreparedUpload<TRenderFile>> {
+  const images: PreparedUpload<TRenderFile>['images'] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
 
   for (const file of files) {
-    if (!SUPPORTED_IMAGE_MIME_TYPES.has(file.type)) {
-      errors.push(`"${file.name}" 不是支持的图片格式（仅支持 JPEG、PNG、WebP）`);
+    const isHeicCandidate = deps.isHeicCandidate(file);
+    if (!SUPPORTED_IMAGE_MIME_TYPES.has(file.type) && !isHeicCandidate) {
+      errors.push(`"${file.name}" 不是支持的图片格式（仅支持 JPEG、PNG、WebP、HEIC、HEIF）`);
       continue;
     }
 
-    const previewUrl = deps.createObjectUrl(file);
+    let renderFile: TRenderFile;
+    try {
+      renderFile = await deps.prepareRenderFile(file);
+    } catch (error) {
+      console.warn('Local image preparation failed', error);
+      errors.push(isHeicCandidate
+        ? `"${file.name}" 无法在浏览器中转换 HEIC/HEIF 图片`
+        : `"${file.name}" 无法准备为可读取的图片`);
+      continue;
+    }
+
+    const previewUrl = deps.createObjectUrl(renderFile);
     let sourceWidth: number;
     let sourceHeight: number;
     try {
@@ -48,8 +65,8 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
       }
       sourceWidth = width;
       sourceHeight = height;
-      const sizeMb = file.size / 1024 / 1024;
-      if (file.size > LARGE_FILE_BYTES || Math.max(width, height) > LARGE_IMAGE_EDGE) {
+      const sizeMb = renderFile.size / 1024 / 1024;
+      if (renderFile.size > LARGE_FILE_BYTES || Math.max(width, height) > LARGE_IMAGE_EDGE) {
         warnings.push(`"${file.name}" 较大（${width}×${height}, ${sizeMb.toFixed(1)}MB），处理时可能较慢或占用较多内存`);
       }
     } catch (error) {
@@ -68,7 +85,7 @@ export async function prepareUploadedImages<TFile extends UploadFile>(
 
     images.push({
       id: deps.createId(file),
-      file,
+      file: renderFile,
       previewUrl,
       exifDate,
       included: true,
