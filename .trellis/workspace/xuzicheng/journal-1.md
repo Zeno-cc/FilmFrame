@@ -689,3 +689,24 @@ Recorded the completed release-push contract and v1.4.8 preparation, avoided dup
 ### Status
 
 [OK] **Completed**
+
+
+## Session 27: Complete release pipeline and local HEIC import
+
+**Date**: 2026-08-20
+**Task**: Complete release pipeline and local HEIC import
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+Added canonical-main ancestry enforcement, read-only PR/main CI with one reusable release gate, Worker-to-main-thread fallback automation, and browser-local static HEIC/HEIF conversion. Full desktop release checks passed; physical-device testing and all remote publication operations were intentionally excluded.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31b398d` | (see git log) |
+
+### Status
+
+[OK] **Completed**

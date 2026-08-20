@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 26
-- **Last Active**: 2026-08-19
+- **Total Sessions**: 27
+- **Last Active**: 2026-08-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~691 | Active |
+| `journal-1.md` | ~712 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 27 | 2026-08-20 | Complete release pipeline and local HEIC import | `31b398d` | `codex/fix-invite-immediate-start` |
 | 26 | 2026-08-19 | 显影动画优化并发布 v1.4.11 | `12c14af` | `codex/fix-invite-immediate-start` |
 | 25 | 2026-08-18 | 前端胶片显影与冲洗失败修复 | `4614735`, `0198676` | `codex/fix-invite-immediate-start` |
 | 24 | 2026-08-18 | Release and workspace reliability follow-up | `e1b8ce6`, `ca7a10d`, `ab11b21`, `4d9c046` | `codex/fix-invite-immediate-start` |
