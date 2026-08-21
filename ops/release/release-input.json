@@ -1,5 +1,5 @@
 {
-  "version": "1.4.11",
+  "version": "1.4.12",
   "minUpdaterVersion": "1.0.2",
   "database": {
     "schemaFrom": 6,
@@ -10,11 +10,11 @@
   "summaryZh": [
     {
       "kind": "feature",
-      "text": "显影动画改为从画面中央向上下柔和扩散，连续恢复成片质感"
+      "text": "支持在浏览器本地导入并转换静态 HEIC/HEIF 照片，无需上传"
     },
     {
       "kind": "fix",
-      "text": "修复显影过渡时胶片框外露出底层原图，并补充真实冲洗流程覆盖"
+      "text": "Worker 渲染失败时，自动回退到主线程 Canvas 渲染"
     }
   ]
 }
