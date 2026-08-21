@@ -710,3 +710,24 @@ Added canonical-main ancestry enforcement, read-only PR/main CI with one reusabl
 ### Status
 
 [OK] **Completed**
+
+
+## Session 28: Release FilmFrame v1.4.12
+
+**Date**: 2026-08-21
+**Task**: Release FilmFrame v1.4.12
+**Branch**: `codex/fix-invite-immediate-start`
+
+### Summary
+
+Published v1.4.12 from canonical main, verified the trusted-release workflow and all three release assets, and recorded the approved no-real-device-test waiver. Local release gate passed after retrying a Docker Hub token timeout; deployment config has one server-only OpenResty runtime check skipped.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `169ce4d431949a21621454a874e132c5ef08ab8f` | (see git log) |
+
+### Status
+
+[OK] **Completed**
