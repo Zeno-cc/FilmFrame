@@ -12,7 +12,7 @@
 | Browser and version | `<name major.minor>` |
 | Test time | `<UTC ISO-8601>` |
 | Operator | `<non-identifying role or initials>` |
-| Configured Canvas budget | `<128-2048 MiB>` |
+| Configured Canvas budget | `<128-4096 MiB>` |
 
 ## Smoke Results
 

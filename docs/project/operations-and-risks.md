@@ -144,7 +144,7 @@ npm run check:access
 
 门禁与渲染是独立层。先确认应用资源已授权加载，再按原有顺序检查 MIME/尺寸解码、同源胶片素材、Worker 能力、主线程 fallback、Canvas 预算、stale 结果和 Object URL 回收。不要通过上传用户照片到 sidecar 来规避浏览器兼容问题。
 
-The administrator setting controls only the estimated RGBA bytes of one Canvas. It does not change upload bytes, decoded-source thresholds, aggregate processing working-set thresholds, ZIP limits, or the 32,767 px edge ceiling. Values from 128 through 2,048 MiB are accepted, with 700 MiB as the bounded fallback. Raising the value is not proof that a browser can allocate that Canvas.
+The administrator setting controls only the estimated RGBA bytes of one Canvas. It does not change upload bytes, decoded-source thresholds, aggregate processing working-set thresholds, ZIP limits, or the 32,767 px edge ceiling. Values from 128 through 4,096 MiB are accepted, with 700 MiB as the bounded fallback. Raising the value is not proof that a browser can allocate that Canvas.
 
 If `/api/runtime-config` is unavailable or malformed, confirm the invited session and exact OpenResty route first. The frontend must report a recoverable fallback state and continue with 700 MiB; it must never become unbounded. A saved value applies to newly opened or refreshed tabs only.
 

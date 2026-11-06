@@ -2,7 +2,7 @@ import type { AccessDatabase } from "./db.js";
 
 export const DEFAULT_MAX_CANVAS_MIB = 700;
 export const MIN_MAX_CANVAS_MIB = 128;
-export const MAX_MAX_CANVAS_MIB = 2_048;
+export const MAX_MAX_CANVAS_MIB = 4_096;
 export const MEBIBYTE = 1024 * 1024;
 
 export interface RenderBudgetSetting {

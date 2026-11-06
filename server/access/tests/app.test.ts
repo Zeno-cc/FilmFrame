@@ -1000,7 +1000,7 @@ describe("administrator routes", () => {
     assert.equal(valid.status, 200);
     assert.match(valid.text, /暗房管理/);
     assert.match(valid.text, /运行配置/);
-    assert.match(valid.text, /min="128" max="2048"/);
+    assert.match(valid.text, /min="128" max="4096"/);
   });
 
   it("reads and updates the global Canvas budget within inclusive bounds", async () => {
@@ -1019,14 +1019,14 @@ describe("administrator routes", () => {
       updatedAt: 0,
     });
 
-    for (const value of [128, 2_048]) {
+    for (const value of [128, 4_096]) {
       const updated = await renderBudgetRequest(app, config, { maxCanvasMiB: value });
       assert.equal(updated.status, 200);
       assert.equal(updated.body.renderBudget.maxCanvasMiB, value);
       assert.equal(updated.body.renderBudget.maxCanvasBytes, value * 1024 * 1024);
       assert.equal(updated.body.renderBudget.updatedAt, 2_000);
     }
-    assert.equal((await read()).body.renderBudget.maxCanvasMiB, 2_048);
+    assert.equal((await read()).body.renderBudget.maxCanvasMiB, 4_096);
   });
 
   it("rejects insecure or invalid Canvas-budget writes without mutation", async () => {
@@ -1040,7 +1040,7 @@ describe("administrator routes", () => {
 
     for (const body of [
       { maxCanvasMiB: 127 },
-      { maxCanvasMiB: 2_049 },
+      { maxCanvasMiB: 4_097 },
       { maxCanvasMiB: 700.5 },
       { maxCanvasMiB: 700, unknown: true },
       {},

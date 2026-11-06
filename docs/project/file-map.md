@@ -77,7 +77,7 @@
 | `src/passkeyStore.ts` | WebAuthn challenge、凭证和恢复会话存储 |
 | `src/routes/adminRoutes.ts` | 管理页、列表、创建和撤销 API |
 | `src/runtimeConfig.ts` | Persisted singleton Canvas budget validation and exact MiB/byte conversion |
-| `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–2,048 MiB Canvas budget |
+| `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–4,096 MiB Canvas budget |
 | `src/views/html.ts` | 无第三方脚本的服务端邀请页和管理页；一次性明文可清除 |
 | `src/cli.ts` | SSH 应急 create/list/revoke/backup |
 | `migrations/001_initial.sql` | invites、sessions 和索引的初始 schema |

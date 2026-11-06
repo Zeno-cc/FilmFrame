@@ -671,7 +671,7 @@ The same-origin response has exactly these fields:
 
 ### 3. Contracts
 
-- Accept only whole-MiB values from 128 through 2,048. Four RGBA bytes per
+- Accept only whole-MiB values from 128 through 4,096. Four RGBA bytes per
   pixel convert the value to `RenderBudgetLimits`; the compiled default is 700
   MiB.
 - Fetch `/api/runtime-config` with same-origin credentials, `no-store`, and a
@@ -697,7 +697,7 @@ The same-origin response has exactly these fields:
 
 ### 4. Validation & Error Matrix
 
-- `128..2048` whole MiB with matching bytes/timestamp -> ready and bounded.
+- `128..4096` whole MiB with matching bytes/timestamp -> ready and bounded.
 - HTTP failure, timeout, malformed JSON, schema drift, or inconsistent bytes ->
   fallback to 700 MiB and show recoverable status.
 - Render command during loading -> no renderer call; show wait guidance.
@@ -716,7 +716,7 @@ The same-origin response has exactly these fields:
 
 ### 6. Tests Required
 
-- Unit tests cover 128, 700, and 2,048 MiB; immediately outside each boundary;
+- Unit tests cover 128, 700, and 4,096 MiB; immediately outside each boundary;
   exact byte conversion; strict response fields; timeout; fallback; and every
   Canvas sizing helper without allocating a giant Canvas.
 - Worker-client and fallback tests assert the same limits are forwarded for

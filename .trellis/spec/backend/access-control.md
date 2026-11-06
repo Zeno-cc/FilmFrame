@@ -745,7 +745,7 @@ the public runtime-config endpoint, or the FilmFrame OpenResty route changes.
 ```sql
 CREATE TABLE render_budget_settings (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-  max_canvas_mib INTEGER NOT NULL CHECK (max_canvas_mib BETWEEN 128 AND 2048),
+  max_canvas_mib INTEGER NOT NULL CHECK (max_canvas_mib BETWEEN 128 AND 4096),
   updated_at INTEGER NOT NULL CHECK (updated_at >= 0)
 );
 ```
@@ -764,13 +764,13 @@ GET /api/runtime-config
 
 ### 3. Contracts
 
-- Migration `005` adds one singleton row seeded to 700 MiB and timestamp `0`.
+- Migration `005` adds one singleton row seeded to 700 MiB and timestamp `0`; migration `007` expands its persisted upper bound to 4,096 MiB.
   It is additive and remains backward-compatible with v1.2, which ignores the
   table.
 - Administrator reads and writes require the exact admin host and verified
   Cloudflare Access identity. Writes also require exact Origin, JSON, CSRF,
   existing rate limits, strict request fields, and a redacted audit event.
-- Accept only integer `maxCanvasMiB` values from 128 through 2,048 and derive
+- Accept only integer `maxCanvasMiB` values from 128 through 4,096 and derive
   `maxCanvasBytes` server-side. Never accept bytes, pixels, identity, or generic
   settings JSON from the request.
 - Public `GET /api/runtime-config` requires an active invited-device session,
@@ -785,7 +785,7 @@ GET /api/runtime-config
 
 - Missing/invalid administrator assertion or wrong host -> reject before read
   or write.
-- Missing Origin/CSRF/JSON, unknown field, non-integer, `<128`, or `>2048` ->
+- Missing Origin/CSRF/JSON, unknown field, non-integer, `<128`, or `>4096` ->
   fixed 4xx response and zero database mutation.
 - Valid write -> atomically retain the previous value for audit, save the new
   value/timestamp, and return the canonical derived response.

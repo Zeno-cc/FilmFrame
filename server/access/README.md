@@ -106,8 +106,8 @@ commands, paths, environment values, and authentication assertions never cross
 the socket bridge.
 
 The render-budget setting is a dedicated SQLite singleton introduced by
-migration `005`. Administrators may save a whole-MiB value from 128 through
-2,048; the seed and frontend fallback are 700 MiB. The write retains the normal
+migration `005`, with migration `007` expanding its persisted constraint. Administrators may save a whole-MiB value from 128 through
+4,096; the seed and frontend fallback are 700 MiB. The write retains the normal
 administrator authentication, exact Origin, CSRF, JSON, rate-limit, and audit
 boundaries. The public runtime-config response is protected by the invitation
 session and exposes only the effective Canvas byte budget. It contains no
