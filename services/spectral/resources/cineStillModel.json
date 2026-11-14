@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "resourceKind": "spectral-cinestill-spatial",
+  "source": {
+    "url": "https://github.com/JamesQiu2005/SpektraLab",
+    "revision": "02d82b56cf65f0f8e802a708612edc4e9a4790af",
+    "aliasSha256": "4b5c5771a1d4755cf2f2994bbc0529387d579cc8d9fb6e23fe5d3d856fc13161",
+    "psfSha256": "ee2902b67a10b1dce04ae5ac835529668cc8ae28579278fb36d90ea56aab6b3d",
+    "baseSetupSha256": "11413d5f577a4ddcfbbb7cb215d88100b103b60d2870e9d1076529841d0d76d0"
+  },
+  "configuration": {
+    "filmId": "cinestill_800t",
+    "baseProfileId": "kodak_vision3_500t",
+    "paperId": "kodak_2383",
+    "antihalation": "no",
+    "backReflection": true,
+    "baseThicknessUm": 120,
+    "filmFormatMm": 36,
+    "amount": 1,
+    "spatialScale": 1,
+    "headroomEv": 4,
+    "headroomFromEv": 1.5,
+    "headroomToEv": 2.5,
+    "clipFromEv": -1,
+    "clipToEv": -0.25,
+    "midGray": 0.184,
+    "strength": [0.3, 0.03, 0.003],
+    "sigmaOverBase": [
+      [0.184586, 0.178469, 0.170237],
+      [1.121207, 1.000078, 0.546805],
+      [1.651048, 1.581389, 0.808738],
+      [4.677567, 9.448921, 1.340598]
+    ],
+    "weights": [
+      [0.04151, 0.106789, 0.202791],
+      [-0.5, -0.5, 0.156578],
+      [1.0345, 1.384389, -0.5],
+      [0.42399, 0.008822, 1.140631]
+    ],
+    "renormalize": true,
+    "boundary": "reflect",
+    "approximation": "Bounded separable Gaussian FIR, truncate 3; source IIR for sigma >= 3 is not claimed. Common scatter, lens/scanner blur, unsharp and stochastic effects are outside this slice."
+  }
+}

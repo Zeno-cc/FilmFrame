@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Isolated synthetic spectral numeric benchmark</title>
+  <style>
+    body { margin: 24px; font: 14px system-ui; background: #171717; color: #eee; }
+    canvas { width: 1024px; height: 224px; max-width: 100%; image-rendering: pixelated; border: 1px solid #555; }
+    pre { max-width: 960px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Isolated synthetic Portra numeric experiment</h1>
+  <p>No photos, templates, grain, UI integration, external image requests, GPU, or WASM.</p>
+  <canvas id="comparison" width="1024" height="224"></canvas>
+  <pre id="status">Loading</pre>
+  <script type="module" src="/scripts/spectral/browser-harness.ts"></script>
+</body>
+</html>

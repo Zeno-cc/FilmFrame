@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "sourceRevision": "3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+  "environment": {
+    "python": "3.13.12",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "colour": "0.4.6"
+  },
+  "baselineTolerance": {
+    "rtol": 0.0015,
+    "atol": 1e-06
+  },
+  "baselines": {
+    "film_raw_portra_endura_gray_ramp16": {
+      "npzSha256": "8e7a7f72f3b14ce5cb473ff11fa5f1058a6a8e26054facaec1a0957ae17214fc",
+      "outputPayloadSha256": "b87f94120e376277a206962ad2c312446423c02b99a4cdea92f38d2cd80e55ff",
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "b228ee9d51550af1b733031e1f433ac271b93910d5403b0757aa850f5aa667c7",
+      "recipe": "gray_ramp_16",
+      "recomputed": {
+        "algorithm": "not-applicable",
+        "passes": true,
+        "maxAbs": 5.551115123125783e-16,
+        "meanAbs": 1.7621899310131065e-16,
+        "violations": 0
+      }
+    },
+    "negative_density_portra_endura_gray_ramp16": {
+      "npzSha256": "05b3e914e9b24c0743a4042841379157ae4ed8752726fe55e027e6de786fd124",
+      "outputPayloadSha256": "4982e183186191ab89fbf03d6c7cc78d4e397fd0e296aebf2a1ec74fd0915d72",
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "f40591c287d91025115d57d2b3a2e52b46cd2c1f050a30e23f5bce59a556c35d",
+      "recipe": "gray_ramp_16",
+      "recomputed": {
+        "algorithm": "not-applicable",
+        "passes": true,
+        "maxAbs": 6.661338147750939e-16,
+        "meanAbs": 1.6017280094852518e-16,
+        "violations": 0
+      }
+    },
+    "print_rgb_portra_endura_gray_ramp16": {
+      "npzSha256": "4345814abe4c516618963c186a5c3f019eae01c7eec0654c25e0b93fff604311",
+      "outputPayloadSha256": "bcb82e8d714be8d62e21c3727e123c016a4c0fc3853b495153a6619bc91d5f8d",
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "ce54b8d81fca17ad2f89ceec38d02eb41262d9b7a36504d8c2aaf882d94e0b30",
+      "recipe": "gray_ramp_16",
+      "recomputed": {
+        "algorithm": "oklch",
+        "passes": false,
+        "maxAbs": 0.007130636018971126,
+        "meanAbs": 0.0004400957459287584,
+        "violations": 48
+      }
+    },
+    "print_rgb_portra_endura_green_patch8": {
+      "npzSha256": "a115fdebed2347f3106e6ec17e38fd3e3dd82721880b892507601595576b4399",
+      "outputPayloadSha256": "e1737ef99db2897fe69cc9f8704af7d348ebfca80997e49575d2be7d016fc961",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "bf14318f690c679b0201824b8f269ae47a0bd02e97a565de1f3835572827b3de",
+      "recipe": "green_patch_8",
+      "recomputed": {
+        "algorithm": "oklch",
+        "passes": true,
+        "maxAbs": 3.247402347028583e-15,
+        "meanAbs": 1.4525417905512465e-15,
+        "violations": 0
+      }
+    }
+  },
+  "intermediates": {
+    "gray_ramp_16.filmRaw": {
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "7620016f2f725ebb2eefe34b56a5b04326c872f183d1b7c78d6b1550d90dd494",
+      "outputPayloadSha256": "37a359a374621ec1716f1da277bfa3e20abcb8b61df3248ed5dbac94e7da8324"
+    },
+    "gray_ramp_16.negativeDensity": {
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "1140fe9e9db0c8adbe02e0b59f5600b1d81c0a45839a326b48eac40effb04e20",
+      "outputPayloadSha256": "b5f952a781209a5675255908da828feedb244a2010fd526582e58a42b1a21480"
+    },
+    "gray_ramp_16.paperLogExposure": {
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "150bb7df94ef0645cd32535e2976ff2b5bd96ec4cba8e90d845cdc249bb89506",
+      "outputPayloadSha256": "eee2119858e5acd89b82986addd86085c224b5c1457c3df72c12ad83b4570543"
+    },
+    "gray_ramp_16.paperDensity": {
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "9bd33cd99b6c959177c3dbb6201870d2a85b92b707829d925030322efea92ed2",
+      "outputPayloadSha256": "89875e81d3534b49fa607fa33e60bc2219af56d4f957aee82a674a7d2ff20ba5"
+    },
+    "gray_ramp_16.printRgb": {
+      "shape": [
+        16,
+        16,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "917bf1ccedbc130290dc5dafbbad734d7f66216d8a07397cd6c037e92b03342f",
+      "outputPayloadSha256": "75918907a2deb44ebaffedf813788119d129b6e35be8577be259debf0b48bd88"
+    },
+    "green_patch_8.filmRaw": {
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "c42e4e9d5ac4e5b37ca49829dce27334003dfbbfff6d81cc2d824c7a4e3ec597",
+      "outputPayloadSha256": "671659d3858dded8fc00e81e24eaf1a2fb011084dc3f816d62305c8ab8bcb418"
+    },
+    "green_patch_8.negativeDensity": {
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "0068d33bc6c3b36c9c7f3e31d192f58951c2d1cab9da2e913f686f3032efeab2",
+      "outputPayloadSha256": "c1cb136f2e960a03b108a1bd0769527cc51554acdc95a1917beccf309adbba6d"
+    },
+    "green_patch_8.paperLogExposure": {
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "4caa933882d91b14e0987d9ef5298467bd4181f2d63d548127abb206c7f05dab",
+      "outputPayloadSha256": "afe474ca557c25fa50648b7f18feba19aad5d05519cea736f3fd026b3e5244ba"
+    },
+    "green_patch_8.paperDensity": {
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "ae60ea3a7b54e452bcc7624dec2f107cc403d7eddabd0b1a579f8ab56967f65a",
+      "outputPayloadSha256": "cd64f1ebb0879b27e067cbc74d37a9a6f1ba0d8ad23a62b96b94c2e1795256ef"
+    },
+    "green_patch_8.printRgb": {
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "float64",
+      "order": "C",
+      "npySha256": "87a506dd3759acdd2a763ffe69c45034c53be7076b416ae2eab8452c5c0da61e",
+      "outputPayloadSha256": "636e441a0f3daf6b954172ae9bd6d654f6331b7bcd090462826193f6f4c5976d"
+    }
+  },
+  "kodak_portra_400Sha256": "b5cdc73dbec8f462f488bca70bedf23fd13ce79969c0457e8ac2a2565d92bf5d",
+  "kodak_portra_enduraSha256": "e3bb6069e02d088d8080d38ce28035816038f62786e2aff9176bf4aeeb4820a0"
+}
