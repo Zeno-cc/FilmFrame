@@ -10,7 +10,7 @@ from .errors import DeploymentError, UpdaterError
 from .models import PRE_SWITCH_STATES, UPDATER_VERSION, Job, ReleaseManifest, parse_semver
 from .release import CachedReleaseService
 from .store import StateStore
-from .system import CommandFailed, DeploymentLock
+from .system import CommandFailed, DeploymentLock, DeploymentLockBusy
 
 LOGGER = logging.getLogger("filmframe-updater")
 
@@ -29,50 +29,56 @@ class DeploymentCoordinator:
         self.lock_path = lock_path
 
     def run_job(self, job_id: str) -> None:
+        try:
+            with DeploymentLock(self.lock_path):
+                self._run_job_locked(job_id)
+        except DeploymentLockBusy:
+            LOGGER.info("update_event job=%s state=deployment_lock_busy", job_id)
+
+    def _run_job_locked(self, job_id: str) -> None:
         job = self.store.get_job(job_id)
         if not job or job.state != "queued":
             return
         switched = False
         try:
-            with DeploymentLock(self.lock_path):
-                manifest = self.releases.resolve(job.target_version)
-                self._transition(job_id, "verifying_release")
-                current = self.deployer.inspect_current()
-                self.deployer.preflight(manifest, current)
-                if not current.release_path:
-                    raise DeploymentError("preflight_failed")
-                self.store.set_release_paths(
-                    job_id,
-                    previous_version=current.version,
-                    previous_revision=current.revision,
-                    previous_release=current.release_path,
-                )
+            manifest = self.releases.resolve(job.target_version)
+            self._transition(job_id, "verifying_release")
+            current = self.deployer.inspect_current()
+            self.deployer.preflight(manifest, current)
+            if not current.release_path:
+                raise DeploymentError("preflight_failed")
+            self.store.set_release_paths(
+                job_id,
+                previous_version=current.version,
+                previous_revision=current.revision,
+                previous_release=current.release_path,
+            )
 
-                self._transition(job_id, "pulling_artifacts")
-                bundle = self.deployer.pull_artifacts(manifest, self._job(job_id))
+            self._transition(job_id, "pulling_artifacts")
+            bundle = self.deployer.pull_artifacts(manifest, self._job(job_id))
 
-                self._transition(job_id, "staging_release")
-                staged = self.deployer.stage_release(manifest, self._job(job_id), bundle)
-                self.store.set_staged_release(job_id, str(staged))
+            self._transition(job_id, "staging_release")
+            staged = self.deployer.stage_release(manifest, self._job(job_id), bundle)
+            self.store.set_staged_release(job_id, str(staged))
 
-                self._transition(job_id, "rehearsing_migration")
-                self.deployer.rehearse_migration(manifest, self._job(job_id))
+            self._transition(job_id, "rehearsing_migration")
+            self.deployer.rehearse_migration(manifest, self._job(job_id))
 
-                self._transition(job_id, "backing_up")
-                self.deployer.final_backup()
+            self._transition(job_id, "backing_up")
+            self.deployer.final_backup()
 
-                self._transition(job_id, "ready_to_switch")
-                self._transition(job_id, "switching")
-                switched = True
-                self.deployer.switch(staged, self._job(job_id))
+            self._transition(job_id, "ready_to_switch")
+            self._transition(job_id, "switching")
+            switched = True
+            self.deployer.switch(staged, self._job(job_id))
 
-                self._transition(job_id, "verifying_loopback")
-                self.deployer.verify_loopback(manifest, revision=manifest.commit, release=staged)
-                self._transition(job_id, "verifying_origin")
-                self.deployer.verify_origin()
-                self._transition(job_id, "verifying_public")
-                self.deployer.verify_public()
-                self._transition(job_id, "succeeded")
+            self._transition(job_id, "verifying_loopback")
+            self.deployer.verify_loopback(manifest, revision=manifest.commit, release=staged)
+            self._transition(job_id, "verifying_origin")
+            self.deployer.verify_origin()
+            self._transition(job_id, "verifying_public")
+            self.deployer.verify_public()
+            self._transition(job_id, "succeeded")
         except DeploymentError as exc:
             self._handle_failure(job_id, exc.code, switched=switched)
         except (UpdaterError, CommandFailed, OSError, ValueError):
@@ -86,6 +92,14 @@ class DeploymentCoordinator:
                     LOGGER.warning("update_event job=%s state=artifact_cleanup_failed", final.id)
 
     def reconcile(self) -> Optional[Job]:
+        try:
+            with DeploymentLock(self.lock_path):
+                return self._reconcile_locked()
+        except DeploymentLockBusy:
+            LOGGER.info("update_event state=deployment_lock_busy")
+            return self.store.get_active_job()
+
+    def _reconcile_locked(self) -> Optional[Job]:
         job = self.store.get_active_job()
         if not job:
             return job
@@ -93,31 +107,30 @@ class DeploymentCoordinator:
             self._cleanup(job)
             return job
         try:
-            with DeploymentLock(self.lock_path):
-                if job.state in PRE_SWITCH_STATES:
-                    result = self._transition(job.id, "failed_pre_switch", error_code="interrupted")
-                    self._cleanup(result)
-                    return result
-                manifest = self.releases.resolve(job.target_version)
-                current = self.deployer.inspect_current()
-                if current.revision == job.previous_revision and current.healthy:
-                    if job.state != "rolling_back":
-                        self._transition(job.id, "rolling_back", error_code="interrupted")
-                    return self._complete_rollback(job.id, manifest, "interrupted")
-                if current.revision != job.target_revision or not current.healthy:
-                    if job.state != "rolling_back":
-                        self._transition(job.id, "rolling_back", error_code="health_check_failed")
-                    return self._complete_rollback(job.id, manifest, "health_check_failed")
-                if (
-                    not current.release_path
-                    or not job.staged_release
-                    or Path(current.release_path).resolve(strict=True)
-                    != Path(job.staged_release).resolve(strict=True)
-                ):
-                    if job.state != "rolling_back":
-                        self._transition(job.id, "rolling_back", error_code="health_check_failed")
-                    return self._complete_rollback(job.id, manifest, "health_check_failed")
-                return self._resume_verification(job.id, manifest)
+            if job.state in PRE_SWITCH_STATES:
+                result = self._transition(job.id, "failed_pre_switch", error_code="interrupted")
+                self._cleanup(result)
+                return result
+            manifest = self.releases.resolve(job.target_version)
+            current = self.deployer.inspect_current()
+            if current.revision == job.previous_revision and current.healthy:
+                if job.state != "rolling_back":
+                    self._transition(job.id, "rolling_back", error_code="interrupted")
+                return self._complete_rollback(job.id, manifest, "interrupted")
+            if current.revision != job.target_revision or not current.healthy:
+                if job.state != "rolling_back":
+                    self._transition(job.id, "rolling_back", error_code="health_check_failed")
+                return self._complete_rollback(job.id, manifest, "health_check_failed")
+            if (
+                not current.release_path
+                or not job.staged_release
+                or Path(current.release_path).resolve(strict=True)
+                != Path(job.staged_release).resolve(strict=True)
+            ):
+                if job.state != "rolling_back":
+                    self._transition(job.id, "rolling_back", error_code="health_check_failed")
+                return self._complete_rollback(job.id, manifest, "health_check_failed")
+            return self._resume_verification(job.id, manifest)
         except (DeploymentError, UpdaterError, CommandFailed, OSError, ValueError):
             current = self.store.get_job(job.id)
             if current and current.state != "rolling_back":

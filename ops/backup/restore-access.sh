@@ -50,7 +50,12 @@ backup_path=$BACKUP_ROOT/$backup_name
 manifest_path=$backup_path.sha256
 [[ -f "$backup_path" && ! -L "$backup_path" ]] || { echo "backup not found" >&2; exit 1; }
 [[ -f "$manifest_path" && ! -L "$manifest_path" ]] || { echo "checksum manifest not found" >&2; exit 1; }
-(cd "$BACKUP_ROOT" && sha256sum --check --status "$backup_name.sha256") \
+manifest=$(cat "$manifest_path")
+expected_hash=${manifest%%  *}
+[[ "$expected_hash" =~ ^[0-9a-f]{64}$ && "$manifest" == "$expected_hash  $backup_name" ]] \
+  || { write_status failure "checksum manifest does not match backup" "$backup_name" "$volume_name"; exit 1; }
+actual_hash=$(sha256sum "$backup_path" | awk '{print $1}')
+[[ "$actual_hash" == "$expected_hash" ]] \
   || { write_status failure "checksum validation failed" "$backup_name" "$volume_name"; exit 1; }
 
 if docker volume inspect "$volume_name" >/dev/null 2>&1; then

@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import select
+import subprocess
+import sys
 import tempfile
 import unittest
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from filmframe_updater.application import DeploymentCoordinator, UpdaterApplication
 from filmframe_updater.errors import DeploymentError, UpdaterError
@@ -93,6 +98,137 @@ class ApplicationTests(unittest.TestCase):
 
     def coordinator(self, deployer):
         return DeploymentCoordinator(self.store, self.releases, deployer, self.root / "update.lock")
+
+    @contextmanager
+    def competing_lock(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", """
+import fcntl, sys
+with open(sys.argv[1], 'a') as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    print('locked', flush=True)
+    sys.stdin.read()
+""", str(self.root / "update.lock")],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            self.assertTrue(select.select([process.stdout], [], [], 5)[0], "lock holder timed out")
+            self.assertEqual(process.stdout.readline(), "locked\n")
+            yield
+        finally:
+            _stdout, stderr = process.communicate("", timeout=5)
+            self.assertEqual(process.returncode, 0, stderr)
+
+    def assert_process_sees_lock(self, *, held: bool) -> None:
+        result = subprocess.run(
+            [sys.executable, "-c", """
+import fcntl, sys
+with open(sys.argv[1], 'a') as lock:
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit(7)
+""", str(self.root / "update.lock")],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertEqual(result.returncode, 7 if held else 0, result.stderr)
+
+    def advance_to_switching(self, job):
+        self.store.set_release_paths(
+            job.id,
+            previous_version="1.0.0",
+            previous_revision="1" * 40,
+            previous_release=str(self.root / "old"),
+            staged_release=str(self.root / "new"),
+        )
+        for state in (
+            "verifying_release", "pulling_artifacts", "staging_release",
+            "rehearsing_migration", "backing_up", "ready_to_switch", "switching",
+        ):
+            self.store.transition(job.id, state)
+
+    def test_busy_job_waits_without_mutation_or_cleanup_and_can_run_after_unlock(self) -> None:
+        deployer = FakeDeployer(self.root)
+        job = self.create()
+        coordinator = self.coordinator(deployer)
+        with self.competing_lock():
+            coordinator.run_job(job.id)
+            self.assertEqual(self.store.get_job(job.id), job)
+            self.assertEqual(self.store.event_states(job.id), ["queued"])
+            self.assertEqual(deployer.calls, [])
+        coordinator.run_job(job.id)
+        self.assertEqual(self.store.get_job(job.id).state, "succeeded")
+        self.assert_process_sees_lock(held=False)
+
+    def test_busy_reconcile_never_rolls_back_or_cleans_another_process_job(self) -> None:
+        deployer = FakeDeployer(self.root)
+        job = self.create()
+        coordinator = self.coordinator(deployer)
+        with self.competing_lock():
+            self.assertEqual(coordinator.reconcile(), job)
+            self.assertEqual(self.store.get_job(job.id), job)
+            self.advance_to_switching(job)
+            for state in ("switching", "rolling_back", "recovery_required"):
+                if state != "switching":
+                    self.store.transition(job.id, state)
+                before = self.store.get_job(job.id)
+                events = self.store.event_states(job.id)
+                self.assertEqual(coordinator.reconcile(), before)
+                self.assertEqual(self.store.get_job(job.id), before)
+                self.assertEqual(self.store.event_states(job.id), events)
+            self.assertEqual(deployer.calls, [])
+
+    def test_failed_job_rollback_and_cleanup_keep_lock_until_finished(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="verify_origin")
+        job = self.create()
+
+        def rollback(*_args):
+            self.assert_process_sees_lock(held=True)
+            deployer._call("rollback")
+
+        def cleanup(*_args):
+            self.assert_process_sees_lock(held=True)
+            deployer._call("cleanup_artifacts")
+
+        with patch.object(deployer, "rollback", side_effect=rollback), patch.object(
+            deployer, "cleanup_artifacts", side_effect=cleanup
+        ):
+            self.coordinator(deployer).run_job(job.id)
+        self.assertEqual(self.store.get_job(job.id).state, "rolled_back")
+        self.assert_process_sees_lock(held=False)
+
+    def test_reconcile_normal_and_exception_rollback_keep_lock(self) -> None:
+        for fail_at in (None, "inspect_current"):
+            with self.subTest(fail_at=fail_at):
+                deployer = FakeDeployer(self.root, fail_at=fail_at)
+                job = self.create()
+                self.advance_to_switching(job)
+
+                def rollback(*_args):
+                    self.assert_process_sees_lock(held=True)
+                    deployer._call("rollback")
+
+                with patch.object(deployer, "rollback", side_effect=rollback):
+                    self.coordinator(deployer).reconcile()
+                self.assertEqual(self.store.get_job(job.id).state, "rolled_back")
+                self.assert_process_sees_lock(held=False)
+
+    def test_lock_io_failure_surfaces_without_mutating_job(self) -> None:
+        deployer = FakeDeployer(self.root)
+        job = self.create()
+        coordinator = self.coordinator(deployer)
+        with patch("filmframe_updater.application.DeploymentLock.__enter__", side_effect=PermissionError):
+            with self.assertRaises(PermissionError):
+                coordinator.run_job(job.id)
+            with self.assertRaises(PermissionError):
+                coordinator.reconcile()
+        self.assertEqual(self.store.get_job(job.id), job)
+        self.assertEqual(deployer.calls, [])
 
     def test_success_runs_every_gate_and_persists_real_states(self) -> None:
         deployer = FakeDeployer(self.root)

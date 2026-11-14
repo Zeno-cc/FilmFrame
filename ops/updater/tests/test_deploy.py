@@ -82,7 +82,8 @@ def secure_compose() -> dict:
                     },
                 ],
             },
-        }
+        },
+        "volumes": {"filmframe_access_data": {"name": "filmframe_access_data"}},
     }
 
 
@@ -158,10 +159,9 @@ class DeploymentBoundaryTests(unittest.TestCase):
                 )._assert_compose_security(self.old, boundary="candidate")
 
         restored = secure_compose()
-        for service in ("access", "access-backup"):
-            restored["services"][service]["volumes"][0]["source"] = (
-                "filmframe_access_restore_validated"
-            )
+        restored["volumes"]["filmframe_access_data"]["name"] = (
+            "filmframe_access_restore_validated"
+        )
         self.assertEqual(
             ProductionDeployer(
                 self.config,
@@ -202,6 +202,42 @@ class DeploymentBoundaryTests(unittest.TestCase):
             ProductionDeployer(
                 self.config, RecordingRunner(public), NoopSource()  # type: ignore[arg-type]
             )._assert_loopback_ports(self.old)
+
+    def test_staging_rejects_a_different_physical_database_volume(self) -> None:
+        current = secure_compose()
+        candidate = secure_compose()
+        candidate["volumes"]["filmframe_access_data"]["name"] = "empty_data"
+        runner = RecordingRunner(current)
+        deployer = ProductionDeployer(self.config, runner, NoopSource())  # type: ignore[arg-type]
+        deployer._production_data_volume = deployer._assert_compose_security(
+            self.old, boundary="current"
+        )
+        runner.compose_config = candidate
+        job = type("Job", (), {"id": "9cb5c3d2-e26d-4f03-83d9-85e56e2b819b"})()
+        archive = self.root / "bundle.tar.gz"
+        with tarfile.open(archive, "w:gz") as output:
+            for name in (
+                "compose.yaml", ".env.example", "ops/backup/backup-access.sh",
+                "ops/backup/check-access-backup.sh", "ops/backup/restore-access.sh",
+            ):
+                info = tarfile.TarInfo(f"filmframe-1.1.0/{name}")
+                info.size = 1
+                output.addfile(info, io.BytesIO(b"x"))
+        with self.assertRaises(DeploymentError) as raised:
+            deployer.stage_release(manifest(), job, archive)  # type: ignore[arg-type]
+        self.assertEqual(raised.exception.code, "staging_failed")
+        self.assertEqual(self.current.resolve(), self.old.resolve())
+        self.assertEqual(list(self.release_root.iterdir()), [self.old])
+
+    def test_compose_rejects_missing_or_invalid_physical_volume_names(self) -> None:
+        for definitions in ({}, {"filmframe_access_data": {}},
+                            {"filmframe_access_data": {"name": "/host/data"}}):
+            config = secure_compose()
+            config["volumes"] = definitions
+            with self.subTest(definitions=definitions), self.assertRaises(DeploymentError):
+                ProductionDeployer(
+                    self.config, RecordingRunner(config), NoopSource()  # type: ignore[arg-type]
+                )._assert_compose_security(self.old, boundary="candidate")
 
     def test_release_env_preserves_secret_and_safe_mode(self) -> None:
         new = self.release_root / "new"

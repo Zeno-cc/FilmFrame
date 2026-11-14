@@ -116,10 +116,12 @@ async function runBrowserWorkflow(cookie) {
 
     await page.goto("/", { waitUntil: "load" });
     await page.getByRole("heading", { name: "让这一卷，慢慢显影" }).waitFor();
-    await page
-      .getByRole("complementary", { name: "暗房配方" })
-      .getByLabel("胶片型号")
-      .selectOption("KODAK PORTRA 160");
+    const inspector = page.getByRole("complementary", { name: "暗房配方" });
+    await inspector.getByRole("button", { name: "胶片型号", exact: true }).click();
+    await inspector
+      .getByRole("listbox", { name: "胶片型号" })
+      .getByRole("option", { name: /^KODAK PORTRA 160(?: · 光谱)?$/, exact: true })
+      .click();
     await page.locator('input[type="file"]').setInputFiles(
       path.join(root, "public/film-overlays/aperture-mask-derived.png"),
     );

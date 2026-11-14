@@ -162,6 +162,8 @@ test("package scripts compose one portable reusable release gate", async () => {
   assert.equal(releaseGate, [
     "npm run verify:release-input",
     "npm run test:release-contract",
+    "npm run test:provenance",
+    "npm run verify:provenance",
     "npm run check:all",
     "npm run test:updater",
     "npm run test:e2e",

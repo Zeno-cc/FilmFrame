@@ -35,6 +35,9 @@ if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-
 }
 for (const name of ["RC_CERTIFICATE", "RC_CERTIFICATE_KEY", "RC_REAL_IP_INCLUDE"]) {
   if (!path.isAbsolute(values[name])) usage(`--${name.toLowerCase().replaceAll("_", "-")} must be absolute`);
+  if (/[\s\u0000-\u001f\u007f"'\\;{}#$]/u.test(values[name])) {
+    usage(`${name} cannot contain whitespace, control characters, or Nginx syntax characters`);
+  }
 }
 
 let source = await readFile(input, "utf8");

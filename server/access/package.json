@@ -22,7 +22,7 @@
     "express": "5.2.1",
     "helmet": "8.1.0",
     "jose": "6.2.5",
-    "zod": "4.3.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",
@@ -30,11 +30,11 @@
     "@types/node": "22.19.7",
     "@types/supertest": "6.0.3",
     "supertest": "7.2.2",
-    "tsx": "4.21.0",
+    "tsx": "4.23.15",
     "typescript": "5.9.3"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
-    "esbuild@0.27.7": true
+    "esbuild@0.28.2": true
   }
 }

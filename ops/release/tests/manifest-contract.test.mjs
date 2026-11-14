@@ -72,6 +72,24 @@ test("rejects incompatible database metadata", () => {
   assert.match(validateManifest(impossibleRollback).join("\n"), /rollbackFloor/);
 });
 
+test("rejects calendar overflow timestamps that the host updater cannot parse", () => {
+  for (const publishedAt of [
+    "2026-02-29T04:03:06Z",
+    "2026-04-31T04:03:06Z",
+    "2026-08-02T24:00:00Z",
+    "0000-08-02T04:03:06Z",
+  ]) {
+    const manifest = validManifest();
+    manifest.publishedAt = publishedAt;
+    assert.match(validateManifest(manifest).join("\n"), /publishedAt/, publishedAt);
+  }
+  for (const publishedAt of ["2024-02-29T04:03:06Z", "2026-08-02T04:03:06.123Z"]) {
+    const manifest = validManifest();
+    manifest.publishedAt = publishedAt;
+    assert.deepEqual(validateManifest(manifest), []);
+  }
+});
+
 test("release input matches the committed manifest contract", async () => {
   const input = JSON.parse(
     await readFile(new URL("../release-input.json", import.meta.url), "utf8"),

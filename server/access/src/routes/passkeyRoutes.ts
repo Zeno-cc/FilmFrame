@@ -12,9 +12,9 @@ import {
 } from "@simplewebauthn/server";
 import { z } from "zod";
 
-import type { AccessConfig } from "../config.js";
+import { publicOriginForRequest, type AccessConfig } from "../config.js";
 import type { AccessDatabase } from "../db.js";
-import { requireHost, requireWriteCsrf } from "../middleware/requestSecurity.js";
+import { requireHost, requireJsonContentType, requireWriteCsrf } from "../middleware/requestSecurity.js";
 import {
   challengeById,
   getPasskeyByCredentialId,
@@ -42,6 +42,11 @@ const verifyBodySchema = z
     response: responseSchema,
   })
   .strict();
+
+function isDatabaseError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && code.startsWith("SQLITE_");
+}
 
 const RP_NAME = "FilmFrame 暗房";
 type Transport = "ble" | "cable" | "hybrid" | "internal" | "nfc" | "smart-card" | "usb";
@@ -83,7 +88,10 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
   const router = Router();
   const now = options.now ?? Date.now;
   const filmHost = requireHost(options.config.filmframeHost);
-  const csrf = requireWriteCsrf(options.config.publicOrigin);
+  const csrf: RequestHandler = (request, response, next) => {
+    response.locals.publicOrigin = publicOriginForRequest(options.config, request);
+    requireWriteCsrf(response.locals.publicOrigin as string | null)(request, response, next);
+  };
 
   router.get("/auth/passkeys/client.js", filmHost, (_request, response) => {
     try {
@@ -115,6 +123,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
     "/auth/passkeys/registration/options",
     filmHost,
     csrf,
+    requireJsonContentType,
     options.optionsRateLimiter,
     express.json({ limit: "4kb", strict: true }),
     async (request, response) => {
@@ -158,7 +167,8 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
           expiresAt: requestNow + WEBAUTHN_CHALLENGE_TTL_MS,
         });
         response.json({ challengeId: challenge.id, options: challengeOptions });
-      } catch {
+      } catch (error) {
+        if (isDatabaseError(error)) throw error;
         response.status(400).json({ error: "passkey_unavailable" });
       }
     },
@@ -168,6 +178,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
     "/auth/passkeys/registration/verify",
     filmHost,
     csrf,
+    requireJsonContentType,
     options.verifyRateLimiter,
     express.json({ limit: "64kb", strict: true }),
     async (request, response) => {
@@ -189,7 +200,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
         const verification = await verifyRegistrationResponse({
           response: input.data.response as unknown as RegistrationResponseJSON,
           expectedChallenge: pending.challenge,
-          expectedOrigin: options.config.publicOrigin,
+          expectedOrigin: response.locals.publicOrigin as string,
           expectedRPID: options.config.filmframeHost,
           requireUserVerification: true,
         });
@@ -206,11 +217,12 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
           deviceType: info.credentialDeviceType,
           backedUp: info.credentialBackedUp,
           transports: parseTransports(input.data.response.response.transports),
-          now: requestNow,
+          now: now(),
         });
         if (!registered) throw new Error("challenge_invalid");
         response.status(201).json({ ok: true });
-      } catch {
+      } catch (error) {
+        if (isDatabaseError(error)) throw error;
         response.status(400).json({ error: "passkey_verification_failed" });
       }
     },
@@ -220,6 +232,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
     "/auth/passkeys/authentication/options",
     filmHost,
     csrf,
+    requireJsonContentType,
     options.optionsRateLimiter,
     express.json({ limit: "4kb", strict: true }),
     async (_request, response) => {
@@ -239,7 +252,8 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
           expiresAt: requestNow + WEBAUTHN_CHALLENGE_TTL_MS,
         });
         response.json({ challengeId: challenge.id, options: challengeOptions });
-      } catch {
+      } catch (error) {
+        if (isDatabaseError(error)) throw error;
         response.status(400).json({ error: "passkey_unavailable" });
       }
     },
@@ -249,6 +263,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
     "/auth/passkeys/authentication/verify",
     filmHost,
     csrf,
+    requireJsonContentType,
     options.verifyRateLimiter,
     express.json({ limit: "64kb", strict: true }),
     async (request, response) => {
@@ -275,7 +290,7 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
         const verification = await verifyAuthenticationResponse({
           response: input.data.response as unknown as AuthenticationResponseJSON,
           expectedChallenge: pending.challenge,
-          expectedOrigin: options.config.publicOrigin,
+          expectedOrigin: response.locals.publicOrigin as string,
           expectedRPID: options.config.filmframeHost,
           requireUserVerification: true,
           credential: {
@@ -293,12 +308,13 @@ export function createPasskeyRoutes(options: PasskeyRouteOptions): Router {
           inviteId: credential.inviteId,
           expectedCounter: credential.counter,
           newCounter: verification.authenticationInfo.newCounter,
-          now: requestNow,
+          now: now(),
         });
         if (!recovered) throw new Error("invite_revoked");
         setSessionCookie(response, options.config, recovered.token);
         response.json({ ok: true });
-      } catch {
+      } catch (error) {
+        if (isDatabaseError(error)) throw error;
         response.status(400).json({ error: "passkey_verification_failed" });
       }
     },

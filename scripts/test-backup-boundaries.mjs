@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import "./tests/backup-integrity.test.mjs";
 
 const root = await mkdtemp(path.join(tmpdir(), "filmframe-backup-test-"));
 let backupRoot = path.join(root, "backups");

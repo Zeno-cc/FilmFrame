@@ -711,7 +711,14 @@ class ProductionDeployer:
             raise DeploymentError("preflight_failed")
         if access_data_volume is None:
             raise DeploymentError("preflight_failed")
-        return access_data_volume
+        definitions = config.get("volumes")
+        definition = definitions.get(access_data_volume) if isinstance(definitions, dict) else None
+        volume_name = definition.get("name") if isinstance(definition, dict) else None
+        if not isinstance(volume_name, str) or not re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9_.-]{0,254}", volume_name
+        ):
+            raise DeploymentError("preflight_failed")
+        return volume_name
 
     def _test_openresty(self) -> None:
         self.runner.run(

@@ -44,7 +44,7 @@ export function requireInternalRequest(config: AccessConfig): RequestHandler {
   };
 }
 
-export function requireWriteCsrf(origin: string): RequestHandler {
+export function requireWriteCsrf(origin: string | null): RequestHandler {
   return (request, response, next) => {
     if (
       request.header("Origin") !== origin ||

@@ -20,7 +20,15 @@ modified=$(stat -c %Y -- "$BACKUP_ROOT/$latest" 2>/dev/null || stat -f %m -- "$B
 age=$(( $(date +%s) - modified ))
 (( age <= MAX_AGE_HOURS * 3600 )) || { echo "latest backup is too old" >&2; exit 1; }
 
-(cd "$BACKUP_ROOT" && sha256sum --check --status "$latest.sha256") \
+manifest_path=$BACKUP_ROOT/$latest.sha256
+[[ -f "$manifest_path" && ! -L "$manifest_path" ]] \
+  || { echo "checksum manifest unavailable" >&2; exit 1; }
+manifest=$(cat "$manifest_path")
+expected_hash=${manifest%%  *}
+[[ "$expected_hash" =~ ^[0-9a-f]{64}$ && "$manifest" == "$expected_hash  $latest" ]] \
+  || { echo "checksum manifest does not match backup" >&2; exit 1; }
+actual_hash=$(sha256sum "$BACKUP_ROOT/$latest" | awk '{print $1}')
+[[ "$actual_hash" == "$expected_hash" ]] \
   || { echo "latest backup checksum failed" >&2; exit 1; }
 
 usage=$(df -P "$BACKUP_ROOT" | awk 'NR==2 {gsub(/%/, "", $5); print $5}')

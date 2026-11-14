@@ -79,6 +79,43 @@ export interface AccessConfig {
   updaterTimeoutMs: number;
 }
 
+export interface PublicOriginRequest {
+  readonly protocol: string;
+  get(name: "host"): string | undefined;
+}
+
+export function publicOriginForRequest(
+  config: Pick<
+    AccessConfig,
+    "filmframeHost" | "nodeEnv" | "publicOrigin" | "secureCookies"
+  >,
+  request: PublicOriginRequest,
+): string | null {
+  if (config.nodeEnv === "production" || config.secureCookies) {
+    return config.publicOrigin;
+  }
+
+  const host = request.get("host");
+  if (!host || request.protocol !== "http") return null;
+
+  try {
+    const parsed = new URL(`http://${host}`);
+    if (
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.hostname !== config.filmframeHost
+    ) {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AccessConfig {
   const parsed = environmentSchema.safeParse(environment);
   if (!parsed.success) {

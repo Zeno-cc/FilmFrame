@@ -67,7 +67,9 @@ export function validateManifest(value) {
   if (
     typeof value.publishedAt !== "string" ||
     !DATE_TIME.test(value.publishedAt) ||
-    Number.isNaN(Date.parse(value.publishedAt))
+    value.publishedAt.startsWith("0000-") ||
+    Number.isNaN(Date.parse(value.publishedAt)) ||
+    new Date(value.publishedAt).toISOString() !== value.publishedAt.replace(/(?<=:\d{2})Z$/, ".000Z")
   ) {
     errors.push("publishedAt must be a valid UTC ISO-8601 timestamp");
   }

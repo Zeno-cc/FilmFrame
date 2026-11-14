@@ -7,7 +7,7 @@ import {
 } from "express";
 import { z } from "zod";
 
-import type { AccessConfig } from "../config.js";
+import { publicOriginForRequest, type AccessConfig } from "../config.js";
 import { GENERIC_INVITE_ERROR } from "../constants.js";
 import type { AccessDatabase } from "../db.js";
 import { requireHost, requireWriteCsrf } from "../middleware/requestSecurity.js";
@@ -98,12 +98,7 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
       return request.header("Sec-Fetch-Site") === "same-origin";
     }
 
-    const expectedOrigin = options.config.secureCookies
-      ? normalizeOrigin(options.config.publicOrigin)
-      : (() => {
-          const host = request.get("host");
-          return host ? normalizeOrigin(`${request.protocol}://${host}`) : null;
-        })();
+    const expectedOrigin = normalizeOrigin(publicOriginForRequest(options.config, request) ?? "");
     return expectedOrigin !== null && normalizeOrigin(origin) === expectedOrigin;
   }
 
@@ -182,7 +177,9 @@ export function createPublicRoutes(options: PublicRouteOptions): Router {
   router.post(
     "/auth/refresh",
     filmHost,
-    requireWriteCsrf(options.config.publicOrigin),
+    (request, response, next) => {
+      requireWriteCsrf(publicOriginForRequest(options.config, request))(request, response, next);
+    },
     (request, response) => {
       const token = readSessionCookie(request, options.config);
       response.locals.operation = "session_refresh";

@@ -12,6 +12,10 @@ class CommandFailed(RuntimeError):
     pass
 
 
+class DeploymentLockBusy(CommandFailed):
+    pass
+
+
 @dataclass(frozen=True)
 class CommandResult:
     stdout: bytes
@@ -80,9 +84,12 @@ class DeploymentLock:
         )
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            os.close(descriptor)
+            raise DeploymentLockBusy("deployment lock is busy") from exc
         except OSError:
             os.close(descriptor)
-            raise CommandFailed("deployment lock is busy")
+            raise
         self._descriptor = descriptor
         return self
 
