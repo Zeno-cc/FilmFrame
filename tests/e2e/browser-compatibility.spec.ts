@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test, type Page, type Request } from '@playwright/test';
+import { selectFilmStock } from './stockPicker';
 
 const firstFixture = path.resolve(
   process.cwd(),
@@ -21,14 +22,15 @@ async function uploadFixtures(page: Page, fixtures: string[]) {
   await page.locator('input[type="file"]').setInputFiles(fixtures);
 }
 
-test('local photo workflow remains compatible across browser engines', async ({ page }) => {
+test('local photo workflow remains compatible across browser engines', async ({ page }, testInfo) => {
+  const applicationOrigin = new URL(testInfo.project.use.baseURL as string).origin;
   const externalRequests: string[] = [];
   const unexpectedMutations: string[] = [];
   const applicationRequests: string[] = [];
   page.on('request', request => {
     const url = new URL(request.url());
     applicationRequests.push(`${request.method()} ${url.pathname}`);
-    if (['http:', 'https:'].includes(url.protocol) && url.origin !== 'http://127.0.0.1:4174') {
+    if (['http:', 'https:'].includes(url.protocol) && url.origin !== applicationOrigin) {
       externalRequests.push(request.url());
     }
     if (isUnexpectedMutation(request)) {
@@ -52,7 +54,9 @@ test('local photo workflow remains compatible across browser engines', async ({ 
   await page.setViewportSize({ width: 1280, height: 900 });
 
   const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
+  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await inspector.getByLabel('成像方式').selectOption('legacy');
+  await selectFilmStock(inspector,'KODAK PORTRA 160');
   await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute(
     'aria-pressed',
     'true',

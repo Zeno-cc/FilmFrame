@@ -112,24 +112,51 @@ describe('recipe storage', () => {
     expect(recipes.at(-1)?.name).toBe('Recipe 2');
   });
 
-  it('deletes recipes by either id or name and tolerates write failures', () => {
+  it('deletes recipes by either id or name', () => {
     const storage = memoryStorage();
     saveRecipe('First', settings, { storage, createId: () => 'first-id', now: () => 1 });
     saveRecipe('Second', settings, { storage, createId: () => 'second-id', now: () => 2 });
 
     expect(deleteRecipe('first-id', storage).map(recipe => recipe.name)).toEqual(['Second']);
     expect(deleteRecipe('Second', storage)).toEqual([]);
+  });
 
+  it('reports a failed save without replacing persisted recipes and allows a retry', () => {
+    const storage = memoryStorage();
+    saveRecipe('Existing', settings, { storage, createId: () => 'existing', now: () => 1 });
+    const originalValue = storage.value;
+    const quotaError = new DOMException('Storage is full', 'QuotaExceededError');
     const failingStorage: RecipeStorage = {
-      getItem: () => null,
-      setItem: () => {
-        throw new Error('quota');
-      },
+      getItem: key => storage.getItem(key),
+      setItem: () => { throw quotaError; },
     };
-    expect(() => saveRecipe('Safe', settings, {
+    expect(() => saveRecipe('Draft', settings, {
       storage: failingStorage,
-      createId: () => 'safe',
-      now: () => 1,
-    })).not.toThrow();
+      createId: () => 'draft',
+      now: () => 2,
+    })).toThrow(quotaError);
+    expect(storage.value).toBe(originalValue);
+    expect(loadRecipes(storage).map(recipe => recipe.name)).toEqual(['Existing']);
+
+    const saved = saveRecipe('Draft', settings, { storage, createId: () => 'draft', now: () => 3 });
+    expect(saved).toEqual(loadRecipes(storage));
+    expect(saved.map(recipe => recipe.name)).toEqual(['Draft', 'Existing']);
+  });
+
+  it('reports unavailable storage instead of returning an unsaved recipe', () => {
+    expect(() => saveRecipe('Draft', settings, { storage: null }))
+      .toThrow('Recipe storage is unavailable');
+  });
+
+  it('reports failed deletion and retains the persisted recipe', () => {
+    const storage = memoryStorage();
+    saveRecipe('Existing', settings, { storage, createId: () => 'existing', now: () => 1 });
+    const originalValue = storage.value;
+    expect(() => deleteRecipe('existing', {
+      getItem: key => storage.getItem(key),
+      setItem: () => { throw new Error('Storage is blocked'); },
+    })).toThrow('Storage is blocked');
+    expect(storage.value).toBe(originalValue);
+    expect(loadRecipes(storage).map(recipe => recipe.name)).toEqual(['Existing']);
   });
 });

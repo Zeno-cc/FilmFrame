@@ -11,12 +11,13 @@ function isUnexpectedMutation(request: Request): boolean {
   return new URL(request.url()).pathname !== '/auth/refresh';
 }
 
-test('a static HEIC still converts locally, previews, and develops', async ({ page }) => {
+test('a static HEIC still converts locally, previews, and develops', async ({ page }, testInfo) => {
+  const applicationOrigin = new URL(testInfo.project.use.baseURL as string).origin;
   const externalRequests: string[] = [];
   const unexpectedMutations: string[] = [];
   page.on('request', request => {
     const url = new URL(request.url());
-    if (['http:', 'https:'].includes(url.protocol) && url.origin !== 'http://127.0.0.1:4174') {
+    if (['http:', 'https:'].includes(url.protocol) && url.origin !== applicationOrigin) {
       externalRequests.push(request.url());
     }
     if (isUnexpectedMutation(request)) {
@@ -38,6 +39,9 @@ test('a static HEIC still converts locally, previews, and develops', async ({ pa
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
+  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await inspector.getByLabel('成像方式').selectOption('legacy');
   const fileInput = page.locator('input[type="file"]');
   await expect(fileInput).toHaveAttribute(
     'accept',

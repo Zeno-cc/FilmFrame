@@ -35,6 +35,15 @@ export function isGenerationCurrent(
   return resultGeneration === currentGeneration;
 }
 
+export function clearImageProcessingErrors<T extends RenderableImageItem>(
+  items: readonly T[],
+  imageIds: ReadonlySet<string>,
+): T[] {
+  return items.map(item => imageIds.has(item.id) && item.processingError !== undefined
+    ? { ...item, processingError: undefined }
+    : item);
+}
+
 export function acceptImageRenderResult<T extends RenderableImageItem>(
   currentItems: readonly T[],
   imageId: string,

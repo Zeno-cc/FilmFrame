@@ -19,6 +19,7 @@ export interface AppHeaderProps {
   onReset: () => void;
   onOpenSupport: () => void;
   onOpenPrivacy?: () => void;
+  onOpenCredits?: () => void;
   githubHref?: string;
   className?: string;
 }
@@ -38,6 +39,7 @@ export function AppHeader({
   onReset,
   onOpenSupport,
   onOpenPrivacy,
+  onOpenCredits,
   githubHref,
   className = '',
 }: AppHeaderProps) {
@@ -100,6 +102,7 @@ export function AppHeader({
             onReset={onReset}
             onOpenSupport={onOpenSupport}
             onOpenPrivacy={onOpenPrivacy}
+            onOpenCredits={onOpenCredits}
             githubHref={githubHref}
             resetDisabled={controlsDisabled}
           />

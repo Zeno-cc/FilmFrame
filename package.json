@@ -18,15 +18,19 @@
     "test:download": "vitest run tests/previewDownload.test.ts",
     "test:quotes": "vitest run tests/photographyQuotes.test.ts tests/wikiquoteSync.test.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:preview": "npm run build && playwright test --config=playwright.preview.config.ts",
     "test:backup": "node scripts/test-backup-boundaries.mjs",
     "test:release-contract": "node --test ops/release/tests/*.test.mjs",
+    "test:provenance": "node --test ops/provenance/tests/*.test.mjs",
+    "test:spectral-stocks": "vite-node --script scripts/spectral/check-stock-parity.mjs",
+    "verify:provenance": "node ops/provenance/validate-provenance.mjs",
     "test:updater": "PYTHONPATH=ops/updater python3 -m unittest discover -s ops/updater/tests -p 'test_*.py' -v && bash ops/updater/tests/test-install-layout.sh",
     "test:e2e:access-proxy": "node scripts/test-invite-proxy.mjs",
     "sync:quotes": "node scripts/sync-photography-quotes.mjs",
-    "check": "npm run test && npm run typecheck && npm run build",
+    "check": "npm run test && npm run test:spectral-stocks && npm run typecheck && npm run build",
     "check:access": "npm --prefix server/access run check",
     "check:all": "npm run check && npm run check:access",
-    "check:release": "npm run verify:release-input && npm run test:release-contract && npm run check:all && npm run test:updater && npm run test:e2e && npm run test:backup && npm run test:e2e:access-proxy && npm run verify:deployment",
+    "check:release": "npm run verify:release-input && npm run test:release-contract && npm run test:provenance && npm run verify:provenance && npm run check:all && npm run test:updater && npm run test:e2e && npm run test:backup && npm run test:e2e:access-proxy && npm run verify:deployment",
     "verify:deployment": "node scripts/verify-invite-deployment.mjs",
     "verify:release-input": "node ops/release/validate-release-input.mjs ops/release/release-input.json",
     "verify:release-manifest": "node ops/release/validate-manifest.mjs",
@@ -41,6 +45,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "playwright": "1.61.1",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^22.20.1",
     "@types/react": "^19.0.0",
@@ -51,6 +56,7 @@
     "tailwindcss": "^4.2.4",
     "typescript": "^5.2.0",
     "vite": "^5.0.0",
+    "vite-node": "2.1.9",
     "vitest": "^2.1.9"
   }
 }

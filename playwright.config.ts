@@ -16,7 +16,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+          args: ['--enable-unsafe-swiftshader'],
+        },
+      },
     },
     {
       name: 'firefox',

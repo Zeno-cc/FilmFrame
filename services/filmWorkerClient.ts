@@ -2,6 +2,7 @@ import type { FilmSettings, ImageItem, RenderTransform } from '../types';
 import * as mainThreadEngine from './filmEngine';
 import { supportsReal135Template } from './filmOverlay';
 import type { RenderBudgetLimits } from './renderBudget';
+import { assertSpectralStripSupported } from './spectral/scope';
 import type { CanvasObjectUrlResult } from './canvasRuntime';
 
 type WorkerResponse =
@@ -295,6 +296,7 @@ export const generateFilmStrip = async (
   settings: FilmSettings,
   renderBudgetLimits?: RenderBudgetLimits,
 ): Promise<RenderOutput> => {
+  assertSpectralStripSupported(settings);
   if (shouldUseWorkerForSettings(settings)) {
     const renderer = getWorkerRenderer();
     if (renderer) {

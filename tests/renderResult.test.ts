@@ -44,6 +44,16 @@ describe('render result identity', () => {
     ['frame number color', { frameNumberColor: '#44cc88' }],
     ['real 135 sprocket color', { real135SprocketColor: '#112233' }],
     ['render mode', { frameRenderMode: 'classic' as const }],
+    ['imaging mode', { imagingMode: 'spectral' as const }],
+    ['spectral backend', { spectralBackend: 'cpu' as const }],
+    ['edge renderer', { edgeRenderMode: 'physical135' as const }],
+    ['backing', { physicalBacking: 'black' as const }],
+    ['body seed', { physicalBodySeed: 99 }],
+    ['frame seed', { physicalFrameSeed: 99 }],
+    ['fog', { physicalFog: 0 }],
+    ['leaks', { physicalLeaks: 0.5 }],
+    ['straighten', { physicalStraighten: 1.5 }],
+    ['aperture', { physicalAperture: 2.8 }],
   ])('marks an artifact stale after a %s change', (_name, patch) => {
     const artifact = {
       url: 'blob:result',
@@ -100,6 +110,18 @@ describe('render result identity', () => {
       .toBe(createImageRenderKey(settings, undefined, centered));
     expect(createImageRenderKey(settings, undefined, centered))
       .not.toBe(createImageRenderKey(settings, undefined, zoomed));
+  });
+
+  it('changes only the affected photo and the ordered strip when a frame seed changes', () => {
+    expect(createImageRenderKey(settings, undefined, undefined, 7))
+      .not.toBe(createImageRenderKey(settings, undefined, undefined, 1));
+    expect(createOrderedStripKey(settings, [
+      { id: 'a', physicalFrameSeed: 1 },
+      { id: 'b', physicalFrameSeed: 1 },
+    ])).not.toBe(createOrderedStripKey(settings, [
+      { id: 'a', physicalFrameSeed: 1 },
+      { id: 'b', physicalFrameSeed: 7 },
+    ]));
   });
 
   it('changes a strip key when any ordered image transform changes', () => {

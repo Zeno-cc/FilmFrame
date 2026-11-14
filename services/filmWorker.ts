@@ -1,4 +1,12 @@
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
+import { applySpectralToAperture, supportsSpectral } from './spectral/canvasAdapter';
+import { assertSpectralStripSupported } from './spectral/scope';
+import { physicalPlanForSettings } from './physical135/frame';
+import { assertPhysicalCombination } from './physical135/plan';
+import { renderPhysicalFrame } from './physical135/spectralAdapter';
+import { restorePhysicalFrameOrientation } from './physical135/canvas';
+import { paintCompatibility135Frame } from './compatibility135';
+import { renderPhysicalStripCanvas } from './physical135/strip';
 import { applyGold200Look } from './filmColor';
 import {
   getReal135SprocketColor,
@@ -16,6 +24,7 @@ import {
 import {
   createFilmTemplateStripLayout,
   createKodakGoldOverlayLayout,
+  COMPATIBILITY_135_OVERLAY,
   createKodakGoldStripLayout,
   drawKodakGoldOverlayLayer,
   getReal135OverlayUrl,
@@ -65,7 +74,6 @@ type WorkerImage = ImageBitmap;
 type KodakGoldLayeredAssets = {
   base: ImageBitmap;
   apertureMask: ImageBitmap;
-  apertureShadow: ImageBitmap;
 };
 
 let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
@@ -150,8 +158,7 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
       try {
         base = await loadBitmapFromUrl(KODAK_GOLD_BASE_URL);
         apertureMask = await loadBitmapFromUrl(KODAK_GOLD_APERTURE_MASK_URL);
-        const apertureShadow = await loadBitmapFromUrl(KODAK_GOLD_APERTURE_SHADOW_URL);
-        return { base, apertureMask, apertureShadow };
+        return { base, apertureMask };
       } catch (error) {
         base?.close();
         apertureMask?.close();
@@ -167,14 +174,16 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   return kodakGoldLayeredAssetsPromise;
 }
 
-function loadReal135Overlay(brand: FilmType): Promise<ImageBitmap> {
+function loadReal135Overlay(brand: FilmType): Promise<ImageBitmap | null> {
   const overlayUrl = getReal135OverlayUrl(brand);
+  if (overlayUrl === COMPATIBILITY_135_OVERLAY) return Promise.resolve(null);
   if (!overlayUrl) return Promise.reject(new Error(`Real 135 overlay is not registered: ${brand}`));
   return loadCachedBitmap(real135OverlayPromises, overlayUrl);
 }
 
 function loadReal135SprocketMask(brand: FilmType): Promise<ImageBitmap> {
   const maskUrl = getReal135SprocketMaskUrl(brand);
+  if (maskUrl === COMPATIBILITY_135_OVERLAY) return Promise.reject(new Error('Compatibility 135 sprockets are drawn programmatically'));
   if (!maskUrl) return Promise.reject(new Error(`Real 135 sprocket mask is not registered: ${brand}`));
   return loadCachedBitmap(real135SprocketMaskPromises, maskUrl);
 }
@@ -184,7 +193,8 @@ async function createTintedSprocketOverlay(
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<OffscreenCanvas | null> {
   const color = getReal135SprocketColor(settings);
-  if (!color) return null;
+  const maskUrl = getReal135SprocketMaskUrl(settings.brandText);
+  if (!color || !maskUrl || maskUrl === COMPATIBILITY_135_OVERLAY) return null;
 
   try {
     const mask = await loadReal135SprocketMask(settings.brandText);
@@ -419,21 +429,22 @@ async function renderClassicFrame(
   }
 }
 
-function drawFlattenedReal135Frame(
+async function drawFlattenedReal135Frame(
   ctx: WorkerContext,
   img: WorkerImage,
-  overlay: WorkerImage,
+  overlay: WorkerImage | null,
   layout: ReturnType<typeof createKodakGoldOverlayLayout>,
   settings: FilmSettings,
   transform?: RenderTransform,
   sprocketOverlay?: WorkerCanvas | null,
-) {
+): Promise<void> {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#050403';
   ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+  if (!overlay) paintCompatibility135Frame(ctx, layout, settings);
 
-  ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
+  if (overlay) ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
   drawImageCoverAutoRotate(
     ctx,
     img,
@@ -443,12 +454,15 @@ function drawFlattenedReal135Frame(
     layout.imageH,
     transform,
   );
+  if (supportsSpectral(settings)) {
+    await applySpectralToAperture(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
+  }
   drawGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
-  drawKodakGoldOverlayLayer(ctx, overlay, layout);
+  if (overlay) drawKodakGoldOverlayLayer(ctx, overlay, layout);
   if (sprocketOverlay) {
     ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
   }
-  drawFilmTemplateFrameNumber(ctx, layout, settings);
+  if (overlay) drawFilmTemplateFrameNumber(ctx, layout, settings);
 }
 
 async function renderFlattenedReal135Frame(
@@ -471,7 +485,7 @@ async function renderFlattenedReal135Frame(
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) throw new Error('Canvas init failed');
 
-    drawFlattenedReal135Frame(ctx, img, overlay, layout, settings, transform, sprocketOverlay);
+    await drawFlattenedReal135Frame(ctx, img, overlay, layout, settings, transform, sprocketOverlay);
 
     const finalCanvas =
       (settings.scanOutputAspect ?? 'native') === '4:3'
@@ -501,6 +515,31 @@ async function renderReal135Frame(
   transform?: RenderTransform,
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<Blob> {
+  if (settings.edgeRenderMode === 'physical135') {
+    assertPhysicalCombination(settings);
+    const img = await createImageBitmap(file);
+    try {
+      const gateWidth = getReal135TargetImageWidth(img.width, settings.processingMode);
+      const rotated = getRotatedDimensions(img.width, img.height, normalizeRenderTransform(transform).quarterTurns);
+      const plan = physicalPlanForSettings(settings, rotated.height > rotated.width ? 'portrait' : 'landscape', 36, gateWidth / 36);
+      assertCanvasBudget(plan.outputWidth, plan.outputHeight, renderBudgetLimits);
+      const canvas = new OffscreenCanvas(plan.outputWidth, plan.outputHeight);
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Canvas init failed');
+      await renderPhysicalFrame(ctx, img, plan, settings, transform, renderBudgetLimits);
+      const finalCanvas = (settings.scanOutputAspect ?? 'native') === '4:3'
+        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR, renderBudgetLimits)
+        : canvas;
+      assertCanvasBudget(finalCanvas.width, finalCanvas.height, renderBudgetLimits);
+      const outputCanvas = new OffscreenCanvas(finalCanvas.width, finalCanvas.height);
+      const outputContext = outputCanvas.getContext('2d', { alpha: false });
+      if (!outputContext) throw new Error('Canvas init failed');
+      restorePhysicalFrameOrientation(outputContext, finalCanvas, plan, transform, renderBudgetLimits);
+      return canvasToBlob(outputCanvas, settings);
+    } finally {
+      img.close();
+    }
+  }
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
     return renderClassicFrame(
       file,
@@ -539,7 +578,11 @@ async function renderReal135Frame(
     emulsionCtx.imageSmoothingEnabled = true;
     emulsionCtx.imageSmoothingQuality = 'high';
     drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
-    applyGold200Look(emulsionCtx as unknown as CanvasRenderingContext2D, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+    if (supportsSpectral(settings)) {
+      await applySpectralToAperture(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
+    } else {
+      applyGold200Look(emulsionCtx as unknown as CanvasRenderingContext2D, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
+    }
     drawGrain(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
 
     emulsionCtx.save();
@@ -561,8 +604,7 @@ async function renderReal135Frame(
     if (sprocketOverlay) {
       ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
     }
-    // Keep aperture shadow disabled to match the current main-thread renderer.
-    // ctx.drawImage(assets.apertureShadow, 0, 0, layout.filmW, layout.filmH);
+    // Aperture shadows are intentionally disabled to match the main-thread renderer.
     drawKodakGoldFrameNumbers(ctx, layout, settings);
 
     const finalCanvas =
@@ -824,7 +866,7 @@ async function renderFlattenedReal135Strip(
 
       ctx.save();
       ctx.translate(x, y);
-      drawFlattenedReal135Frame(
+      await drawFlattenedReal135Frame(
         ctx,
         img,
         overlay,
@@ -848,6 +890,10 @@ async function renderReal135Strip(
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<Blob> {
   if (images.length === 0) throw new Error('No images to render');
+  if (settings.edgeRenderMode === 'physical135') {
+    const canvas = await renderPhysicalStripCanvas<OffscreenCanvas>(images, item => createImageBitmap(item.file), settings, renderBudgetLimits, true);
+    return canvasToBlob(canvas, settings);
+  }
   if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) {
     return renderClassicStrip(
       images,
@@ -911,6 +957,7 @@ async function renderReal135Strip(
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   try {
+    if (request.type === 'generateFilmStrip') assertSpectralStripSupported(request.settings);
     const blob =
       request.type === 'processImage'
         ? (request.settings.frameRenderMode ?? 'real135') === 'real135'

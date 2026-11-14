@@ -4,14 +4,19 @@ export enum FilmType {
   KODAK_PORTRA_160 = 'KODAK PORTRA 160',
   KODAK_PORTRA_400 = 'KODAK PORTRA 400',
   KODAK_PORTRA_800 = 'KODAK PORTRA 800',
+  KODAK_PORTRA_800_PUSH1 = 'KODAK PORTRA 800 PUSH 1',
+  KODAK_PORTRA_800_PUSH2 = 'KODAK PORTRA 800 PUSH 2',
   KODAK_EKTAR_100 = 'KODAK EKTAR 100',
   // 柯达 消费级彩色负片
   KODAK_GOLD_200 = 'KODAK GOLD 200',
   KODAK_ULTRAMAX_400 = 'GC 400 KODAK', // 修正为真实胶片代码
   KODAK_COLORPLUS_200 = 'KODAK COLORPLUS 200',
   KODAK_PROIMAGE_100 = 'KODAK PRO IMAGE 100',
-  // 柯达 反转片 (正片)
+  // 反转片 (正片)
+  FUJI_PROVIA_100F = 'FUJI PROVIA 100F',
+  FUJI_VELVIA_100 = 'FUJI VELVIA 100',
   KODAK_EKTACHROME_E100 = 'KODAK EKTACHROME E100',
+  KODAK_KODACHROME_64 = 'KODAK KODACHROME 64',
   // 柯达 黑白负片
   KODAK_TRI_X_400 = 'KODAK TRI-X 400',
   KODAK_TMAX_100 = 'KODAK T-MAX 100',
@@ -19,6 +24,14 @@ export enum FilmType {
   KODAK_P3200 = 'KODAK T-MAX P3200',
   // 其他经典型号
   FUJI_SUPERIA = 'FUJI SUPERIA 400',
+  FUJI_C200 = 'FUJI C200',
+  FUJI_XTRA_400 = 'FUJI X-TRA 400',
+  FUJI_PRO_400H = 'FUJI PRO 400H',
+  FUJI_ACROS_II = 'FUJI ACROS II',
+  KODAK_VISION3_50D = 'KODAK VISION3 50D',
+  KODAK_VISION3_200T = 'KODAK VISION3 200T',
+  KODAK_VISION3_250D = 'KODAK VISION3 250D',
+  KODAK_VISION3_500T = 'KODAK VISION3 500T',
   CINESTILL_800T = 'CINESTILL 800T',
   ILFORD_HP5 = 'ILFORD HP5 PLUS'
 }
@@ -28,6 +41,10 @@ export type OutputFormat = 'image/png' | 'image/jpeg';
 export type FrameRenderMode = 'classic' | 'real135';
 export type ScanOutputAspect = 'native' | '4:3';
 export type ProcessingMode = 'preview' | 'high';
+export type ImagingMode = 'legacy' | 'spectral';
+export type EdgeRenderMode = 'legacy-template' | 'physical135';
+export type PhysicalBacking = 'black' | 'open';
+export type SpectralBackendPreference = 'auto' | 'webgl2' | 'cpu';
 export type OutputMode = 'single' | 'strip';
 export type FocusAnchor = number;
 export type QuarterTurn = 0 | 1 | 2 | 3;
@@ -58,6 +75,8 @@ export interface FilmSettings {
   outputFormat: OutputFormat; // 新增：输出格式
   outputQuality: number;      // 新增：输出质量 (0.1 - 1.0)
   processingMode?: ProcessingMode;
+  imagingMode?: ImagingMode;
+  spectralBackend?: SpectralBackendPreference;
   frameRenderMode?: FrameRenderMode;
   scanOutputAspect?: ScanOutputAspect;
   scanBackgroundColor?: string;
@@ -66,6 +85,14 @@ export interface FilmSettings {
   maxRollFrames?: 24 | 36;
   useFilmOverlayTemplate?: boolean;
   filmOverlayUrl?: string;
+  edgeRenderMode?: EdgeRenderMode;
+  physicalBacking?: PhysicalBacking;
+  physicalBodySeed?: number;
+  physicalFrameSeed?: number;
+  physicalFog?: number;
+  physicalLeaks?: number;
+  physicalStraighten?: number;
+  physicalAperture?: number;
 }
 
 export interface ImageItem {
@@ -79,6 +106,8 @@ export interface ImageItem {
   sourceHeight: number;
   /** Current full-roll position attached only to a strip render request. */
   rollIndex?: number;
+  /** Session-owned advance/scan variation for this photograph, not a roll default. */
+  physicalFrameSeed?: number;
   /** Byte size captured when the current render artifact is created. */
   processedByteSize?: number;
   processedUrl?: string;
@@ -136,6 +165,8 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
   [FilmType.KODAK_PORTRA_160]: { ...BASE_KODAK, brandColor: '#d97706' },
   [FilmType.KODAK_PORTRA_400]: { ...BASE_KODAK, brandColor: '#f59e0b' },
   [FilmType.KODAK_PORTRA_800]: { ...BASE_KODAK, brandColor: '#b45309' },
+  [FilmType.KODAK_PORTRA_800_PUSH1]: { ...BASE_KODAK, brandColor: '#b45309' },
+  [FilmType.KODAK_PORTRA_800_PUSH2]: { ...BASE_KODAK, brandColor: '#b45309' },
   [FilmType.KODAK_EKTAR_100]:   { ...BASE_KODAK, brandColor: '#ef4444' },
 
   [FilmType.KODAK_GOLD_200]:      { ...BASE_KODAK, brandColor: '#eab308' },
@@ -155,7 +186,10 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
   [FilmType.KODAK_COLORPLUS_200]: { ...BASE_KODAK, brandColor: '#a855f7' },
   [FilmType.KODAK_PROIMAGE_100]:  { ...BASE_KODAK, brandColor: '#6366f1' },
 
+  [FilmType.FUJI_PROVIA_100F]: { ...BASE_FUJI },
+  [FilmType.FUJI_VELVIA_100]: { ...BASE_FUJI },
   [FilmType.KODAK_EKTACHROME_E100]: { ...BASE_KODAK, holeRounding: 0.1, brandColor: '#ffffff' },
+  [FilmType.KODAK_KODACHROME_64]: { ...BASE_KODAK, holeRounding: 0.1, brandColor: '#fbbf24' },
 
   [FilmType.KODAK_TRI_X_400]: { ...BASE_BW, brandColor: '#fbbf24' },
   [FilmType.KODAK_TMAX_100]:  { ...BASE_BW, brandColor: '#a3a3a3' },
@@ -163,6 +197,14 @@ export const FILM_PRESETS: Record<string, FilmPreset> = {
   [FilmType.KODAK_P3200]:     { ...BASE_BW, brandColor: '#525252' },
 
   [FilmType.FUJI_SUPERIA]:    { ...BASE_FUJI },
+  [FilmType.FUJI_C200]: { ...BASE_FUJI },
+  [FilmType.FUJI_XTRA_400]: { ...BASE_FUJI },
+  [FilmType.FUJI_PRO_400H]: { ...BASE_FUJI },
+  [FilmType.FUJI_ACROS_II]: { ...BASE_BW, brandColor: '#d4d4d4' },
+  [FilmType.KODAK_VISION3_50D]: { ...BASE_KODAK, brandColor: '#f59e0b' },
+  [FilmType.KODAK_VISION3_200T]: { ...BASE_KODAK, brandColor: '#d97706' },
+  [FilmType.KODAK_VISION3_250D]: { ...BASE_KODAK, brandColor: '#f59e0b' },
+  [FilmType.KODAK_VISION3_500T]: { ...BASE_KODAK, brandColor: '#ef4444' },
   
   [FilmType.CINESTILL_800T]: { 
     holeWidthRatio: 0.39,

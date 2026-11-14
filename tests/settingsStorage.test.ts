@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FilmType } from '../types';
+import { FILM_PRESETS, FilmType } from '../types';
+import { defaultEdgeForStock, supportsPhysicalSpectralStock } from '../services/physical135/capability';
 import type { FilmSettings } from '../types';
 import {
   loadPreferences,
@@ -7,6 +8,7 @@ import {
   normalizeOutputMode,
   normalizeSettingsPatch,
   savePreferences,
+  settingsForFilmStock,
 } from '../services/settingsStorage';
 
 const defaults: FilmSettings = {
@@ -52,6 +54,8 @@ describe('settings normalization', () => {
       outputFormat: 'image/png',
       outputQuality: 5,
       processingMode: 'high',
+      imagingMode: 'spectral',
+      spectralBackend: 'cpu',
       frameRenderMode: 'classic',
       scanOutputAspect: 'native',
       scanBackgroundColor: '#ABCDEF',
@@ -60,6 +64,14 @@ describe('settings normalization', () => {
       maxRollFrames: 24,
       useFilmOverlayTemplate: false,
       filmOverlayUrl: '/should-not-persist.png',
+      edgeRenderMode: 'physical135',
+      physicalBacking: 'black',
+      physicalBodySeed: 0xdeadbeef,
+      physicalFrameSeed: 0xffffffff,
+      physicalFog: 3,
+      physicalLeaks: -1,
+      physicalStraighten: 8,
+      physicalAperture: 0.5,
     });
 
     expect(patch.brandText).toBe(FilmType.ILFORD_HP5);
@@ -70,10 +82,20 @@ describe('settings normalization', () => {
     expect(patch.grainIntensity).toBe(0);
     expect(patch.outputQuality).toBe(1);
     expect(patch.maxRollFrames).toBe(24);
+    expect(patch.imagingMode).toBe('spectral');
+    expect(patch.spectralBackend).toBe('cpu');
     expect(patch.textColor).toBe('#fedcba');
     expect(patch.holeType).toBe('square');
     expect(patch.scanBackgroundColor).toBe('#abcdef');
     expect('filmOverlayUrl' in patch).toBe(false);
+    expect(patch.edgeRenderMode).toBe('physical135');
+    expect(patch.physicalBacking).toBe('black');
+    expect(patch.physicalBodySeed).toBe(0xdeadbeef);
+    expect(patch.physicalFrameSeed).toBe(0xffffffff);
+    expect(patch.physicalFog).toBe(2);
+    expect(patch.physicalLeaks).toBe(0);
+    expect(patch.physicalStraighten).toBe(5);
+    expect(patch.physicalAperture).toBe(1);
   });
 
   it('merges normalized values over defaults', () => {
@@ -98,9 +120,78 @@ describe('settings normalization', () => {
     expect(merged.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
   });
 
+  it('preserves an explicit reset for the original sprocket color', () => {
+    const reset = normalizeSettingsPatch({ real135SprocketColor: undefined });
+    expect(reset).toEqual({ real135SprocketColor: undefined });
+    expect(Object.hasOwn(reset, 'real135SprocketColor')).toBe(true);
+    expect(mergeSettings(
+      { ...defaults, real135SprocketColor: '#cc3344' },
+      { real135SprocketColor: undefined },
+    ).real135SprocketColor).toBeUndefined();
+  });
+
+  it('clears both optional color overrides when restoring an uncolored recipe', () => {
+    const reset = mergeSettings({
+      ...defaults,
+      frameNumberColor: '#112233',
+      real135SprocketColor: '#445566',
+    }, {
+      frameNumberColor: undefined,
+      real135SprocketColor: undefined,
+      ...normalizeSettingsPatch(defaults),
+    }, 0);
+
+    expect(reset.frameNumberColor).toBeUndefined();
+    expect(reset.real135SprocketColor).toBeUndefined();
+    expect(reset.textColor).toBe(defaults.textColor);
+    expect(reset.holeType).toBe(defaults.holeType);
+  });
+
+  it('applies stock defaults only on explicit selection and preserves color overrides', () => {
+    const custom = {
+      ...defaults,
+      textColor: '#aabbcc',
+      holeType: 'square' as const,
+      frameNumberColor: '#112233',
+      real135SprocketColor: '#445566',
+      imagingMode: 'spectral' as const,
+      edgeRenderMode: 'physical135' as const,
+    };
+    expect(settingsForFilmStock(custom, custom.brandText)).toBe(custom);
+    expect(mergeSettings(defaults, normalizeSettingsPatch(custom))).toMatchObject(custom);
+
+    const selected = settingsForFilmStock(custom, FilmType.ILFORD_HP5);
+    const preset = FILM_PRESETS[FilmType.ILFORD_HP5];
+    expect(selected).toMatchObject({
+      brandText: FilmType.ILFORD_HP5,
+      textColor: preset.brandColor,
+      holeType: preset.holeRounding > 0.4 ? 'rounded' : 'square',
+      frameNumberColor: '#112233',
+      real135SprocketColor: '#445566',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'spectral',
+    });
+  });
+
   it('normalizes output modes', () => {
     expect(normalizeOutputMode('strip', 'single')).toBe('strip');
     expect(normalizeOutputMode('grid', 'single')).toBe('single');
+  });
+
+  it('preserves legacy edge choices while migrating new sessions to physical 135', () => {
+    expect(mergeSettings({ ...defaults, edgeRenderMode: 'physical135' }, {}, 0).edgeRenderMode).toBe('legacy-template');
+    expect(mergeSettings({ ...defaults, imagingMode: 'spectral' }, {}, 0).imagingMode).toBe('legacy');
+    expect(mergeSettings({ ...defaults, imagingMode: 'legacy' }, { imagingMode: 'spectral' }, 0).imagingMode).toBe('spectral');
+    expect(mergeSettings({ ...defaults, edgeRenderMode: 'physical135' }, { edgeRenderMode: 'legacy-template' }, 1).edgeRenderMode).toBe('legacy-template');
+    expect(mergeSettings({ ...defaults, edgeRenderMode: 'legacy-template' }, { edgeRenderMode: 'physical135' }, 1).edgeRenderMode).toBe('physical135');
+    expect(defaultEdgeForStock(FilmType.KODAK_PORTRA_400)).toBe('physical135');
+    expect(defaultEdgeForStock(FilmType.FUJI_PRO_400H)).toBe('physical135');
+    expect(supportsPhysicalSpectralStock(FilmType.FUJI_PRO_400H)).toBe(true);
+    expect(mergeSettings({ ...defaults, imagingMode: 'spectral', edgeRenderMode: 'physical135' }, { brandText: FilmType.FUJI_PROVIA_100F }).edgeRenderMode).toBe('legacy-template');
+    expect(mergeSettings({ ...defaults, imagingMode: 'spectral', edgeRenderMode: 'physical135' }, { brandText: FilmType.CINESTILL_800T }).edgeRenderMode).toBe('legacy-template');
+    expect(supportsPhysicalSpectralStock(FilmType.CINESTILL_800T)).toBe(false);
+    expect(mergeSettings({ ...defaults, imagingMode: 'legacy', edgeRenderMode: 'physical135' }, { brandText: FilmType.FUJI_PROVIA_100F }).edgeRenderMode).toBe('physical135');
+    expect(mergeSettings({ ...defaults, imagingMode: 'spectral', edgeRenderMode: 'physical135' }, { brandText: FilmType.KODAK_PORTRA_800_PUSH2 }).edgeRenderMode).toBe('physical135');
   });
 });
 
@@ -149,5 +240,34 @@ describe('settings storage', () => {
     expect(loaded.settings.real135SprocketColor).toBe('#112233');
     expect(loaded.settings.scanBackgroundColor).toBe('#aabbcc');
     expect(loaded.settings.filmOverlayUrl).toBe(defaults.filmOverlayUrl);
+  });
+
+  it('keeps custom stock appearance after saving and restoring preferences', () => {
+    const original = savedValues.get('filmFrame.preferences.v1');
+    try {
+      const custom = { ...defaults, textColor: '#abcdef', holeType: 'square' as const };
+      savePreferences(custom, 'single');
+      expect(loadPreferences(defaults, 'strip')).toMatchObject({
+        settings: custom,
+        outputMode: 'single',
+      });
+    } finally {
+      if (original === undefined) savedValues.delete('filmFrame.preferences.v1');
+      else savedValues.set('filmFrame.preferences.v1', original);
+    }
+  });
+
+  it('falls back safely when accessing localStorage itself throws', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')!;
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() { throw new DOMException('Storage is blocked', 'SecurityError'); },
+    });
+    try {
+      expect(loadPreferences(defaults, 'strip')).toEqual({ settings: defaults, outputMode: 'strip' });
+      expect(() => savePreferences(defaults, 'single')).not.toThrow();
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', descriptor);
+    }
   });
 });

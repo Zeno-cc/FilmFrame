@@ -187,7 +187,7 @@ export function drawImageCoverAutoRotate(
 }
 
 type RenderContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-type RenderImage = HTMLImageElement | ImageBitmap;
+type RenderImage = HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
 export function drawImageCoverWithTransform(
   ctx: RenderContext,

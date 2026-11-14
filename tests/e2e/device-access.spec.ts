@@ -11,7 +11,7 @@ test('application refreshes device authorization without exposing a logout comma
   await expect.poll(() => refreshRequest?.method()).toBe('POST');
   expect(refreshRequest).toBeDefined();
   expect(new URL(refreshRequest!.url()).pathname).toBe('/auth/refresh');
-  expect(refreshRequest!.headers().origin).toBe('http://127.0.0.1:4174');
+  expect(refreshRequest!.headers().origin).toBe(new URL(page.url()).origin);
   expect(refreshRequest!.headers()['x-filmframe-csrf']).toBe('1');
   expect(refreshRequest!.postData()).toBeNull();
 

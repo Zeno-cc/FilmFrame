@@ -230,7 +230,7 @@ describe('createWorkerRenderer', () => {
 describe('worker routing policy', () => {
   it('allows every registered real135 template path', () => {
     const registeredStocks = Object.keys(REAL135_TEMPLATE_URLS) as FilmType[];
-    expect(registeredStocks).toHaveLength(16);
+    expect(registeredStocks).toHaveLength(Object.values(FilmType).length);
     for (const brandText of registeredStocks) {
       expect(shouldUseWorkerForSettings({ ...settings, brandText })).toBe(true);
     }

@@ -1,5 +1,6 @@
 
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
+import { applySpectralToAperture, supportsSpectral } from './spectral/canvasAdapter';
 import { applyGold200Look } from './filmColor';
 import {
   getReal135SprocketColor,
@@ -32,6 +33,7 @@ import {
   createFilmTemplateStripLayout,
   createKodakGoldStripLayout,
   createKodakGoldOverlayLayout,
+  COMPATIBILITY_135_OVERLAY,
   drawKodakGoldOverlayLayer,
   getReal135OverlayUrl,
   KodakGoldOverlayLayout,
@@ -49,12 +51,20 @@ import {
   getScannerCanvasSize,
 } from './filmResolution';
 import { assertCanvasBudget, type RenderBudgetLimits } from './renderBudget';
+import { assertSpectralStripSupported } from './spectral/scope';
+import { physicalPlanForSettings } from './physical135/frame';
+import { assertPhysicalCombination } from './physical135/plan';
+import { renderPhysicalFrame } from './physical135/spectralAdapter';
+import { createPhysicalCanvas, restorePhysicalFrameOrientation } from './physical135/canvas';
+import { paintCompatibility135Frame } from './compatibility135';
+import { renderPhysicalStripCanvas } from './physical135/strip';
 import {
   type CanvasObjectUrlResult,
   createLuminanceAlphaMask,
   exportCanvasToObjectUrl,
   loadCanvasImage,
   restoreOutputOrientationForSource,
+  rotateCanvas,
 } from './canvasRuntime';
 
 /**
@@ -109,7 +119,6 @@ async function createTintedSprocketOverlay(
 type KodakGoldLayeredAssets = {
   base: HTMLImageElement;
   apertureMask: HTMLImageElement;
-  apertureShadow: HTMLImageElement;
 };
 
 let kodakGoldLayeredAssetsPromise: Promise<KodakGoldLayeredAssets> | null = null;
@@ -119,9 +128,8 @@ const loadKodakGoldLayeredAssets = (): Promise<KodakGoldLayeredAssets> => {
     kodakGoldLayeredAssetsPromise = Promise.all([
       loadCanvasImage(KODAK_GOLD_BASE_URL),
       loadCanvasImage(KODAK_GOLD_APERTURE_MASK_URL),
-      loadCanvasImage(KODAK_GOLD_APERTURE_SHADOW_URL),
     ])
-      .then(([base, apertureMask, apertureShadow]) => ({ base, apertureMask, apertureShadow }))
+      .then(([base, apertureMask]) => ({ base, apertureMask }))
       .catch((error) => {
         kodakGoldLayeredAssetsPromise = null;
         throw error;
@@ -423,7 +431,7 @@ function drawReal135Hole(
 }
 
 function composeOnScannerCanvas(
-  filmCanvas: HTMLCanvasElement,
+  filmCanvas: HTMLCanvasElement | OffscreenCanvas,
   backgroundColor = DEFAULT_SCAN_BACKGROUND_COLOR,
   renderBudgetLimits: RenderBudgetLimits = {},
 ): HTMLCanvasElement {
@@ -529,18 +537,19 @@ const processImageWithTemplateOverlay = async (
   if (settings.useFilmOverlayTemplate === false) return null;
   const registeredOverlayUrl = getReal135OverlayUrl(settings.brandText);
   if (!registeredOverlayUrl) return null;
-  const sprocketOverlay = await createTintedSprocketOverlay(settings, renderBudgetLimits);
+  const sprocketOverlay = registeredOverlayUrl === COMPATIBILITY_135_OVERLAY
+    ? null
+    : await createTintedSprocketOverlay(settings, renderBudgetLimits);
 
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     try {
       const layeredAssets = await loadKodakGoldLayeredAssets();
       const img = await loadCanvasImage(imageSource);
       const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-      const canvas = renderKodakGoldLayeredFrameCanvas(
+      const canvas = await renderKodakGoldLayeredFrameCanvas(
         img,
         layeredAssets.base,
         layeredAssets.apertureMask,
-        layeredAssets.apertureShadow,
         settings,
         targetImageWidthPx,
         transform,
@@ -567,6 +576,7 @@ const processImageWithTemplateOverlay = async (
       );
       return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
     } catch (error) {
+      if (settings.imagingMode === 'spectral') throw error;
       console.warn('Layered film assets not available, falling back to flattened template.', error);
     }
   }
@@ -575,10 +585,12 @@ const processImageWithTemplateOverlay = async (
     const overlayUrl = settings.brandText === FilmType.KODAK_GOLD_200
       ? settings.filmOverlayUrl || registeredOverlayUrl
       : registeredOverlayUrl;
-    const overlay = await loadCanvasImage(overlayUrl);
+    const overlay = overlayUrl === COMPATIBILITY_135_OVERLAY
+      ? null
+      : await loadCanvasImage(overlayUrl);
     const img = await loadCanvasImage(imageSource);
     const targetImageWidthPx = getReal135TargetImageWidth(img.width, settings.processingMode);
-    const canvas = renderKodakGoldTemplateFrameCanvas(
+    const canvas = await renderKodakGoldTemplateFrameCanvas(
       img,
       overlay,
       settings,
@@ -607,20 +619,21 @@ const processImageWithTemplateOverlay = async (
     );
     return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
   } catch (error) {
+    if (settings.imagingMode === 'spectral') throw error;
     console.warn('Film overlay template not available, falling back to programmatic renderer.', error);
     return null;
   }
 };
 
-function renderKodakGoldTemplateFrameCanvas(
+async function renderKodakGoldTemplateFrameCanvas(
   img: HTMLImageElement,
-  overlay: HTMLImageElement,
+  overlay: HTMLImageElement | null,
   settings: FilmSettings,
   targetImageWidthPx: number,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
   renderBudgetLimits: RenderBudgetLimits = {},
-): HTMLCanvasElement {
+): Promise<HTMLCanvasElement> {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
@@ -630,21 +643,20 @@ function renderKodakGoldTemplateFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings, transform, sprocketOverlay);
+  await drawKodakGoldTemplateFrame(ctx, img, overlay, layout, settings, transform, sprocketOverlay, renderBudgetLimits);
   return canvas;
 }
 
-function renderKodakGoldLayeredFrameCanvas(
+async function renderKodakGoldLayeredFrameCanvas(
   img: HTMLImageElement,
   base: HTMLImageElement,
   apertureMask: HTMLImageElement,
-  apertureShadow: HTMLImageElement,
   settings: FilmSettings,
   targetImageWidthPx: number,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
   renderBudgetLimits: RenderBudgetLimits = {},
-): HTMLCanvasElement {
+): Promise<HTMLCanvasElement> {
   const layout = createKodakGoldOverlayLayout(targetImageWidthPx);
   assertCanvasBudget(layout.filmW, layout.filmH, renderBudgetLimits);
   const canvas = document.createElement('canvas');
@@ -654,12 +666,11 @@ function renderKodakGoldLayeredFrameCanvas(
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas context not found');
 
-  drawKodakGoldLayeredFrame(
+  await drawKodakGoldLayeredFrame(
     ctx,
     img,
     base,
     apertureMask,
-    apertureShadow,
     layout,
     settings,
     transform,
@@ -669,18 +680,17 @@ function renderKodakGoldLayeredFrameCanvas(
   return canvas;
 }
 
-function drawKodakGoldLayeredFrame(
+async function drawKodakGoldLayeredFrame(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
   base: HTMLImageElement,
   apertureMask: HTMLImageElement,
-  apertureShadow: HTMLImageElement,
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
   renderBudgetLimits: RenderBudgetLimits = {},
-) {
+): Promise<void> {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#050403';
@@ -698,7 +708,9 @@ function drawKodakGoldLayeredFrame(
   emulsionCtx.imageSmoothingQuality = 'high';
   drawImageCoverAutoRotate(emulsionCtx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
-  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+  if (supportsSpectral(settings)) {
+    await applySpectralToAperture(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
+  } else if (settings.brandText === FilmType.KODAK_GOLD_200) {
     applyGold200Look(emulsionCtx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
   }
 
@@ -723,40 +735,61 @@ function drawKodakGoldLayeredFrame(
   if (sprocketOverlay) {
     ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
   }
-  // Temporarily disabled to avoid darkening the photo edges.
-  // ctx.drawImage(apertureShadow, 0, 0, layout.filmW, layout.filmH);
+  // Aperture shadows are intentionally disabled to avoid darkening photo edges.
   drawKodakGoldFrameNumbers(ctx, layout, settings);
 }
 
-function drawKodakGoldTemplateFrame(
+async function drawKodakGoldTemplateFrame(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
-  overlay: HTMLImageElement,
+  overlay: HTMLImageElement | null,
   layout: KodakGoldOverlayLayout,
   settings: FilmSettings,
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
-) {
+  renderBudgetLimits: RenderBudgetLimits = {},
+): Promise<void> {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#050403';
   ctx.fillRect(0, 0, layout.filmW, layout.filmH);
+  if (!overlay) paintCompatibility135Frame(ctx, layout, settings);
 
-  ctx.drawImage(overlay, 0, 0, layout.filmW, layout.filmH);
-  drawImageCoverAutoRotate(ctx, img, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
+  assertCanvasBudget(img.width, img.height, renderBudgetLimits);
+  const source = document.createElement('canvas');
+  const sourceContext = source.getContext('2d');
+  if (!sourceContext) throw new Error('Canvas context not found');
+  // Match ImageBitmap's raster semantics used by the Worker before scaled composition.
+  if (overlay) {
+    source.width = overlay.width;
+    source.height = overlay.height;
+    sourceContext.drawImage(overlay, 0, 0);
+    ctx.drawImage(source, 0, 0, layout.filmW, layout.filmH);
+  }
+  source.width = img.width;
+  source.height = img.height;
+  sourceContext.drawImage(img, 0, 0);
+  drawImageCoverAutoRotate(ctx, source, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
-  if (settings.brandText === FilmType.KODAK_GOLD_200) {
+  if (supportsSpectral(settings)) {
+    await applySpectralToAperture(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
+  } else if (settings.brandText === FilmType.KODAK_GOLD_200) {
     applyGold200Look(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
   }
 
   drawRealGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
-  drawKodakGoldOverlayLayer(ctx, overlay, layout);
+  if (overlay) {
+    source.width = overlay.width;
+    source.height = overlay.height;
+    sourceContext.drawImage(overlay, 0, 0);
+    drawKodakGoldOverlayLayer(ctx, source, layout);
+  }
   if (sprocketOverlay) {
     ctx.drawImage(sprocketOverlay, 0, 0, layout.filmW, layout.filmH);
   }
   if (settings.brandText === FilmType.KODAK_GOLD_200) {
     drawKodakGoldFrameNumbers(ctx, layout, settings);
-  } else {
+  } else if (overlay) {
     drawFilmTemplateFrameNumber(ctx, layout, settings);
   }
 }
@@ -940,14 +973,14 @@ const generateReal135FilmStrip = async (
     const overlayUrl = getReal135OverlayUrl(settings.brandText);
     if (!overlayUrl) return null;
 
-    let overlay: HTMLImageElement;
+    let overlay: HTMLImageElement | null;
     try {
-      overlay = await loadCanvasImage(overlayUrl);
+      overlay = overlayUrl === COMPATIBILITY_135_OVERLAY ? null : await loadCanvasImage(overlayUrl);
     } catch (error) {
       console.warn('Film strip overlay template not available, falling back to classic strip.', error);
       return null;
     }
-    const sprocketOverlay = await createTintedSprocketOverlay(settings, renderBudgetLimits);
+    const sprocketOverlay = overlay ? await createTintedSprocketOverlay(settings, renderBudgetLimits) : null;
 
     const targetImageWidthPx = getReal135StripTargetImageWidth(settings.processingMode);
     const layout = createFilmTemplateStripLayout(targetImageWidthPx, images.length, 4);
@@ -979,7 +1012,7 @@ const generateReal135FilmStrip = async (
 
       ctx.save();
       ctx.translate(x, y);
-      drawKodakGoldTemplateFrame(
+      await drawKodakGoldTemplateFrame(
         ctx,
         img,
         overlay,
@@ -987,6 +1020,7 @@ const generateReal135FilmStrip = async (
         frameSettings,
         images[index].transform,
         sprocketOverlay,
+        renderBudgetLimits,
       );
       ctx.restore();
     }
@@ -1063,6 +1097,30 @@ export const processImage = async (
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<CanvasObjectUrlResult> => {
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
+    if (settings.edgeRenderMode === 'physical135') {
+      assertPhysicalCombination(settings);
+      const image = await loadCanvasImage(imageSource);
+      const gateWidth = getReal135TargetImageWidth(image.width, settings.processingMode);
+      const pxPerMm = gateWidth / 36;
+      const rotated = getRotatedDimensions(image.width, image.height, normalizeRenderTransform(transform).quarterTurns);
+      const plan = physicalPlanForSettings(settings, rotated.height > rotated.width ? 'portrait' : 'landscape', 36, pxPerMm);
+      assertCanvasBudget(plan.outputWidth, plan.outputHeight, renderBudgetLimits);
+      const canvas = createPhysicalCanvas(plan.outputWidth, plan.outputHeight, renderBudgetLimits);
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Canvas context not found');
+      await renderPhysicalFrame(ctx, image, plan, settings, transform, renderBudgetLimits);
+      const finalCanvas = (settings.scanOutputAspect ?? 'native') === '4:3'
+        ? composeOnScannerCanvas(canvas, settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR, renderBudgetLimits)
+        : canvas;
+      assertCanvasBudget(finalCanvas.width, finalCanvas.height, renderBudgetLimits);
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = finalCanvas.width;
+      outputCanvas.height = finalCanvas.height;
+      const outputContext = outputCanvas.getContext('2d', { alpha: false });
+      if (!outputContext) throw new Error('Canvas context not found');
+      restorePhysicalFrameOrientation(outputContext, finalCanvas, plan, transform, renderBudgetLimits);
+      return exportCanvasToObjectUrl(outputCanvas, settings.outputFormat, settings.outputQuality);
+    }
     const templatedResult = await processImageWithTemplateOverlay(
       imageSource,
       settings,
@@ -1258,6 +1316,11 @@ export const generateFilmStrip = async (
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<CanvasObjectUrlResult> => {
   if (images.length === 0) return { url: '', byteSize: 0 };
+  assertSpectralStripSupported(settings);
+  if (settings.edgeRenderMode === 'physical135') {
+    const canvas = await renderPhysicalStripCanvas<HTMLCanvasElement>(images, item => loadCanvasImage(item.previewUrl), settings, renderBudgetLimits);
+    return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality);
+  }
 
   if ((settings.frameRenderMode ?? 'real135') === 'real135') {
     const realStrip = await generateReal135FilmStrip(images, settings, renderBudgetLimits);

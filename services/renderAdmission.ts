@@ -22,6 +22,8 @@ import {
   type RenderBudgetResult,
 } from './renderBudget';
 import { getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
+import { physicalPlanForSettings } from './physical135/frame';
+import { createPhysicalStripPlan } from './physical135/strip';
 
 export interface RenderCanvasSize {
   width: number;
@@ -38,10 +40,11 @@ export function frameNumberForIndex(settings: FilmSettings, index: number): numb
   return ((settings.frameNumber + index - 1) % (settings.maxRollFrames ?? 36)) + 1;
 }
 
-export function settingsForImage(settings: FilmSettings, index: number): FilmSettings {
+export function settingsForImage(settings: FilmSettings, index: number, item?: Pick<ImageItem, 'physicalFrameSeed'>): FilmSettings {
   return {
     ...settings,
     frameNumber: frameNumberForIndex(settings, index),
+    ...(item?.physicalFrameSeed === undefined ? {} : { physicalFrameSeed: item.physicalFrameSeed }),
   };
 }
 
@@ -73,6 +76,14 @@ export function getSingleImageCanvasSizes(
   const usesTemplate = settings.useFilmOverlayTemplate !== false
     && supportsReal135Template(settings.brandText);
   const targetImageWidth = getReal135TargetImageWidth(image.sourceWidth, settings.processingMode);
+  if (settings.edgeRenderMode === 'physical135') {
+    const rotated = getRotatedDimensions(image.sourceWidth, image.sourceHeight, normalizeRenderTransform(image.transform).quarterTurns);
+    const plan = physicalPlanForSettings(settings, rotated.height > rotated.width ? 'portrait' : 'landscape', 36, targetImageWidth / 36);
+    const filmCanvas = { width: plan.outputWidth, height: plan.outputHeight };
+    return (settings.scanOutputAspect ?? 'native') === '4:3'
+      ? [filmCanvas, getScannerCanvasSize(filmCanvas)]
+      : [filmCanvas];
+  }
   const layout = usesTemplate
     ? createKodakGoldOverlayLayout(targetImageWidth)
     : create135SidePerforationLayout(targetImageWidth);
@@ -109,6 +120,10 @@ export function getStripCanvasSize(
   settings: FilmSettings,
   frameCount: number,
 ): RenderCanvasSize {
+  if (settings.edgeRenderMode === 'physical135') {
+    const plan = createPhysicalStripPlan(settings, frameCount);
+    return { width: plan.outputWidth, height: plan.outputHeight };
+  }
   if (
     (settings.frameRenderMode ?? 'real135') === 'real135'
     && settings.useFilmOverlayTemplate !== false

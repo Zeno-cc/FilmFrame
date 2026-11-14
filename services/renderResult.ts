@@ -27,6 +27,8 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
     settings.outputFormat,
     settings.outputQuality,
     settings.processingMode,
+    settings.imagingMode ?? 'legacy',
+    settings.spectralBackend ?? 'auto',
     settings.frameRenderMode,
     settings.scanOutputAspect,
     settings.scanBackgroundColor ?? DEFAULT_SCAN_BACKGROUND_COLOR,
@@ -34,18 +36,26 @@ export function createRenderSettingsKey(settings: FilmSettings): string {
     settings.maxRollFrames,
     settings.useFilmOverlayTemplate,
     settings.filmOverlayUrl,
+    settings.edgeRenderMode ?? 'legacy-template',
+    settings.physicalBacking ?? 'open',
+    settings.physicalBodySeed ?? 1,
+    settings.physicalFrameSeed ?? 1,
+    settings.physicalFog ?? 1,
+    settings.physicalLeaks ?? 0,
+    settings.physicalStraighten ?? 0,
+    settings.physicalAperture ?? 5.6,
   ]);
 }
 
 export function createOrderedStripKey(
   settings: FilmSettings,
-  orderedImages: readonly (string | { id: string; transform?: RenderTransform; rollIndex?: number })[]
+  orderedImages: readonly (string | { id: string; transform?: RenderTransform; rollIndex?: number; physicalFrameSeed?: number })[]
 ): string {
   return JSON.stringify([
     createRenderSettingsKey(settings),
     orderedImages.map(image => typeof image === 'string'
       ? [image, createRenderTransformKey()]
-      : [image.id, image.rollIndex ?? null, createRenderTransformKey(image.transform)]),
+      : [image.id, image.rollIndex ?? null, createRenderTransformKey(image.transform), image.physicalFrameSeed ?? settings.physicalFrameSeed ?? 1]),
   ]);
 }
 
@@ -53,9 +63,11 @@ export function createImageRenderKey(
   settings: FilmSettings,
   dateOverride?: string,
   transform?: RenderTransform,
+  physicalFrameSeed?: number,
 ): string {
   return JSON.stringify([
-    createRenderSettingsKey(settings),
+    createRenderSettingsKey({ ...settings, physicalFrameSeed: physicalFrameSeed ?? settings.physicalFrameSeed }),
+    physicalFrameSeed ?? null,
     dateOverride ?? '',
     createRenderTransformKey(transform),
   ]);

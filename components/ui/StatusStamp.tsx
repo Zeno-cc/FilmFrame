@@ -6,7 +6,6 @@ import {
   ErrorIcon,
   ApertureIcon,
   RefreshIcon,
-  WarningIcon,
 } from '../icons/FilmFrameIcons';
 import { joinClassNames } from './utils';
 

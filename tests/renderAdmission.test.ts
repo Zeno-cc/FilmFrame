@@ -7,6 +7,8 @@ import {
   settingsForImage,
 } from '../services/renderAdmission';
 import { createRuntimeRenderConfig } from '../services/runtimeConfig';
+import { physicalPlanForSettings } from '../services/physical135/frame';
+import { createPhysicalStripPlan } from '../services/physical135/strip';
 
 const settings: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
@@ -41,6 +43,17 @@ describe('pure render admission', () => {
       width: 10_893,
       height: 1_600,
     });
+  });
+
+  it('uses physical production plans for single and continuous-strip admission', () => {
+    const physical = { ...settings, edgeRenderMode: 'physical135' as const, imagingMode: 'spectral' as const };
+    const strip = createPhysicalStripPlan(physical, 10);
+    expect(getStripCanvasSize(physical, 10)).toEqual({ width: strip.outputWidth, height: strip.outputHeight });
+    expect(getStripCanvasSize(physical, 10)).toEqual({ width: 9_500, height: 875 });
+    const image = { sourceWidth: 800, sourceHeight: 1_200, transform: { quarterTurns: 1 as const, focusX: 0.5, focusY: 0.5, zoom: 1 } };
+    const plan = physicalPlanForSettings(physical, 'landscape', 36, 1200 / 36);
+    expect(getSingleImageCanvasSizes(image, physical)).toEqual([{ width: plan.outputWidth, height: plan.outputHeight }]);
+    expect(evaluateSingleImageRenderAdmission(image, physical, { maxPixels: 1 }).ok).toBe(false);
   });
 
   it('includes the scanner canvas when 4:3 output is selected', () => {

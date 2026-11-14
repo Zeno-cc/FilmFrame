@@ -216,4 +216,15 @@ describe('started Worker failure fallback', () => {
       renderBudgetLimits,
     );
   });
+
+  it('rejects unsupported spectral strips before creating a Worker or allocating a result', async () => {
+    enableWorkerCapabilities();
+    await expect(generateFilmStrip([image], {
+      ...eligibleSettings,
+      brandText: FilmType.KODAK_PORTRA_400,
+      imagingMode: 'spectral',
+    })).rejects.toThrow('single frames only');
+    expect(FailingWorker.instances).toHaveLength(0);
+    expect(engine.generateFilmStrip).not.toHaveBeenCalled();
+  });
 });

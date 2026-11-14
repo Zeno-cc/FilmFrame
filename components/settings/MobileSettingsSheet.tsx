@@ -61,7 +61,9 @@ export function MobileSettingsSheet({
         sheetRef.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
         ),
-      ).filter(element => !element.closest('[aria-hidden="true"], [hidden]'));
+      ).filter(element => (
+        !element.closest('[aria-hidden="true"], [hidden]') && element.getClientRects().length > 0
+      ));
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

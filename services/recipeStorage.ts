@@ -90,12 +90,8 @@ export function loadRecipes(storage: RecipeStorage | null = defaultStorage()): F
 }
 
 function persistRecipes(storage: RecipeStorage | null, recipes: readonly FilmRecipe[]): void {
-  if (!storage) return;
-  try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(recipes.slice(0, MAX_RECIPES)));
-  } catch {
-    // Storage may be unavailable in privacy mode or over quota.
-  }
+  if (!storage) throw new Error('Recipe storage is unavailable');
+  storage.setItem(STORAGE_KEY, JSON.stringify(recipes.slice(0, MAX_RECIPES)));
 }
 
 export function saveRecipe(

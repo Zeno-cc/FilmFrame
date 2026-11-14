@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceptImageRenderResult,
+  clearImageProcessingErrors,
   isGenerationCurrent,
   type ImageRenderResult,
 } from '../services/imageBatch';
+import { deriveImageWorkflowStatus } from '../services/workflowState';
 
 type TestImage = {
   id: string;
@@ -94,5 +96,32 @@ describe('acceptImageRenderResult', () => {
     expect(isGenerationCurrent(3, 4)).toBe(false);
     expect(merged).toEqual({ items: current, accepted: false });
     expect(merged.items).toBe(current);
+  });
+});
+
+describe('batch retry errors', () => {
+  it('shows active and queued states without clearing errors outside this batch or losing artifacts', () => {
+    const current = [
+      { id: 'active', processingError: 'old failure', processedUrl: 'blob:previous', processedByteSize: 321 },
+      { id: 'queued', processingError: 'old failure' },
+      { id: 'excluded', processingError: 'keep this failure' },
+      { id: 'complete', processedUrl: 'blob:complete' },
+    ];
+    const next = clearImageProcessingErrors(current, new Set(['active', 'queued']));
+    const context = {
+      expectedMime: 'image/png',
+      expectedSettingsKey: 'current-key',
+      activeImageId: 'active',
+      queuedImageIds: ['queued'],
+    };
+
+    expect(deriveImageWorkflowStatus(next[0], context).kind).toBe('processing');
+    expect(deriveImageWorkflowStatus(next[1], context).kind).toBe('queued');
+    expect(deriveImageWorkflowStatus(next[2], context).kind).toBe('failed');
+    expect(next[0]).toMatchObject({ processedUrl: 'blob:previous', processedByteSize: 321 });
+    expect(next[2]).toBe(current[2]);
+    expect(next[3]).toBe(current[3]);
+    expect(current[0].processingError).toBe('old failure');
+    expect(current[1].processingError).toBe('old failure');
   });
 });

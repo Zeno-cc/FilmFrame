@@ -50,4 +50,30 @@ describe('drawGrain', () => {
     expect(fillRect).toHaveBeenCalledOnce();
     expect(context.restore).toHaveBeenCalledOnce();
   });
+
+  it.each([[0, 0], [10, 20], [1400, 2000]])('covers the full frame at offset (%i, %i)', (x, y) => {
+    vi.stubGlobal('OffscreenCanvas', FakeOffscreenCanvas);
+    let shiftX = 0;
+    let shiftY = 0;
+    const painted: number[][] = [];
+    const context = {
+      save: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      createPattern: () => ({}),
+      translate: (dx: number, dy: number) => { shiftX += dx; shiftY += dy; },
+      fillRect: (left: number, top: number, width: number, height: number) => {
+        painted.push([left + shiftX, top + shiftY, width, height]);
+      },
+      restore: vi.fn(),
+    } as unknown as OffscreenCanvasRenderingContext2D;
+
+    drawGrain(context, x, y, 300, 200, 15);
+
+    expect(painted).toHaveLength(1);
+    expect(painted[0][0]).toBeCloseTo(x, 10);
+    expect(painted[0][1]).toBeCloseTo(y, 10);
+    expect(painted[0].slice(2)).toEqual([300, 200]);
+  });
 });

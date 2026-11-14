@@ -3,7 +3,7 @@ import { REAL135_SPROCKET_MASK_URLS } from '../../services/filmSprocket';
 
 test('every real 135 sprocket mask covers only the rebate bands', async ({ page }) => {
   await page.goto('/');
-  const maskUrls = Object.values(REAL135_SPROCKET_MASK_URLS).filter((url): url is string => Boolean(url));
+  const maskUrls = [...new Set(Object.values(REAL135_SPROCKET_MASK_URLS).filter((url): url is string => Boolean(url) && url.startsWith('/')))];
   const results = await page.evaluate(async urls => Promise.all(urls.map(async url => {
     const bitmap = await createImageBitmap(await fetch(url).then(response => response.blob()));
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -26,7 +26,7 @@ test('every real 135 sprocket mask covers only the rebate bands', async ({ page 
     return { url, width: canvas.width, height: canvas.height, coveredPixels, aperturePixels };
   })), maskUrls);
 
-  expect(results).toHaveLength(16);
+  expect(results).toHaveLength(maskUrls.length);
   for (const result of results) {
     expect(result.width, result.url).toBe(1307);
     expect(result.height, result.url).toBe(1203);

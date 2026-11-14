@@ -11,6 +11,7 @@ export interface MoreMenuProps {
   onReset: () => void;
   onOpenSupport: () => void;
   onOpenPrivacy?: () => void;
+  onOpenCredits?: () => void;
   deviceAuthorizationHref?: string;
   githubHref?: string;
   disabled?: boolean;
@@ -23,6 +24,7 @@ export function MoreMenu({
   onReset,
   onOpenSupport,
   onOpenPrivacy,
+  onOpenCredits,
   deviceAuthorizationHref = '/access/passkey/setup',
   githubHref = 'https://github.com/Zeno-cc/FilmFrame',
   disabled = false,
@@ -188,6 +190,17 @@ export function MoreMenu({
             >
               <HelpIcon />
               本地处理与隐私
+            </button>
+          )}
+          {onOpenCredits && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => run(onOpenCredits)}
+              className="flex min-h-11 w-full items-center gap-3 rounded-[4px] px-3 text-left text-[var(--ff-paper-muted)] hover:bg-[var(--ff-panel-soft)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)]"
+            >
+              <HelpIcon />
+              来源与许可
             </button>
           )}
         </div>

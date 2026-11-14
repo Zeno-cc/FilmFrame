@@ -1,8 +1,15 @@
 import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
-import { DEFAULT_SCAN_BACKGROUND_COLOR, FILM_PRESETS, FilmType, type FilmSettings, type OutputMode } from '../../types';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FILM_PRESETS, type FilmSettings, type OutputMode } from '../../types';
 import { getFrameNumberColor } from '../../services/filmFrameNumber';
 import type { FilmRecipe } from '../../services/recipeStorage';
+import { settingsForFilmStock } from '../../services/settingsStorage';
 import { supportsReal135Template } from '../../services/filmOverlay';
+import { supportsSpectralStock } from '../../services/spectral/stockRegistry';
+import { FilmStockPicker } from './FilmStockPicker';
+import { nextPhysicalSeed } from '../../services/physical135/seed';
+import { supportsPhysicalSpectralStock } from '../../services/physical135/capability';
+import { physicalEdgeForFilm } from '../../services/physical135/edgeRegistry';
+import { FilmType } from '../../types';
 import { ResetIcon } from '../app/FilmFrameAppIcons';
 import { EyedropperIcon, SettingsIcon, TrashIcon } from '../icons/FilmFrameIcons';
 import { IconButton } from '../ui';
@@ -37,6 +44,8 @@ export interface RecipeInspectorProps {
   showHeader?: boolean;
   showSummary?: boolean;
   showFooter?: boolean;
+  physicalFrameSeed?: number;
+  onPhysicalFrameSeedChange?: (seed: number) => void;
   id?: string;
   className?: string;
 }
@@ -89,6 +98,8 @@ export function RecipeInspector({
   showHeader = true,
   showSummary = true,
   showFooter = true,
+  physicalFrameSeed,
+  onPhysicalFrameSeedChange,
   id = 'recipe-inspector',
   className = '',
 }: RecipeInspectorProps) {
@@ -127,7 +138,7 @@ export function RecipeInspector({
 
   const updateNumber = (
     event: ChangeEvent<HTMLInputElement>,
-    key: 'frameNumber' | 'borderSize' | 'grainIntensity',
+    key: 'frameNumber' | 'borderSize' | 'grainIntensity' | 'physicalStraighten' | 'physicalFog' | 'physicalLeaks' | 'physicalAperture',
   ) => {
     const value = Number(event.target.value);
     if (!Number.isFinite(value)) return;
@@ -136,8 +147,16 @@ export function RecipeInspector({
       ? [1, settings.maxRollFrames ?? 36]
       : key === 'borderSize'
         ? [5, 25]
-        : [0, 60];
-    const normalized = Math.min(bounds[1], Math.max(bounds[0], Math.trunc(value)));
+        : key === 'grainIntensity'
+          ? [0, 60]
+          : key === 'physicalStraighten'
+            ? [-5, 5]
+            : key === 'physicalFog'
+              ? [0, 2]
+              : key === 'physicalLeaks'
+                ? [0, 1]
+                : [1, 22];
+    const normalized = Math.min(bounds[1], Math.max(bounds[0], value));
     update({ [key]: normalized });
   };
 
@@ -198,19 +217,132 @@ export function RecipeInspector({
           <section aria-labelledby={`${id}-film-heading`}>
             <div id={`${id}-film-heading`}><SectionHeading>胶片与片边</SectionHeading></div>
             <div className="space-y-4">
-              <label className="block">
-                <span className={labelClass}>胶片型号</span>
-                <select
-                  value={settings.brandText}
-                  onChange={event => update({ brandText: event.target.value as FilmType })}
-                  disabled={disabled}
-                  className={inputClass}
-                >
-                  {Object.values(FilmType).map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </label>
+              <FilmStockPicker
+                id={`${id}-stock`}
+                value={settings.brandText}
+                onChange={brandText => onSettingsChange(settingsForFilmStock(settings, brandText))}
+                disabled={disabled}
+              />
+
+              {isReal135 && supportsSpectralStock(settings.brandText) && (
+                <>
+                  <label className="block">
+                    <span className={labelClass}>成像方式</span>
+                    <select
+                      value={settings.imagingMode ?? 'legacy'}
+                      onChange={event => update({ imagingMode: event.target.value as FilmSettings['imagingMode'] })}
+                      disabled={disabled}
+                      className={inputClass}
+                    >
+                      <option value="legacy">经典色彩</option>
+                      <option value="spectral" disabled={settings.edgeRenderMode === 'physical135' && !supportsPhysicalSpectralStock(settings.brandText)}>光谱负片（实验）</option>
+                    </select>
+                  </label>
+                  {settings.imagingMode === 'spectral' && (
+                    <label className="block">
+                      <span className={labelClass}>光谱计算</span>
+                      <select
+                        value={settings.spectralBackend ?? 'auto'}
+                        onChange={event => update({ spectralBackend: event.target.value as FilmSettings['spectralBackend'] })}
+                        disabled={disabled}
+                        className={inputClass}
+                      >
+                        <option value="auto">自动（优先 GPU）</option>
+                        <option value="webgl2">WebGL2 GPU</option>
+                        <option value="cpu">CPU 光谱</option>
+                      </select>
+                    </label>
+                  )}
+                </>
+              )}
+
+              {isReal135 && (
+                <fieldset disabled={disabled} className="rounded-[5px] border border-[var(--ff-line-soft)] px-3 pb-3 pt-1">
+                  <legend className="px-1 font-mono text-[9px] tracking-[0.12em] text-[var(--ff-amber)]">PHYSICAL 135 · 本地渲染</legend>
+                  <div className="space-y-4">
+                    <div>
+                      <span className={labelClass}>底片渲染</span>
+                      <select
+                        aria-label="底片渲染"
+                        value={settings.edgeRenderMode ?? 'legacy-template'}
+                        onChange={event => {
+                          const edgeRenderMode = event.target.value as FilmSettings['edgeRenderMode'];
+                          update({
+                            edgeRenderMode,
+                            ...(edgeRenderMode === 'physical135' && !supportsPhysicalSpectralStock(settings.brandText)
+                              ? { imagingMode: 'legacy' as const }
+                              : {}),
+                          });
+                        }}
+                        disabled={disabled}
+                        className={inputClass}
+                      >
+                        <option value="legacy-template">真实 135 贴图</option>
+                        <option value="physical135">物理底片</option>
+                      </select>
+                    </div>
+                    {settings.edgeRenderMode === 'physical135' && (
+                      <>
+                        <div className="border-l border-[var(--ff-amber-line)] pl-2.5 text-[11px] leading-5 text-[var(--ff-paper-dim)]">
+                          {settings.imagingMode === 'spectral'
+                            ? supportsPhysicalSpectralStock(settings.brandText)
+                              ? settings.brandText === FilmType.FUJI_PRO_400H
+                                ? '片门与齿孔进入光谱显影；片边采用 X-Tra 兼容布局，非 Pro 400H 实测扫描；灰雾和漏光为近似。'
+                                : '片门与齿孔进入光谱显影；灰雾和漏光为片边曝光近似，非完整感光测量。'
+                              : physicalEdgeForFilm(settings.brandText)
+                                ? '该型号的物理孔密度未通过完整显影验收；请使用真实 135 贴图，或仅使用明确的几何兼容。'
+                                : '该型号没有经验证的物理片边布局；请使用真实 135 兼容贴图。'
+                            : '几何与扫描背光兼容模式；不将经典色彩描述为光谱显影。'}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className={labelClass}>齿孔背光</span>
+                            <select
+                              aria-label="齿孔背光"
+                              value={settings.physicalBacking ?? 'open'}
+                              onChange={event => update({ physicalBacking: event.target.value as FilmSettings['physicalBacking'] })}
+                              className={inputClass}
+                            >
+                              <option value="open">开放白光</option>
+                              <option value="black">黑色背底</option>
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className={labelClass}>镜头光圈</span>
+                            <input
+                              aria-label="镜头光圈"
+                              type="number" min={1} max={22} step={0.1}
+                              value={settings.physicalAperture ?? 5.6}
+                              onChange={event => updateNumber(event, 'physicalAperture')}
+                              className={inputClass}
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" className={segmentClass} onClick={() => update({ physicalBodySeed: nextPhysicalSeed(settings.physicalBodySeed ?? 1) })}>换一台 · {settings.physicalBodySeed ?? 1}</button>
+                          <button type="button" className={segmentClass} onClick={() => {
+                            const current = physicalFrameSeed ?? settings.physicalFrameSeed ?? 1;
+                            if (onPhysicalFrameSeedChange) onPhysicalFrameSeedChange(nextPhysicalSeed(current));
+                            else update({ physicalFrameSeed: nextPhysicalSeed(current) });
+                          }}>换一格 · {physicalFrameSeed ?? settings.physicalFrameSeed ?? 1}</button>
+                        </div>
+                        <label className="block">
+                          <span className={`${labelClass} flex justify-between`}><span>拉直</span><span className="font-mono">{settings.physicalStraighten ?? 0}°</span></span>
+                          <input aria-label="拉直" type="range" min={-5} max={5} step={0.1} value={settings.physicalStraighten ?? 0} onChange={event => updateNumber(event, 'physicalStraighten')} className="min-h-11 w-full accent-[var(--ff-amber)]" />
+                        </label>
+                        <label className="block">
+                          <span className={`${labelClass} flex justify-between`}><span>边缘灰雾</span><span className="font-mono">{settings.physicalFog ?? 1}</span></span>
+                          <input aria-label="边缘灰雾" type="range" min={0} max={2} step={0.1} value={settings.physicalFog ?? 1} onChange={event => updateNumber(event, 'physicalFog')} className="min-h-11 w-full accent-[var(--ff-amber)]" />
+                        </label>
+                        <label className="block">
+                          <span className={`${labelClass} flex justify-between`}><span>片轴漏光</span><span className="font-mono">{settings.physicalLeaks ?? 0}</span></span>
+                          <input aria-label="片轴漏光" type="range" min={0} max={1} step={0.05} value={settings.physicalLeaks ?? 0} onChange={event => updateNumber(event, 'physicalLeaks')} className="min-h-11 w-full accent-[var(--ff-amber)]" />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </fieldset>
+              )}
 
               {supportsReal135 && (
                 <fieldset disabled={disabled}>

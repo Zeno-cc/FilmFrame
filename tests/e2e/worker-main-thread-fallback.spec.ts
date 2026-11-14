@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { selectFilmStock } from './stockPicker';
 
 const fixture = path.resolve(
   process.cwd(),
@@ -14,6 +15,77 @@ type WorkerFallbackProbe = {
 };
 
 test('a started Worker failure completes through the main-thread Canvas renderer', async ({ page }) => {
+  await prepareFailingWorker(page);
+  await developThroughMainThread(page);
+  const probe = await readFallbackProbe(page);
+  expect(probe.workerConstructions).toBe(1);
+  expect(probe.workerRequests).toBeGreaterThanOrEqual(1);
+  expect(probe.forcedFailures).toBe(probe.workerRequests);
+  expect(probe.htmlCanvasExports).toBeGreaterThanOrEqual(1);
+});
+
+test('spectral Worker failure completes locally through the same spectral main-thread route', async ({ page }, testInfo) => {
+  const applicationOrigin = new URL(testInfo.project.use.baseURL as string).origin;
+  const externalRequests: string[] = [];
+  page.on('request', request => {
+    if (new URL(request.url()).origin !== applicationOrigin
+      && !request.url().startsWith('blob:') && !request.url().startsWith('data:')) {
+      externalRequests.push(request.url());
+    }
+  });
+  await prepareFailingWorker(page);
+  await developThroughMainThread(page);
+  const legacyPixels = await readAperturePixels(page);
+  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await inspector.getByLabel('成像方式').selectOption('spectral');
+  await inspector.getByLabel('光谱计算').selectOption('cpu');
+  await inspector.getByLabel('颗粒强度').fill('0');
+  await page.getByRole('button', { name: /冲洗待更新照片|重新冲洗全部/ }).click();
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(1, { timeout: 30_000 });
+  const spectralPixels = await readAperturePixels(page);
+  expect(spectralPixels).not.toEqual(legacyPixels);
+  const probe = await readFallbackProbe(page);
+  expect(probe.workerConstructions).toBe(1);
+  expect(probe.workerRequests).toBeGreaterThanOrEqual(2);
+  expect(probe.forcedFailures).toBe(probe.workerRequests);
+  expect(probe.htmlCanvasExports).toBeGreaterThanOrEqual(2);
+  expect(externalRequests).toEqual([]);
+});
+
+async function readAperturePixels(page: import('@playwright/test').Page) {
+  return page.getByRole('img', { name: path.basename(fixture) }).evaluate(element => {
+    if (!(element instanceof HTMLImageElement)) throw new Error('Expected a rendered image');
+    const image = element;
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Missing test canvas context');
+    context.drawImage(image, 0, 0);
+    const x = Math.round(92 * image.naturalWidth / 1307);
+    const y = Math.round(211 * image.naturalHeight / 1203);
+    return Array.from(context.getImageData(x + 20, y + 20, 20, 20).data);
+  });
+}
+
+async function developThroughMainThread(page: import('@playwright/test').Page) {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await inspector.getByLabel('成像方式').selectOption('legacy');
+  await selectFilmStock(inspector,'KODAK PORTRA 160');
+  await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('input[type="file"]').setInputFiles(fixture);
+  await expect(page.getByRole('img', { name: path.basename(fixture) })).toBeVisible();
+  await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.getByRole('dialog', { name: '需要处理' })).toHaveCount(0);
+}
+
+async function prepareFailingWorker(page: import('@playwright/test').Page) {
   await page.route('**/api/runtime-config', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -82,7 +154,9 @@ test('a started Worker failure completes through the main-thread Canvas renderer
   await page.setViewportSize({ width: 1280, height: 900 });
 
   const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('胶片型号').selectOption('KODAK PORTRA 160');
+  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await inspector.getByLabel('成像方式').selectOption('legacy');
+  await selectFilmStock(inspector,'KODAK PORTRA 160');
   await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -95,14 +169,12 @@ test('a started Worker failure completes through the main-thread Canvas renderer
     timeout: 30_000,
   });
   await expect(page.getByRole('dialog', { name: '需要处理' })).toHaveCount(0);
+}
 
-  const probe = await page.evaluate(() => (
+async function readFallbackProbe(page: import('@playwright/test').Page) {
+  return page.evaluate(() => (
     window as typeof window & {
       __filmFrameWorkerFallbackProbe: WorkerFallbackProbe;
     }
   ).__filmFrameWorkerFallbackProbe);
-  expect(probe.workerConstructions).toBe(1);
-  expect(probe.workerRequests).toBeGreaterThanOrEqual(1);
-  expect(probe.forcedFailures).toBe(probe.workerRequests);
-  expect(probe.htmlCanvasExports).toBeGreaterThanOrEqual(1);
-});
+}

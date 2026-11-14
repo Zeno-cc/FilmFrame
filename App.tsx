@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, FILM_PRESETS, HoleType, OutputFormat, OutputMode } from './types';
+import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, OutputMode } from './types';
 import {
   cancelFilmRendering,
   disposeFilmWorkerClient,
@@ -19,7 +19,7 @@ import {
   isHeicOrHeifCandidate,
   prepareHeicRenderFile,
 } from './services/heicConversion';
-import { acceptImageRenderResult } from './services/imageBatch';
+import { acceptImageRenderResult, clearImageProcessingErrors } from './services/imageBatch';
 import {
   deriveImageWorkflowStatus,
   getPrimaryAction,
@@ -42,8 +42,8 @@ import { DEFAULT_RENDER_TRANSFORM, normalizeRenderTransform } from './services/r
 import { deleteRecipe, loadRecipes, saveRecipe } from './services/recipeStorage';
 import { shareArtifact } from './services/shareArtifact';
 import { createPreviewRenderController } from './services/previewRenderController';
+import { FULL_FRAME_135 } from './services/physical135/plan';
 import {
-  getReal135OverlayUrl,
   KODAK_GOLD_APERTURE_ASPECT,
   supportsReal135Template,
 } from './services/filmOverlay';
@@ -89,6 +89,7 @@ import { PreviewDialog } from './components/preview/PreviewDialog';
 import { NoticeToast as DarkroomNoticeToast } from './components/feedback/NoticeToast';
 import { ErrorDialog } from './components/feedback/ErrorDialog';
 import { SupportDialog } from './components/feedback/SupportDialog';
+import { CreditsDialog } from './components/feedback/CreditsDialog';
 import { DeleteAllPhotosDialog } from './components/feedback/DeleteAllPhotosDialog';
 import { IncompleteExportDialog } from './components/feedback/IncompleteExportDialog';
 // Security Fix: Import EXIF from local dependency instead of external CDN
@@ -109,6 +110,8 @@ const DEFAULT_SETTINGS: FilmSettings = {
   outputFormat: 'image/jpeg', // Default to JPG for WeChat
   outputQuality: 0.95,
   processingMode: 'preview',
+  imagingMode: 'spectral',
+  spectralBackend: 'auto',
   frameRenderMode: 'real135',
   scanOutputAspect: 'native',
   scanBackgroundColor: DEFAULT_SCAN_BACKGROUND_COLOR,
@@ -116,7 +119,15 @@ const DEFAULT_SETTINGS: FilmSettings = {
   enableRealisticRebate: true,
   maxRollFrames: 36,
   useFilmOverlayTemplate: true,
-  filmOverlayUrl: '/film-overlays/kodak-gold-200.png'
+  filmOverlayUrl: '/film-overlays/kodak-gold-200.png',
+  edgeRenderMode: 'physical135',
+  physicalBacking: 'open',
+  physicalBodySeed: 1,
+  physicalFrameSeed: 1,
+  physicalFog: 1,
+  physicalLeaks: 0,
+  physicalStraighten: 0,
+  physicalAperture: 5.6,
 };
 
 type PreviewState =
@@ -156,12 +167,11 @@ function getCurrentImageArtifact(
     return null;
   }
 
-  const imageSettings = settingsForImage(settings, index);
-  const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform);
+  const imageSettings = settingsForImage(settings, index, item);
+  const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform, item.physicalFrameSeed);
   if (item.processedMime !== settings.outputFormat || item.processedSettingsKey !== settingsKey) {
     return null;
   }
-
   return {
     url: item.processedUrl,
     mime: item.processedMime,
@@ -191,17 +201,22 @@ function readImageSize(src: string): Promise<{ width: number; height: number }> 
 const App: React.FC = () => {
   const [initialPreferences] = useState(() => loadPreferences(DEFAULT_SETTINGS, 'single'));
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [settings, setSettings] = useState<FilmSettings>(() => initialPreferences.settings);
+  const [settings, setSettingsState] = useState<FilmSettings>(() => initialPreferences.settings);
+  const setSettings: typeof setSettingsState = useCallback(update => {
+    setSettingsState(current => mergeSettings(current, typeof update === 'function' ? update(current) : update));
+  }, []);
   const [processing, setProcessing] = useState(false);
   const [activeBatchMode, setActiveBatchMode] = useState<OutputMode | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>(() => initialPreferences.outputMode);
   const [stripResult, setStripResult] = useState<RenderArtifact | null>(null);
   const [showDonate, setShowDonate] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [processingMessage, setProcessingMessage] = useState('');
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [queuedImageIds, setQueuedImageIds] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
@@ -228,6 +243,7 @@ const App: React.FC = () => {
   const settingsRef = useRef<FilmSettings>(settings);
   const stripResultRef = useRef<RenderArtifact | null>(null);
   const renderGenerationRef = useRef(0);
+  const rollEpochRef = useRef(0);
   const mountedRef = useRef(true);
   const hasReal135Template = supportsReal135Template(settings.brandText);
   const isReal135Mode = hasReal135Template && (settings.frameRenderMode ?? 'real135') === 'real135';
@@ -254,6 +270,7 @@ const App: React.FC = () => {
     return () => {
       mountedRef.current = false;
       renderGenerationRef.current += 1;
+      rollEpochRef.current += 1;
       disposeFilmWorkerClient();
       imagesRef.current.forEach(img => {
         revokeObjectUrl(img.previewUrl);
@@ -314,8 +331,14 @@ const App: React.FC = () => {
       if (current?.type !== 'single') return current;
 
       const nextImageId = getNextPreviewImageId(imagesRef.current, current.imageId, direction);
+      if (nextImageId) setSelectedImageId(nextImageId);
       return nextImageId ? { type: 'single', imageId: nextImageId } : null;
     });
+  }, []);
+
+  const openImagePreview = useCallback((id: string) => {
+    setSelectedImageId(id);
+    setPreview({ type: 'single', imageId: id });
   }, []);
 
   const closeCropEditor = useCallback(() => {
@@ -350,23 +373,10 @@ const App: React.FC = () => {
     }
 
     if (getPreviewImageIndex(images, preview.imageId) === -1) {
+      setSelectedImageId(images[0].id);
       setPreview({ type: 'single', imageId: images[0].id });
     }
   }, [images, preview, settings, stripResult]);
-
-  useEffect(() => {
-    const preset = FILM_PRESETS[settings.brandText];
-    if (preset) {
-      const recommendedHoleType: HoleType = preset.holeRounding > 0.4 ? 'rounded' : 'square';
-      setSettings(prev => ({ 
-        ...prev, 
-        textColor: preset.brandColor,
-        holeType: recommendedHoleType,
-        frameRenderMode: hasReal135Template ? prev.frameRenderMode : 'classic',
-        filmOverlayUrl: getReal135OverlayUrl(settings.brandText) ?? prev.filmOverlayUrl,
-      }));
-    }
-  }, [settings.brandText]);
 
   const readExifDate = useCallback(async (file: File): Promise<string> => {
     let exifDate = '';
@@ -386,6 +396,7 @@ const App: React.FC = () => {
   }, []);
 
   const addFiles = useCallback(async (files: Iterable<File>) => {
+    const rollEpoch = rollEpochRef.current;
     const { images: newImages, errors: uploadErrors, warnings: uploadWarnings } = await prepareUploadedImages(files, {
       isHeicCandidate: isHeicOrHeifCandidate,
       prepareRenderFile: prepareHeicRenderFile,
@@ -395,6 +406,10 @@ const App: React.FC = () => {
       readImageSize,
       readExifDate,
     });
+    if (!mountedRef.current || rollEpoch !== rollEpochRef.current) {
+      newImages.forEach(item => revokeObjectUrl(item.previewUrl));
+      return;
+    }
     const nextImages = [...imagesRef.current, ...newImages];
     const admission = newImages.length > 0
       ? evaluateBatchAdmission({
@@ -421,6 +436,7 @@ const App: React.FC = () => {
 
     imagesRef.current = nextImages;
     setImages(nextImages);
+    setSelectedImageId(current => current ?? newImages[0]?.id ?? null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [readExifDate]);
 
@@ -441,6 +457,9 @@ const App: React.FC = () => {
     const nextImages = currentImages.filter(img => img.id !== id);
     imagesRef.current = nextImages;
     setImages(nextImages);
+    if (selectedImageId === id) {
+      setSelectedImageId(nextImages[Math.min(targetIndex, nextImages.length - 1)]?.id ?? null);
+    }
 
     if (nextImages.length === 0) {
       setStripResult(prev => {
@@ -453,6 +472,7 @@ const App: React.FC = () => {
     if (preview?.type === 'single' && preview.imageId === id) {
       const nextPreviewImage = nextImages[Math.min(targetIndex, nextImages.length - 1)];
       setPreview(nextPreviewImage ? { type: 'single', imageId: nextPreviewImage.id } : null);
+      setSelectedImageId(nextPreviewImage?.id ?? null);
     }
   };
 
@@ -468,6 +488,7 @@ const App: React.FC = () => {
     }
 
     renderGenerationRef.current += 1;
+    rollEpochRef.current += 1;
     imagesRef.current.forEach(item => {
       revokeObjectUrl(item.previewUrl);
       revokeObjectUrl(item.processedUrl);
@@ -488,6 +509,7 @@ const App: React.FC = () => {
     setActiveBatchMode(null);
     setProcessingMessage('');
     setActiveImageId(null);
+    setSelectedImageId(null);
     setQueuedImageIds([]);
     setErrorMsg(null);
     setNotice(null);
@@ -523,10 +545,10 @@ const App: React.FC = () => {
     const batchEntries = includedEntries
       .filter(({ item, index }) => {
         if (batchMode === 'strip' || force) return true;
-        const imageSettings = settingsForImage(batchSettings, index);
+        const imageSettings = settingsForImage(batchSettings, index, item);
         return deriveImageWorkflowStatus(item, {
           expectedMime: batchSettings.outputFormat,
-          expectedSettingsKey: createImageRenderKey(imageSettings, item.exifDate, item.transform),
+          expectedSettingsKey: createImageRenderKey(imageSettings, item.exifDate, item.transform, item.physicalFrameSeed),
         }).kind !== 'complete';
       });
     const batchImages = batchEntries.map(entry => entry.item);
@@ -539,7 +561,7 @@ const App: React.FC = () => {
       for (const { item, index } of batchEntries) {
         const canvasAdmission = evaluateSingleImageRenderAdmission(
           item,
-          settingsForImage(batchSettings, index),
+          settingsForImage(batchSettings, index, item),
           renderBudgetLimits,
         );
         if (!canvasAdmission.ok) {
@@ -571,6 +593,14 @@ const App: React.FC = () => {
     }
 
     const generation = ++renderGenerationRef.current;
+    if (batchMode === 'single') {
+      const nextImages = clearImageProcessingErrors(
+        imagesRef.current,
+        new Set(batchImages.map(item => item.id)),
+      );
+      imagesRef.current = nextImages;
+      setImages(nextImages);
+    }
     setProcessing(true);
     setActiveBatchMode(batchMode);
     setErrorMsg(null);
@@ -618,8 +648,8 @@ const App: React.FC = () => {
           if (generation !== renderGenerationRef.current) break;
           const { item, index } = batchEntries[i];
           if (!imagesRef.current.some(current => current.id === item.id)) continue;
-          const imageSettings = settingsForImage(batchSettings, index);
-          const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform);
+          const imageSettings = settingsForImage(batchSettings, index, item);
+          const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform, item.physicalFrameSeed);
           setActiveImageId(item.id);
           setQueuedImageIds(batchEntries.slice(i + 1).map(entry => entry.item.id));
           setProcessingMessage(`正在处理 ${i + 1}/${batchImages.length}`);
@@ -637,9 +667,10 @@ const App: React.FC = () => {
             const currentItem = imagesRef.current[currentIndex];
             const currentSettingsKey = currentItem && currentIndex >= 0
               ? createImageRenderKey(
-                  settingsForImage(settingsRef.current, currentIndex),
+                  settingsForImage(settingsRef.current, currentIndex, currentItem),
                   currentItem.exifDate,
                   currentItem.transform,
+                  currentItem.physicalFrameSeed,
                 )
               : null;
             if (currentSettingsKey !== settingsKey) {
@@ -713,7 +744,9 @@ const App: React.FC = () => {
     } catch (e) {
       if (!mountedRef.current || generation !== renderGenerationRef.current) return 'cancelled';
       console.error(e);
-      setErrorMsg('处理过程中发生错误，可能是图片文件损坏或内存不足。');
+      setErrorMsg(e instanceof Error && e.message.includes('single frames only')
+        ? '光谱负片目前仅支持真实 135 单张出片；胶片长条请使用经典色彩。'
+        : '处理过程中发生错误，可能是图片文件损坏或内存不足。');
       return 'failed';
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
@@ -754,7 +787,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const retrySettings = settingsForImage(settings, index);
+    const retrySettings = settingsForImage(settings, index, item);
     const canvasAdmission = evaluateSingleImageRenderAdmission(
       item,
       retrySettings,
@@ -776,7 +809,7 @@ const App: React.FC = () => {
     }
 
     const generation = ++renderGenerationRef.current;
-    const settingsKey = createImageRenderKey(retrySettings, item.exifDate, item.transform);
+    const settingsKey = createImageRenderKey(retrySettings, item.exifDate, item.transform, item.physicalFrameSeed);
 
     setProcessing(true);
     setActiveBatchMode('single');
@@ -808,9 +841,10 @@ const App: React.FC = () => {
       const currentItem = imagesRef.current[currentIndex];
       const currentSettingsKey = currentItem && currentIndex >= 0
         ? createImageRenderKey(
-            settingsForImage(settingsRef.current, currentIndex),
+            settingsForImage(settingsRef.current, currentIndex, currentItem),
             currentItem.exifDate,
             currentItem.transform,
+            currentItem.physicalFrameSeed,
           )
         : null;
       if (currentSettingsKey !== settingsKey) {
@@ -1030,12 +1064,20 @@ const App: React.FC = () => {
     window.requestAnimationFrame(() => setShowDonate(true));
   };
 
+  const openCreditsFromSettings = () => {
+    setSettingsOpen(false);
+    window.requestAnimationFrame(() => setShowCredits(true));
+  };
+
   const saveCurrentRecipe = () => {
-    const next = saveRecipe(recipeName, settings);
-    setRecipes(next);
-    if (recipeName.trim()) {
+    if (!recipeName.trim()) return;
+    try {
+      const next = saveRecipe(recipeName, settings);
+      setRecipes(next);
       setNotice({ tone: 'success', message: `配方“${recipeName.trim().slice(0, 40)}”已保存在本机。` });
       setRecipeName('');
+    } catch {
+      setNotice({ tone: 'warning', message: '配方保存失败，浏览器存储不可用或空间不足。名称和当前设置已保留，请重试。' });
     }
   };
 
@@ -1043,13 +1085,21 @@ const App: React.FC = () => {
     const recipe = recipes.find(item => item.id === recipeId);
     if (!recipe) return;
     setSelectedRecipeId(recipeId);
-    setSettings(current => mergeSettings(current, recipe.settings));
+    setSettings(current => mergeSettings(current, {
+      frameNumberColor: undefined,
+      real135SprocketColor: undefined,
+      ...recipe.settings,
+    }, 0));
     setNotice({ tone: 'info', message: `已应用配方“${recipe.name}”，现有成片需要重新冲洗。` });
   };
 
   const removeRecipe = (recipeId: string) => {
-    setRecipes(deleteRecipe(recipeId));
-    if (selectedRecipeId === recipeId) setSelectedRecipeId('');
+    try {
+      setRecipes(deleteRecipe(recipeId));
+      if (selectedRecipeId === recipeId) setSelectedRecipeId('');
+    } catch {
+      setNotice({ tone: 'warning', message: '配方删除失败，浏览器存储不可用。原配方仍然保留，请重试。' });
+    }
   };
 
   const shareCurrentPreview = async () => {
@@ -1083,7 +1133,7 @@ const App: React.FC = () => {
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragEnter = (e: React.DragEvent<HTMLElement>, index: number) => {
+  const handleDragEnter = (_event: React.DragEvent<HTMLElement>, index: number) => {
      if (processing || exporting) return;
      if (dragItem.current === null) return;
      if (dragItem.current === index) return;
@@ -1166,12 +1216,12 @@ const App: React.FC = () => {
   const singleExportReadiness = getSingleExportReadiness(images, settings);
   const imageWorkflowStatuses = new Map(
     images.map((img, index) => {
-      const imageSettings = settingsForImage(settings, index);
+      const imageSettings = settingsForImage(settings, index, img);
       return [
         img.id,
         deriveImageWorkflowStatus(img, {
           expectedMime: settings.outputFormat,
-          expectedSettingsKey: createImageRenderKey(imageSettings, img.exifDate, img.transform),
+          expectedSettingsKey: createImageRenderKey(imageSettings, img.exifDate, img.transform, img.physicalFrameSeed),
           activeImageId,
           queuedImageIds,
         }),
@@ -1225,7 +1275,7 @@ const App: React.FC = () => {
     }
 
     const previewSettings = {
-      ...settingsForImage(settings, previewImageIndex),
+      ...settingsForImage(settings, previewImageIndex, previewImageItem),
       processingMode: 'preview' as const,
     };
     const canvasAdmission = evaluateSingleImageRenderAdmission(
@@ -1246,7 +1296,7 @@ const App: React.FC = () => {
     const controller = createPreviewRenderController<PreviewRenderRequest>({
       render: async request => (await processImage(
         request.item.file,
-        { ...settingsForImage(request.settings, request.index), processingMode: 'preview' },
+        { ...settingsForImage(request.settings, request.index, request.item), processingMode: 'preview' },
         request.item.exifDate,
         request.item.previewUrl,
         request.item.transform,
@@ -1276,12 +1326,6 @@ const App: React.FC = () => {
     settings,
   ]);
 
-  const effectivePreviewSource =
-    preview?.type === 'single' && previewImageItem
-      ? previewSourceMode === 'before'
-        ? previewImageItem.previewUrl
-        : editorPreviewUrl ?? previewImageArtifact?.url ?? previewImageItem.previewUrl
-      : previewImageSource;
   const processButtonLabel =
     images.length === 0
       ? '先添加图片'
@@ -1342,7 +1386,7 @@ const App: React.FC = () => {
 
   const resetToDefaults = () => {
     if (processing || exporting) return;
-    setSettings({ ...DEFAULT_SETTINGS });
+    setSettingsState(mergeSettings(DEFAULT_SETTINGS, DEFAULT_SETTINGS));
     setOutputMode('single');
     setSelectedRecipeId('');
     setNotice({ tone: 'info', message: '已恢复默认设置，照片和本地配方仍然保留。' });
@@ -1391,6 +1435,17 @@ const App: React.FC = () => {
     processing,
     exporting,
     selectedRecipeName,
+    physicalFrameSeed: (images.find(item => item.id === selectedImageId) ?? images[0])?.physicalFrameSeed,
+    onPhysicalFrameSeedChange: seed => {
+      const id = selectedImageId ?? images[0]?.id;
+      if (!id) {
+        setSettings(current => ({ ...current, physicalFrameSeed: seed }));
+        return;
+      }
+      const nextImages = imagesRef.current.map(item => item.id === id ? { ...item, physicalFrameSeed: seed } : item);
+      imagesRef.current = nextImages;
+      setImages(nextImages);
+    },
   };
   const mobilePrimaryAction = {
     ...primaryAction,
@@ -1461,6 +1516,7 @@ const App: React.FC = () => {
             onReset={resetToDefaults}
             onOpenSupport={() => setShowDonate(true)}
             onOpenPrivacy={() => setNotice({ tone: 'info', message: '照片只在当前设备处理，不会上传；刷新或关闭页面后不会保留。' })}
+            onOpenCredits={openCreditsFromSettings}
             githubHref="https://github.com/Zeno-cc/FilmFrame"
           />
         )}
@@ -1512,7 +1568,7 @@ const App: React.FC = () => {
                   reorderDisabled={processing || exporting}
                   selectionDisabled={processing || exporting}
                   draggable={!processing && !exporting}
-                  onOpen={id => setPreview({ type: 'single', imageId: id })}
+                  onOpen={openImagePreview}
                   onRetry={id => void retryImage(id)}
                   onToggleIncluded={toggleImageSelection}
                   onDownload={downloadImage}
@@ -1547,7 +1603,7 @@ const App: React.FC = () => {
                   onPreview={currentStripResult ? () => setPreview({ type: 'strip' }) : undefined}
                   onDownload={downloadImage}
                   downloadFilename="film_strip"
-                  onSelectSequenceItem={id => setPreview({ type: 'single', imageId: id })}
+                  onSelectSequenceItem={openImagePreview}
                   onToggleSequenceItem={toggleImageSelection}
                   onRemove={removeImage}
                   onMove={moveImage}
@@ -1587,6 +1643,7 @@ const App: React.FC = () => {
                 onReset: resetToDefaults,
                 onOpenSupport: openSupportFromSettings,
                 onOpenPrivacy: () => setNotice({ tone: 'info', message: '照片只在当前设备处理，不会上传；刷新或关闭页面后不会保留。' }),
+                onOpenCredits: openCreditsFromSettings,
                 githubHref: 'https://github.com/Zeno-cc/FilmFrame',
                 resetDisabled: processing || exporting,
               }}
@@ -1631,7 +1688,9 @@ const App: React.FC = () => {
                   sourceUrl={previewImageItem.previewUrl}
                   initialTransform={previewImageItem.transform}
                   landscapeFrameAspect={isReal135Mode
-                    ? (settings.useFilmOverlayTemplate === false ? 3 / 2 : KODAK_GOLD_APERTURE_ASPECT)
+                    ? (settings.edgeRenderMode === 'physical135'
+                        ? FULL_FRAME_135.gateWidthMm / FULL_FRAME_135.gateHeightMm
+                        : settings.useFilmOverlayTemplate === false ? 3 / 2 : KODAK_GOLD_APERTURE_ASPECT)
                     : undefined}
                   onCancel={closeCropEditor}
                   onCommit={transform => {
@@ -1661,6 +1720,10 @@ const App: React.FC = () => {
             <SupportDialog
               open={showDonate}
               onClose={() => setShowDonate(false)}
+            />
+            <CreditsDialog
+              open={showCredits}
+              onClose={() => setShowCredits(false)}
             />
             <DeleteAllPhotosDialog
               open={deleteAllPhotosOpen}

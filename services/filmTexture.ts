@@ -67,7 +67,7 @@ export function drawGrain(
     ctx.globalAlpha = Math.min(1, (intensity / 100) * 2);
     ctx.fillStyle = pattern;
     ctx.translate(offsetX, offsetY);
-    ctx.fillRect(-offsetX, -offsetY, width + offsetX, height + offsetY);
+    ctx.fillRect(x - offsetX, y - offsetY, width, height);
   }
 
   ctx.restore();

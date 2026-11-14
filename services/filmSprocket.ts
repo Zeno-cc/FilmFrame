@@ -1,4 +1,5 @@
 import { FilmType, type FilmSettings } from '../types';
+import { COMPATIBILITY_135_OVERLAY } from './filmOverlay';
 
 export const REAL135_SPROCKET_MASK_WIDTH = 1307;
 export const REAL135_SPROCKET_MASK_HEIGHT = 1203;
@@ -8,11 +9,24 @@ export const REAL135_SPROCKET_MASK_URLS: Partial<Record<FilmType, string>> = {
   [FilmType.KODAK_PORTRA_160]: '/film-sprocket-masks/kodak-portra-160.png',
   [FilmType.KODAK_PORTRA_400]: '/film-sprocket-masks/kodak-portra-400.png',
   [FilmType.KODAK_PORTRA_800]: '/film-sprocket-masks/kodak-portra-800.png',
+  [FilmType.KODAK_PORTRA_800_PUSH1]: '/film-sprocket-masks/kodak-portra-800.png',
+  [FilmType.KODAK_PORTRA_800_PUSH2]: '/film-sprocket-masks/kodak-portra-800.png',
   [FilmType.KODAK_EKTAR_100]: '/film-sprocket-masks/kodak-ektar-100.png',
   [FilmType.KODAK_ULTRAMAX_400]: '/film-sprocket-masks/kodak-ultramax-400.png',
   [FilmType.KODAK_COLORPLUS_200]: '/film-sprocket-masks/kodak-colorplus-200.png',
   [FilmType.KODAK_PROIMAGE_100]: '/film-sprocket-masks/kodak-pro-image-100.png',
+  [FilmType.FUJI_PROVIA_100F]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.FUJI_VELVIA_100]: COMPATIBILITY_135_OVERLAY,
   [FilmType.KODAK_EKTACHROME_E100]: '/film-sprocket-masks/kodak-ektachrome-e100.png',
+  [FilmType.KODAK_KODACHROME_64]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.FUJI_C200]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.FUJI_XTRA_400]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.FUJI_PRO_400H]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.FUJI_ACROS_II]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.KODAK_VISION3_50D]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.KODAK_VISION3_200T]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.KODAK_VISION3_250D]: COMPATIBILITY_135_OVERLAY,
+  [FilmType.KODAK_VISION3_500T]: COMPATIBILITY_135_OVERLAY,
   [FilmType.KODAK_TRI_X_400]: '/film-sprocket-masks/kodak-tri-x-400.png',
   [FilmType.KODAK_TMAX_100]: '/film-sprocket-masks/kodak-tmax-100.png',
   [FilmType.KODAK_TMAX_400]: '/film-sprocket-masks/kodak-tmax-400.png',
