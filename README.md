@@ -13,8 +13,10 @@ FilmFrame 是一间运行在浏览器里的数字暗房。它把本地照片排�
 
 ### 真实 135 与经典片边
 
-- 16 款胶片均配有独立的真实 135 PNG 模板和齿孔蒙版。
-- 真实 135 支持单张成片与连续胶片长条。
+- 提供 29 款胶片选择；16 套历史 PNG 模板和齿孔蒙版供贴图模式使用，其余型号使用标明兼容性的程序化片边。
+- 支持物理 135、真实 135 贴图与经典片边。物理片边的光谱显影仅对通过能力检查的型号开放。
+- 默认使用 Gold 200 光谱成像与物理片边。旧偏好和旧配方保留经典色彩及贴图模式。
+- 物理 135 支持连续长条；光谱成像配合贴图片边时仅支持单张。
 - 经典片边使用 Canvas 程序化绘制，可调整文字、日期、边框和齿孔。
 - 帧号颜色与真实 135 齿孔颜色可以全局自定义，也可以恢复为原片效果。
 - 扫描输出可保留自定义背景色，也可以只保留底片主体。
@@ -53,13 +55,16 @@ FilmFrame 是一间运行在浏览器里的数字暗房。它把本地照片排�
 
 | 品牌 / 系列 | 型号 |
 | --- | --- |
-| Kodak Portra | 160、400、800 |
+| Kodak Portra | 160、400、800、800 Push 1、800 Push 2 |
 | Kodak 彩色负片 | Gold 200、Ultramax 400、ColorPlus 200、Pro Image 100、Ektar 100 |
-| Kodak 反转片 | Ektachrome E100 |
+| Kodak 反转片 | Ektachrome E100、Kodachrome 64 |
 | Kodak 黑白片 | Tri-X 400、T-Max 100、T-Max 400、T-Max P3200 |
-| Fujifilm | Superia 400 |
+| Fujifilm | Superia 400、C200、X-Tra 400、Pro 400H、Acros II、Provia 100F、Velvia 100 |
+| Kodak Vision3 | 50D、200T、250D、500T |
 | CineStill | 800T |
 | Ilford | HP5 Plus |
+
+其中 24 款提供光谱成像。ColorPlus 200、Pro Image 100、Superia 400、T-Max 400 和 P3200 保留经典色彩，不以其他型号的光谱数据替代。CineStill、反转片和黑白片的光谱成像使用兼容片边；Pro 400H 的物理片边使用 X-Tra 兼容布局，不代表实测 Pro 400H 扫描。
 
 ## 快速开始
 
@@ -96,7 +101,7 @@ npm run dev          # 启动 Vite 开发服务器
 npm run typecheck    # TypeScript 类型检查
 npm test             # 运行 Vitest 单元测试
 npm run test:e2e     # 运行 Playwright 浏览器测试
-npm run check        # 单元测试 + 类型检查 + 生产构建
+npm run check        # 单元测试 + 光谱数值校验 + 类型检查 + 生产构建
 npm run check:access # 鉴权服务测试 + 类型检查 + 构建
 npm run check:all    # 前端与鉴权服务完整检查
 npm run check:release # 完整 pre-tag 发布门禁
@@ -127,6 +132,7 @@ Cloudflare / OpenResty
 - React 19 + TypeScript + Vite 5
 - Tailwind CSS 4 + 项目语义化 CSS token
 - Canvas / OffscreenCanvas 图像合成
+- 光谱成像与 WebGL2 / CPU 后端，按型号延迟加载光谱资源
 - Web Worker 可选渲染路径
 - `exif-js` 本地读取拍摄日期
 - `heic-to/csp` 1.5.2 按首次 HEIC/HEIF 导入延迟加载并在本地转换静态画面；该依赖体积较大（npm 解包约 24.4 MB），许可证为 LGPL-3.0
@@ -197,8 +203,8 @@ npm run verify:deployment -- --live
 | iPhone Safari | 不以桌面模拟替代 | `v1.3.0` 标签前必须完成脱敏真机烟测 |
 | Android Chrome | 不以桌面模拟替代 | `v1.3.0` 标签前必须完成脱敏真机烟测 |
 
-Worker 或 OffscreenCanvas 不可用时，应用会回退到主线程 Canvas。真机流程和内存压力记录方法见 [浏览器与移动端烟测](docs/project/browser-mobile-smoke.md)。
+Worker 或 OffscreenCanvas 不可用时，应用会回退到主线程 Canvas。光谱后端 `auto` 可在不适用的 GPU 上使用 CPU；显式选择 WebGL2 时，失败会显示错误。真机流程和内存压力记录方法见 [浏览器与移动端烟测](docs/project/browser-mobile-smoke.md)。
 
 ## 许可证
 
-仓库目前没有许可证文件。在添加明确许可证之前，请不要假定代码或胶片素材可以自由复制、修改或商用。第三方 `heic-to` 1.5.2 使用 LGPL-3.0；其许可证与项目自身代码/素材的授权状态应分别审阅。
+仓库目前没有根许可证文件。光谱与物理片边集成包含 GPL-3.0-or-later 代码和具有独立许可的数据；`heic-to` 1.5.2 使用 LGPL-3.0。来源与许可入口已在应用中提供，详细状态见 [来源与分发清单](ops/provenance/README.md)。该清单仍有未解决的权利与对应源码事项，校验成功不代表已获准公开分发。

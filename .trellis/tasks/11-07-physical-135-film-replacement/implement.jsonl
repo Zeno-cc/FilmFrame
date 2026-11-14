@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Preserve real-135 geometry, Worker/main lifecycle, export and browser validation contracts."}
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Reuse validated spectral resources and explicit CPU/GPU boundaries without treating border pixels as aperture-only processing."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Persist normalized seeds/settings and preserve stable result and Object URL identity."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Build accessible controlled physical-edge settings without unrelated UI redesign."}
+{"file": ".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md", "reason": "Use pinned physical-edge functional research and licensing boundaries."}
+{"file": ".trellis/tasks/11-06-integrate-spektralab-negative/research/filmframe-integration-boundaries.md", "reason": "Preserve existing crop, Worker, export, settings and fallback integration contracts."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/implementation-contract.md", "reason": "Read this concise non-negotiable rendering/seed/lifecycle contract before any implementation."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/plan-review.md", "reason": "Apply corrected hole-density, mode-matrix and stock-scope decisions from planning review."}

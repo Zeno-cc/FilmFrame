@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Independently audit physical geometry, main/Worker/browser lifecycle and regression coverage."}
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Audit spectral-domain ordering, resource lifecycle and honest CPU/GPU fallback."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Audit seed identity, migration, settings normalization and artifact ownership."}
+{"file": ".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md", "reason": "Audit physical-model claims, source evidence and distribution limits."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/implementation-contract.md", "reason": "Audit the concise replacement, ordering, seed and validation contract without truncation."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Review controlled physical-edge settings and nested focus behavior."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/plan-review.md", "reason": "Review corrected plan errors and remaining implementation gates before coding."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/scanline-regression-investigation.md", "reason": "Audit the reproduced portrait scanline defect and require final-artifact evidence."}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/stock-wide-edge-audit.md", "reason": "Added manually"}

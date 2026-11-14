@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check provenance validator behavior and avoid weakening existing runtime/privacy contracts."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Verify the implementation does not equate license adoption with historical rights clearance."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Audit GPL, CC BY-SA, spectral constants, attribution and source-availability evidence."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md","reason":"Audit asset/font/trademark provenance and unresolved release blockers."}

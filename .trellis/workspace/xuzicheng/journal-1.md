@@ -731,3 +731,24 @@ Published v1.4.12 from canonical main, verified the trusted-release workflow and
 ### Status
 
 [OK] **Completed**
+
+
+## Session 29: Close Pro 400H physical spectral acceptance
+
+**Date**: 2026-11-14
+**Task**: SpektraLab 全底片逐项迁移与发布验收
+**Branch**: `codex/spectral-negative-print-prototype`
+
+### Summary
+
+Removed FilmFrame's local Pro 400H residual rejection gate after matching the pinned upstream finite-sample least-squares CMY behavior. Enabled its exact spectral aperture and physical perforation route while retaining the explicitly approximate X-Tra-derived 135 edge label. Added independent CMY/residual anchors, request-bound real Worker/WebGL2/FLOAT-readback evidence, CPU/GPU pixel comparison, Worker/forced-main full-frame hashes and GPU frame-release assertions. The final CPU/GPU maximum RGB difference was 1/255, with no channels differing by more than two levels.
+
+Validation: 289 unit tests, spectral-stage checks, TypeScript, production build, 7 provenance tests, 78 production browser workflows, 12 development-only diagnostics including two five-frame reruns, and Firefox/WebKit compatibility passed. A five-frame diagnostic exceeded its 60-second test-only limit; both angle variants passed after setting the existing 180-second production limit without weakening pixel assertions. Distribution rights and corresponding-source blockers remain unresolved.
+
+### Git Commits
+
+None. No commit, push, deployment or release was authorized or performed.
+
+### Status
+
+[OK] **Pro 400H technical acceptance completed; distribution review remains open**

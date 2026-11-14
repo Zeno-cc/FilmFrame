@@ -12,7 +12,7 @@ FilmFrame uses React state only. There is no global store, router state, or serv
 - **Transient UI state:** open dialog/sheet, preview selection, drag state, notices, local crop draft. Owned by the nearest component that coordinates it.
 - **Derived state:** included images, pending counts, workflow status, current artifact validity. Compute with pure helpers; do not persist separately.
 - **Persistent preferences:** only the normalized FilmSettings whitelist and local recipes in `localStorage`. Never persist files, Blob URLs, transforms, or rendered artifacts.
-- **Async ownership state:** generation IDs, active/queued image IDs, and refs to latest state prevent late tasks from overwriting newer state.
+- **Async ownership state:** generation IDs, active/queued image IDs, and refs to latest state prevent late tasks from overwriting newer state. A delete-all roll reset has a separate upload epoch: uploads begun before the reset may finish decoding, but their new Object URLs are revoked without publishing images or feedback.
 
 ## Update Patterns
 

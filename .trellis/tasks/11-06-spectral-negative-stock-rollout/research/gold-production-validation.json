@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "date": "2026-11-07",
+  "scope": "Actual Gold 200 layered FilmFrame production path; zero grain, PNG output, aperture interior only. No full-frame legacy texture parity or 1080p performance claim.",
+  "browser": "156.0.8078.80",
+  "executablePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "cpuWorkerMain": {
+    "maxDifference": 0,
+    "differingValues": 0,
+    "dimensions": [
+      1397,
+      1286
+    ]
+  },
+  "resources": {
+    "worker": [
+      "http://127.0.0.1:4174/services/spectral/resources/kodak_gold_200-setup.json?import"
+    ],
+    "main": [
+      "http://127.0.0.1:4174/services/spectral/resources/kodak_gold_200-setup.json?import"
+    ]
+  },
+  "errors": [],
+  "gpuWorkerMain": {
+    "maxDifference": 0,
+    "differingValues": 0,
+    "dimensions": [
+      1397,
+      1286
+    ]
+  },
+  "gpuCpuWorker": {
+    "maxDifference": 0,
+    "differingValues": 0,
+    "dimensions": [
+      1397,
+      1286
+    ]
+  }
+}

@@ -1,6 +1,14 @@
 # 渲染引擎与图像算法
 
-> 最后核验：2026-08-05。核心文件：`filmEngine.ts`、`canvasRuntime.ts`、`filmWorker.ts`、`filmGeometry.ts`、`filmOverlay.ts`、`filmResolution.ts`。
+> 物理/光谱路由补充：2026-11-14。下文历史贴图与经典路径的详细记录核验于 2026-08-05；它们不是全部渲染模式的统一描述。
+
+## 光谱与物理片边
+
+当前默认使用 Gold 200 光谱成像与物理 135。`services/spectral/stockRegistry.ts` 选择型号及其资源，`services/physical135/capability.ts` 决定物理光谱能力，`services/physical135/` 负责几何、材质和连续长条。光谱模块与资源按需加载，支持 CPU 与 WebGL2；`auto` 可以选择 CPU，显式 WebGL2 的失败必须报错。
+
+物理片门与贴图片窗尺寸不同，不能复用贴图几何作为物理裁切标准。物理长条连续展开，不使用下文贴图路径的四帧换行。光谱配合贴图片边时只支持单张；CineStill、反转片和黑白片不具备已验收的物理光谱齿孔路径。
+
+旧偏好与旧配方保留原渲染选择。精确的资源身份、色彩空间、行跨度、连续材质、资源释放和 Worker/主线程验证契约见 [光谱渲染规范](../../.trellis/spec/frontend/spectral-rendering.md)。下文的 Gold 字节色彩变换、随机片基和模板尺寸适用于经典色彩及历史贴图路径，不能用于解释光谱成像。
 
 ## 路由决策
 
@@ -53,7 +61,7 @@ h = 800
 | --- | --- | --- |
 | `film-base.png` | 1307x1203 RGBA | 分层片基 |
 | `aperture-mask-derived.png` | 1307x1203 grayscale | 片窗亮度 alpha mask |
-| `aperture-shadow-derived.png` | 1307x1203 RGBA | 已加载，当前不绘制 |
+| `aperture-shadow-derived.png` | 1307x1203 RGBA | 当前不加载、不绘制 |
 | `kodak-gold-200.png` | 1307x1203 RGBA | legacy 单图模板 fallback |
 | `kodak-portra-160.png` | 1307x1203 RGB | Portra 160 单图与长条扁平模板 |
 | `kodak-portra-400.png` | 1307x1203 RGB | Portra 400 单图与长条扁平模板 |
@@ -91,7 +99,7 @@ h = 800
 12. 若源图为竖图，把最终单张成片逆时针旋回。
 13. 导出 JPEG/PNG Blob URL。
 
-分层加载失败后，先尝试 Gold legacy overlay；再失败才调用程序化 `processImageReal135()`。其余 15 款胶片直接加载注册表中的扁平模板，按同一片窗几何绘制照片、颗粒和动态帧号，再覆盖模板；四条模板边带严格止于片窗边界，不得把素材中的不透明黑色片窗向照片内重叠，否则缩放后会形成可见黑框。模板加载失败时同样回退程序化渲染。当前 16 种 `FilmType` 均已注册。
+分层加载失败后，经典色彩先尝试 Gold legacy overlay；再失败才调用程序化 `processImageReal135()`。光谱模式保持分层素材错误并交回主线程，避免同一请求静默改用另一种模板。其余 15 款胶片直接加载注册表中的扁平模板，按同一片窗几何绘制照片、颗粒和动态帧号，再覆盖模板；四条模板边带严格止于片窗边界，不得把素材中的不透明黑色片窗向照片内重叠，否则缩放后会形成可见黑框。模板加载失败时经典色彩同样回退程序化渲染，光谱模式则报错。当前 16 种 `FilmType` 均已注册。
 
 ## Worker 真实单张路径
 

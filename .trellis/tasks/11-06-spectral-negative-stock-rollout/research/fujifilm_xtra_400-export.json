@@ -1,0 +1,97 @@
+{
+  "filmId": "fujifilm_xtra_400",
+  "paperId": "fujifilm_crystal_archive_typeii",
+  "setupSha256": "759e8456f3d57f3a11af2f537017a3306382108c4f74c247f3f43f18526ed723",
+  "stages": {
+    "gray_ramp_16.filmRaw": {
+      "sha256": "cfaf5d0b9a532f6ec6e77efe3067154d530fc512bab689bb27665f320807fa5b",
+      "payloadSha256": "452bea5dccde242179e6efe90a6979512d2dec579d633a4607090b030433749f",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.negativeDensity": {
+      "sha256": "48bb7cb697eeca0069d01cf1544ade64dee34c6551aad060c3aa9ada49ec0b2b",
+      "payloadSha256": "8ed25ba2658e3d95c9781c74737e7e5a104977140d233d2a2cdc75f06b4a9abd",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.paperLogExposure": {
+      "sha256": "617e85891d425836599c65d6110002d1d3d0c45a97b75ba46df312e5006075bd",
+      "payloadSha256": "09ad7a8b3f1af8fb2908bed1f8178a3096c15417de96154a5e3b9b1b38dedef3",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.paperDensity": {
+      "sha256": "6c3af65f9605e6d11232ba87a49e669cbb479625ea77072c01735e41e9b9c4ea",
+      "payloadSha256": "db6210a3588fbd67094b8c587c6919d43ed141b85003f0bd953ea601f8fdbb17",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.printRgb": {
+      "sha256": "43390c6fc8859e13ca45d3b13232fe6eaed3eb527c4e9f5c34cd3c4f4622edd0",
+      "payloadSha256": "61bf88d6ad7cf3332773b6ef6aa70615c67fb6e44f50f4d96e800194e5063a8e",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "green_patch_8.filmRaw": {
+      "sha256": "06dcf9bcf5de13e926cec267aae69086906c7c3593c343dac6e1dde036c5af25",
+      "payloadSha256": "d6ac615a2718b426b4085b5fd9e9a7ba0e7a7226030d7e8bea3bb8cf5914f930",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.negativeDensity": {
+      "sha256": "b2451898efb9bb0a1d04c76759027a5b1bb445a931b378a9f998f753079071e4",
+      "payloadSha256": "48059c09dfa592ba94698402858cdba5ded3a1ab057ee34ba3de35f280a4b169",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.paperLogExposure": {
+      "sha256": "595d77d9de6546f2d2f1b555b473009eb0915429e8c40d5c364d305624f68527",
+      "payloadSha256": "85341bca5cd952fbd2c7f6f0cab6725aa2602ee7f989ce21bfe68c9013e51ae4",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.paperDensity": {
+      "sha256": "91499e510fd00bd55a9dcdac2544958f2af6679fab01254a4551b8953db20a14",
+      "payloadSha256": "38bca6e66d25f50a0cea85fae5da18ff1e542902fdc82b21e48981f06fa69279",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.printRgb": {
+      "sha256": "a5bf1d49d67429512051ecc4ddfaf326e4657436022c3d06d28e923dab549f48",
+      "payloadSha256": "355ae377062b78b2410dce14a3dc60684894fa9cc15033168fdb7bcb5ba42003",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    }
+  }
+}

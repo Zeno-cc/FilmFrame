@@ -1,0 +1,102 @@
+{
+  "gray_ramp_16.filmRaw": {
+    "path": "gray_ramp_16.filmRaw.npy",
+    "sha256": "0d9615a763bc9a9a020edc59f191a595eccc9735e6d75f737d23e9e352950ff4",
+    "shape": [
+      16,
+      16,
+      3
+    ],
+    "payloadSha256": "7f10ea6bbb4da47bd9a80b243e35ecd1a6021753fbf1c979e3a5aa1187238cb7"
+  },
+  "gray_ramp_16.negativeDensity": {
+    "path": "gray_ramp_16.negativeDensity.npy",
+    "sha256": "2583a12ecdd20fa52659b507c7e1f396e25aeb4f9e4c48968d646dfa49bb37ee",
+    "shape": [
+      16,
+      16,
+      3
+    ],
+    "payloadSha256": "3ae6cb171fbd4a308436657d13514f8be0ad947a76bfc82c24e8ff18598b1068"
+  },
+  "gray_ramp_16.paperLogExposure": {
+    "path": "gray_ramp_16.paperLogExposure.npy",
+    "sha256": "af0fad3701c15bc1ec89708fc569f065088ffda3daf1c1dacf684e8fc3355fb4",
+    "shape": [
+      16,
+      16,
+      3
+    ],
+    "payloadSha256": "b2aee184da10aa75c5e2f1aeede7a0284e62af574eaf5367aff8d1d163d073b0"
+  },
+  "gray_ramp_16.paperDensity": {
+    "path": "gray_ramp_16.paperDensity.npy",
+    "sha256": "ae2bfaab1af7c108381e034052081e6eae052d0983f3648aba8da17b2cde5146",
+    "shape": [
+      16,
+      16,
+      3
+    ],
+    "payloadSha256": "4018fdbcee5091b5f550e6c7ef666d3461d0c695365c013c32915a811345ef3f"
+  },
+  "gray_ramp_16.printRgb": {
+    "path": "gray_ramp_16.printRgb.npy",
+    "sha256": "26a033b4c4fbd577460b1a8819b5d790d572d72c983d3003b4a95699faaf385a",
+    "shape": [
+      16,
+      16,
+      3
+    ],
+    "payloadSha256": "9a36c1f014e6dde0f986bc7633b3305ae06cebedc2fb1811bc6e1f1bdb2c10d5"
+  },
+  "green_patch_8.filmRaw": {
+    "path": "green_patch_8.filmRaw.npy",
+    "sha256": "7de4205869ef7e7ad9631fc06aa8833cfcc17a619a12c798b18b994eb5342dcd",
+    "shape": [
+      8,
+      8,
+      3
+    ],
+    "payloadSha256": "46e5b8473495a3df75086a6be5e55dd343cf8166358430b462929241b507d618"
+  },
+  "green_patch_8.negativeDensity": {
+    "path": "green_patch_8.negativeDensity.npy",
+    "sha256": "49718c0d5fcbd4b7e14706b63b01e643894f32bb931ccb073d06b3a4dc292616",
+    "shape": [
+      8,
+      8,
+      3
+    ],
+    "payloadSha256": "4f627d71bd447c9da5f8218ef0a9dcb4cf4f0961a9ade7a58b67813edfe25f6a"
+  },
+  "green_patch_8.paperLogExposure": {
+    "path": "green_patch_8.paperLogExposure.npy",
+    "sha256": "9d4d8ca231776c8927aad38c562b2604ac461bc6072817706b7beceb93db5423",
+    "shape": [
+      8,
+      8,
+      3
+    ],
+    "payloadSha256": "ff59a549b8a259eaf1d43c1c579e52f059a5ff96ce74cff23b9846d42c4022e1"
+  },
+  "green_patch_8.paperDensity": {
+    "path": "green_patch_8.paperDensity.npy",
+    "sha256": "48425e21c881916e43c2b8d15f6930c815888080d96e1990ed36099e4f238c2a",
+    "shape": [
+      8,
+      8,
+      3
+    ],
+    "payloadSha256": "f983334ff757c6b1be7267f482d92dacc31c6a3ebb2ff6c5fba55d8cea850a71"
+  },
+  "green_patch_8.printRgb": {
+    "path": "green_patch_8.printRgb.npy",
+    "sha256": "ba71dd413ada31a00e022d652fc4e8c5a9ab2a0b2b483ecbc1ecf1ce7c113803",
+    "shape": [
+      8,
+      8,
+      3
+    ],
+    "payloadSha256": "b837ba05b871be902eb54c8fed5adfb170ba8345298d470df4c137d781f7d222"
+  }
+}

@@ -32,5 +32,7 @@ with per-image piecewise edge and aperture resizing so the film reaches all
 four canvas edges without black padding. Do not replace a template with its
 raw generated image because its aperture geometry differs.
 
-Kodak Gold 200 remains the only layered template that is eligible for the
-Worker renderer. Every flattened template is rendered on the main thread.
+Kodak Gold 200 uses the layered Worker path. The other registered stocks use
+flattened templates through the same Worker route when supported, with the
+full main-thread renderer as the ordinary failure fallback. Classic rendering
+remains on the main thread.

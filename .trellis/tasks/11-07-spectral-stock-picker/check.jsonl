@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Review keyboard, focus, mobile Sheet and token consistency."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Review listener/timer cleanup and stale lifecycle behavior."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review complete unit/browser/accessibility checks and no regressions."}
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Verify support marking does not change the renderer or imply unsupported spectral parity."}

@@ -1,0 +1,97 @@
+{
+  "filmId": "kodak_ultramax_400",
+  "paperId": "kodak_portra_endura",
+  "setupSha256": "7ad9a91344bcbd5f5c7093a1b3d387d6cbe49d734e58f7a716343808e24e0c4b",
+  "stages": {
+    "gray_ramp_16.filmRaw": {
+      "sha256": "526e60f7eb4c1f17023eafbac666ac3e98527cf413fd9c4e57be2eb9b1d7adf9",
+      "payloadSha256": "0a37463fda57081a778611a3bbc69f7ca70887d4b71d1cb0de94b670dce98320",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.negativeDensity": {
+      "sha256": "bffc0ee4e112b609cff8d2d89435ffc984593c178ed2343bf610e988b0599de6",
+      "payloadSha256": "352dedc716b32d8f27aa06e2929d008aed821b088c19a028073fd7b7cc5d3608",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.paperLogExposure": {
+      "sha256": "8f985e7e4931d97cf24a47c891937bf27b6cc38a0c166c7d261bc4bc3a4f03aa",
+      "payloadSha256": "e862042e1f20cf1e5a5b402a30819867f09ff335131918a5dc3ba6e93707c9b3",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.paperDensity": {
+      "sha256": "0c2df236d7c46de035be7d0c16753e798a407068a2fc32a039aea7507d3e7fa0",
+      "payloadSha256": "84c7bfd1d2f1e7b9b802dd6c08023a30806d4917c54e95afd7c2785a1528ad2b",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "gray_ramp_16.printRgb": {
+      "sha256": "490ecaf88a53cb7c0a74e670bcac80a696cde20922ea5a9a35097aacbef4f16e",
+      "payloadSha256": "fbf1699097636a55dea80b2aac782d6bf0093b5b65b8d0974d01b9ce5217af2e",
+      "shape": [
+        16,
+        16,
+        3
+      ]
+    },
+    "green_patch_8.filmRaw": {
+      "sha256": "9f4f300d9cad01bdf2bd5d629cc663573d273900d98b716959b733ee0ca972e7",
+      "payloadSha256": "4a08ae393c58c1910c44230651b00da323a6b8320d76900a41e7ab2ff42c4d83",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.negativeDensity": {
+      "sha256": "ad1961df80ba8d06b4cddeadc4e0e09b1295f56b2793f226be2c0d6f643fb595",
+      "payloadSha256": "fe6c1eac7488edd67c08dff46ccbd2b11b7c324b24922ab9c21427962f22fc50",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.paperLogExposure": {
+      "sha256": "b68b8574e0ba1dd3d82fbba87665ebdd401b2a171743fe104078555c9f9d49ef",
+      "payloadSha256": "25761498b896d2b885716063f9f91f5ed8e7a039d0881c4b8086b30422d79b1d",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.paperDensity": {
+      "sha256": "d0e646f01570a9acaf448e818c77e3d51b43e92675f1faecf06c36f3be22250e",
+      "payloadSha256": "bd3fa528b539f19e46bed762f3535d8d19898452c929f958614db8c7bc7c41ae",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    },
+    "green_patch_8.printRgb": {
+      "sha256": "f57a86e5a89e6d55611e993ecb91508527074e5b7e2be5b507a5d63391f051ab",
+      "payloadSha256": "bdf31c4a0658422d96dabc4c460791f85704bf487acdf17e33d32e078235941c",
+      "shape": [
+        8,
+        8,
+        3
+      ]
+    }
+  }
+}

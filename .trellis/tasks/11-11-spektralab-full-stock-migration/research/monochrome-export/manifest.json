@@ -1,0 +1,435 @@
+{
+  "schema": 1,
+  "sourceRevision": "02d82b56cf65f0f8e802a708612edc4e9a4790af",
+  "scope": "Controlled product monochrome tone resources with Multigrade grade filters; no native grain/sharpness or distribution clearance.",
+  "stocks": [
+    {
+      "filmId": "kodak_tri_x_400",
+      "profileSha256": "a54be071c6a055a9a49acb7072d10bf0b1bcddf9c0a459b0800a9b14bb66b1f1",
+      "setupSha256": "d3e26d31c51cd94418996dae7517df2fe9d56b9141978bf25cd2924ac0466160",
+      "fixtures": {
+        "gray_ramp_16.filmRaw": {
+          "path": "gray_ramp_16.filmRaw.npy",
+          "sha256": "bbeca0f712e0a87b3947d63b92f6e55a07b22df2079d61bba9d7a865730b6c56",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "b1cdda9f8b8334f75f3363ce23a2c1f1732cda3d0066342a455022bee2b70c0d"
+        },
+        "gray_ramp_16.negativeDensity": {
+          "path": "gray_ramp_16.negativeDensity.npy",
+          "sha256": "53e7843780bab43b807546be9e8cdac454f6b322e53767985b8be53db1808d9e",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "8610f3bb6a7905e575eac03fc2dcd5b2e5c1ce72e48fd5ac7eacfc17d8baeeda"
+        },
+        "gray_ramp_16.paperLogExposure": {
+          "path": "gray_ramp_16.paperLogExposure.npy",
+          "sha256": "5b7dfdd242d9abb3dd2ac642ed1e08f5e60d90e2cdacec1e2efc7dfe0edd6fa7",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "d88248b9ee84a234563f4e79b164eca5feec8b9de0f15f5c90987c5e2a64e004"
+        },
+        "gray_ramp_16.paperDensity": {
+          "path": "gray_ramp_16.paperDensity.npy",
+          "sha256": "b78260327ac058d31084b1749fb7915938a56e57fda9cc6c0740785fd63a1dee",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "be723e046c5c1c6b6f33f0c9b7973a9be7000ad23d6c55ae61c659449c64acc0"
+        },
+        "gray_ramp_16.printRgb": {
+          "path": "gray_ramp_16.printRgb.npy",
+          "sha256": "088b5f4c3d0dd9db68d67bd5f6c63cb89b971e89816443b228566feeb9f28fbd",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "11ed92a2e019ba48a30eea8125b54008570b783f5ccc06c6baa097502c2f9886"
+        },
+        "green_patch_8.filmRaw": {
+          "path": "green_patch_8.filmRaw.npy",
+          "sha256": "bb72cc95a3127fd25fbe45a03e406c9ab29725bce678c1d80c3447645b8c2a5c",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "7478b0501c0fce7dca53a802477042ae0ea92adb4a2b2e95c7ddeed95079c90b"
+        },
+        "green_patch_8.negativeDensity": {
+          "path": "green_patch_8.negativeDensity.npy",
+          "sha256": "82a41ca75d0ef70f0c655a68905e34d75b2a8288518fd2130d669cb4613e1602",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "2d73d261fa216c47548ffe8655f5909a9a2cdee9cca5cd84188f124977501d86"
+        },
+        "green_patch_8.paperLogExposure": {
+          "path": "green_patch_8.paperLogExposure.npy",
+          "sha256": "f70acfbaf0530db3aada131b51bdc68412b4ff68fa5295b7075a1db7627a25a0",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "9b43e48bba8886acb9302d4ecd94fc603fcf8a397c92fbbb3ab19848e11f6ccc"
+        },
+        "green_patch_8.paperDensity": {
+          "path": "green_patch_8.paperDensity.npy",
+          "sha256": "ad31d5c48cf34de5ba0894bf0f93fdefd32e7f162a638833bcf26f79bdbb38a5",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "29ee5b3d26e69c618e1572b8daf27f7e56bcbcdbadbcdf6b7b34cd3cd2e97569"
+        },
+        "green_patch_8.printRgb": {
+          "path": "green_patch_8.printRgb.npy",
+          "sha256": "057fb2c9baf445d2630862ad556a5b25b37481950c733cdd08230159e619ebe4",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "9c5f09621dcc162ded29bc4f90f0a3b694f5ef9f8f7703642b7de66c47302268"
+        }
+      }
+    },
+    {
+      "filmId": "kodak_tmax_100",
+      "profileSha256": "c9160236872034b86fb42b67be3a9252088bfa7bdbb450148b0c20ad83e3033a",
+      "setupSha256": "6a4f41326d04ff6b09ad79aaca676cb3367d2e6d881ad55e8be3ba35f26dfa96",
+      "fixtures": {
+        "gray_ramp_16.filmRaw": {
+          "path": "gray_ramp_16.filmRaw.npy",
+          "sha256": "0d9615a763bc9a9a020edc59f191a595eccc9735e6d75f737d23e9e352950ff4",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "7f10ea6bbb4da47bd9a80b243e35ecd1a6021753fbf1c979e3a5aa1187238cb7"
+        },
+        "gray_ramp_16.negativeDensity": {
+          "path": "gray_ramp_16.negativeDensity.npy",
+          "sha256": "2583a12ecdd20fa52659b507c7e1f396e25aeb4f9e4c48968d646dfa49bb37ee",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "3ae6cb171fbd4a308436657d13514f8be0ad947a76bfc82c24e8ff18598b1068"
+        },
+        "gray_ramp_16.paperLogExposure": {
+          "path": "gray_ramp_16.paperLogExposure.npy",
+          "sha256": "af0fad3701c15bc1ec89708fc569f065088ffda3daf1c1dacf684e8fc3355fb4",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "b2aee184da10aa75c5e2f1aeede7a0284e62af574eaf5367aff8d1d163d073b0"
+        },
+        "gray_ramp_16.paperDensity": {
+          "path": "gray_ramp_16.paperDensity.npy",
+          "sha256": "ae2bfaab1af7c108381e034052081e6eae052d0983f3648aba8da17b2cde5146",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "4018fdbcee5091b5f550e6c7ef666d3461d0c695365c013c32915a811345ef3f"
+        },
+        "gray_ramp_16.printRgb": {
+          "path": "gray_ramp_16.printRgb.npy",
+          "sha256": "26a033b4c4fbd577460b1a8819b5d790d572d72c983d3003b4a95699faaf385a",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "9a36c1f014e6dde0f986bc7633b3305ae06cebedc2fb1811bc6e1f1bdb2c10d5"
+        },
+        "green_patch_8.filmRaw": {
+          "path": "green_patch_8.filmRaw.npy",
+          "sha256": "7de4205869ef7e7ad9631fc06aa8833cfcc17a619a12c798b18b994eb5342dcd",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "46e5b8473495a3df75086a6be5e55dd343cf8166358430b462929241b507d618"
+        },
+        "green_patch_8.negativeDensity": {
+          "path": "green_patch_8.negativeDensity.npy",
+          "sha256": "49718c0d5fcbd4b7e14706b63b01e643894f32bb931ccb073d06b3a4dc292616",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "4f627d71bd447c9da5f8218ef0a9dcb4cf4f0961a9ade7a58b67813edfe25f6a"
+        },
+        "green_patch_8.paperLogExposure": {
+          "path": "green_patch_8.paperLogExposure.npy",
+          "sha256": "9d4d8ca231776c8927aad38c562b2604ac461bc6072817706b7beceb93db5423",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "ff59a549b8a259eaf1d43c1c579e52f059a5ff96ce74cff23b9846d42c4022e1"
+        },
+        "green_patch_8.paperDensity": {
+          "path": "green_patch_8.paperDensity.npy",
+          "sha256": "48425e21c881916e43c2b8d15f6930c815888080d96e1990ed36099e4f238c2a",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "f983334ff757c6b1be7267f482d92dacc31c6a3ebb2ff6c5fba55d8cea850a71"
+        },
+        "green_patch_8.printRgb": {
+          "path": "green_patch_8.printRgb.npy",
+          "sha256": "ba71dd413ada31a00e022d652fc4e8c5a9ab2a0b2b483ecbc1ecf1ce7c113803",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "b837ba05b871be902eb54c8fed5adfb170ba8345298d470df4c137d781f7d222"
+        }
+      }
+    },
+    {
+      "filmId": "fujifilm_neopan_acros_100_ii",
+      "profileSha256": "4429b45664a06c7ee8d16687bcc7adf656403e534fba584f83762e160abdc4f9",
+      "setupSha256": "f6fea8f53ef9f553edbb8bcd4496e17bec1ab712dd6cc0e9908fc71630c43473",
+      "fixtures": {
+        "gray_ramp_16.filmRaw": {
+          "path": "gray_ramp_16.filmRaw.npy",
+          "sha256": "ba147ac8e7c1cb7e2596c1eaa42647c28ba671dcdbadb198854ed90b0d10e377",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "1539fb41d01163129260d815acebd238c663aa519a8f7b67a31283ad1ce6967f"
+        },
+        "gray_ramp_16.negativeDensity": {
+          "path": "gray_ramp_16.negativeDensity.npy",
+          "sha256": "9e2bbec5e7d16b2d646e8587644b0f11f8d3592603a08f4ac6a6ed2e5c575574",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "e36b79ff2584dbe1e10bf788f92860430c297046ff5278809bc157a1024fedf6"
+        },
+        "gray_ramp_16.paperLogExposure": {
+          "path": "gray_ramp_16.paperLogExposure.npy",
+          "sha256": "fd6896025ecb38e41f0184cb2be4ea36b9bcce5a02d391120d3e4a0c1a88d465",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "43759dae02da1825bab0687935db8cfc5943e55bdcdf0a752cbc8b286b597421"
+        },
+        "gray_ramp_16.paperDensity": {
+          "path": "gray_ramp_16.paperDensity.npy",
+          "sha256": "70c75437d596b836617af778417214f2568bbd97789ee3d1153d4757a0193b61",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "7b4652654ed4e463225dde3ae345fd37baac68a76011d118152fde7da72ea773"
+        },
+        "gray_ramp_16.printRgb": {
+          "path": "gray_ramp_16.printRgb.npy",
+          "sha256": "4a6e24012fcaa66ba586c07ec1dbf1013b69b3430c8b30c5f67ea58bbe26c67a",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "c4ab266191151d70a160aa56f5d1cd9b62ffb432ee45d110f159f4b9efb28a2d"
+        },
+        "green_patch_8.filmRaw": {
+          "path": "green_patch_8.filmRaw.npy",
+          "sha256": "58e427cd49c8a4bcfdb6ad0d5791b38fad4dee5e33c9af9e396216a14661502f",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "313621c45e5cc6f41ec72cb7721524a95817ed40587631f123a5ac96688c6ee7"
+        },
+        "green_patch_8.negativeDensity": {
+          "path": "green_patch_8.negativeDensity.npy",
+          "sha256": "067e55be49bcfc1b8eae22b806f28e1317b632d370593efad0b78149b4305c34",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "25465b67eb8a80ecff408c9c923f042bbd833d7ffb1aa0cb0a7e543d701f4434"
+        },
+        "green_patch_8.paperLogExposure": {
+          "path": "green_patch_8.paperLogExposure.npy",
+          "sha256": "6942b48315b8897a44728a3009f63f4773b9027a06e70965bb77afe98758a7e9",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "544dbe7d96212aaa4941ad4dd21e60ce42d4e8e73c85eacb55d77490580d991a"
+        },
+        "green_patch_8.paperDensity": {
+          "path": "green_patch_8.paperDensity.npy",
+          "sha256": "bcc343296041875704e771b53dee10048be7453872aef88eb9e435a60d6ea33c",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "644ac25e6b40fded08a81fc126f00fceff10afff473a7fc69043cc6c8f1b5fd0"
+        },
+        "green_patch_8.printRgb": {
+          "path": "green_patch_8.printRgb.npy",
+          "sha256": "a7a8e748cb2d67b4b88c151bb2f9818bb7f4810b6ebaa55d74dba5fb0f8ff485",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "2a255cad96f4d8072b00eec2c2a5b3d7419f9d1e81cf6e215dbe050f078a4b85"
+        }
+      }
+    },
+    {
+      "filmId": "ilford_hp5_plus_400",
+      "profileSha256": "a09ccdb57816f220ab598e534318a743ef79e16a300f8bd2de7453d451fe8ec5",
+      "setupSha256": "42d6bb63d410eef464105a2b7cdafaaf66b8cc08d0e8640f7a2ac79e7465f1c9",
+      "fixtures": {
+        "gray_ramp_16.filmRaw": {
+          "path": "gray_ramp_16.filmRaw.npy",
+          "sha256": "d5ff6c272f1d658bcb45ba9a322e94acfb815c666efe07de451200b5c433835d",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "a3d870e2d6cab88c263f92fd87a219b8e084c0b08ba94ecafcbe41e7db63aadb"
+        },
+        "gray_ramp_16.negativeDensity": {
+          "path": "gray_ramp_16.negativeDensity.npy",
+          "sha256": "68ae61e2bea1229eb1cb5c7a0c91005f9454af50990fa5a4b9f6495fb6a25f99",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "0d2a458428b9b79e0d611d3b753dcb8d91d3adfe4e772b16469c510fbdb32b1d"
+        },
+        "gray_ramp_16.paperLogExposure": {
+          "path": "gray_ramp_16.paperLogExposure.npy",
+          "sha256": "4a31973fbdce16416590c0a93a29b0e260876081d5d0408be11f8ffea760fe16",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "b0bc6e288ef541ac283e6cd06ca168a21f1ab9c9616241e18d3d68811835df9d"
+        },
+        "gray_ramp_16.paperDensity": {
+          "path": "gray_ramp_16.paperDensity.npy",
+          "sha256": "dd8625fdbc0649ab0af2f59393a0a1d0da4241e1f76c5345306e7ff35cc4341f",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "54edc7d7abe490c693d96c8d529d6c8a19062c327fcb025f7bc42eda400d88fc"
+        },
+        "gray_ramp_16.printRgb": {
+          "path": "gray_ramp_16.printRgb.npy",
+          "sha256": "78862d60c44c83c19d00b7f89b42af35b19c8703400114eb747c9f238ae1fde4",
+          "shape": [
+            16,
+            16,
+            3
+          ],
+          "payloadSha256": "3a8167e26657b7e078649e8d5accf891c0e51915b2baba96f0638ae4e4500761"
+        },
+        "green_patch_8.filmRaw": {
+          "path": "green_patch_8.filmRaw.npy",
+          "sha256": "33abe348d4da46288e83bb0839b37cc6912e1a94ffb405712ab31428d69a69bf",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "fa485c3d36ea550a3aff65dcb81a5fa9708a93eb96c2aef75ab17eaa751d5e59"
+        },
+        "green_patch_8.negativeDensity": {
+          "path": "green_patch_8.negativeDensity.npy",
+          "sha256": "1b449d8a81da97d6418f4bc19b3f01e9a33263d1f17545c258bb97ef2394eb27",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "a6a528fbb01d634532b0dadad2a1a5b214e70ed7664c7506ea8e8df1fe09fb6d"
+        },
+        "green_patch_8.paperLogExposure": {
+          "path": "green_patch_8.paperLogExposure.npy",
+          "sha256": "2c81ef09b21ca6da81e2237cbea2e32c7d1e7f01a7d8c4bfe2beb8a8197fe90c",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "c0ae3142ba33747c69e60652c77bf9b5514b6c80d954ca08fe6453ed94e79da3"
+        },
+        "green_patch_8.paperDensity": {
+          "path": "green_patch_8.paperDensity.npy",
+          "sha256": "34767c6eb5132569eea3ed634eb7d240a50c6992b5b59f0ed6bae9784e6444bb",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "6819745d4074b7318c403780328ee7d58f087cb29c4fb71979881963d8105f6c"
+        },
+        "green_patch_8.printRgb": {
+          "path": "green_patch_8.printRgb.npy",
+          "sha256": "44d3b44b2fb30b87795560a172e8771a0d363b32f5529688333930bac40cbfa3",
+          "shape": [
+            8,
+            8,
+            3
+          ],
+          "payloadSha256": "d21d9f38c45795347f7c58b5b5a804dae98ba6cf0f95d79476db10e347cf8657"
+        }
+      }
+    }
+  ]
+}

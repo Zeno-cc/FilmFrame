@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load the frontend pre-development checklist and quality gates before implementing the spectral prototype or UI integration."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep spectral numeric services, controlled UI and tests within FilmFrame's established module boundaries."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve App session ownership, normalized settings, async generation checks and resource lifecycle."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Define typed float-density and opt-in settings contracts with explicit runtime normalization."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve local-only privacy, Canvas budgets, Worker fallback, artifact/export and real-browser validation contracts."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Read the concise approved scope, required full-report sections, numerical gates and compatibility constraints before implementation."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/filmframe-integration-boundaries.md","reason":"Use the evidenced aperture insertion point and existing compatibility boundaries rather than rewriting the renderer."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Implement and validate the confirmed scene-positive negative-density print/scan model with explicit approximations and resource limits."}
+{"file":".trellis/tasks/11-06-spectral-negative-print-prototype/prd.md","reason":"Execute the isolated Portra reference prototype before enabling any production UI integration."}
+{"file":".trellis/tasks/11-06-spectral-license-provenance/prd.md","reason":"Preserve GPL/CC provenance and block distribution on unresolved third-party or historical asset rights."}

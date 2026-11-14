@@ -1,0 +1,757 @@
+{
+  "schema": 1,
+  "date": "2026-11-06",
+  "scope": "Isolated pointwise WebGL2 feasibility; CPU oracle and explicit test-only GPU stage readback. No production UI, stock migration, native spatial/stochastic effects, public distribution or full-engine parity claim.",
+  "configuration": {
+    "film": "fujiC200",
+    "paper": "fujifilm_crystal_archive_typeii",
+    "input": "scene-linear ProPhoto including explicit synthetic sRGB transfer/primaries conversion",
+    "output": "sRGB with measured OkLch compression",
+    "densityFormat": "RGBA32F",
+    "spatialEffects": false,
+    "stochasticEffects": false,
+    "grain": false,
+    "templates": false,
+    "externalRuntimeDependencies": false,
+    "photos": false,
+    "licenseNotices": "services/spectral/NOTICE.md; derived GPL-3.0-or-later and CC BY-SA 4.0; unresolved Hanatos/KG3 distribution blockers retained"
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "totalMemoryBytes": 17179869184,
+    "node": "v26.7.0",
+    "playwright": "1.61.1"
+  },
+  "results": [
+    {
+      "browser": "chromium",
+      "status": "passed",
+      "platform": "darwin",
+      "arch": "arm64",
+      "externalRequests": [],
+      "consoleErrors": [],
+      "browserVersion": "156.0.8078.80",
+      "result": {
+        "capabilities": {
+          "webgl2": true,
+          "colorBufferFloat": true,
+          "vendor": "WebKit",
+          "renderer": "WebKit WebGL",
+          "unmaskedVendor": "Google Inc. (Apple)",
+          "unmaskedRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+          "maxTextureSize": 16384,
+          "maxRenderbufferSize": 16384,
+          "maxTextureImageUnits": 32,
+          "maxFragmentTextureUnits": 16,
+          "maxViewportDimensions": [
+            16384,
+            16384
+          ],
+          "fragmentHighp": {
+            "supported": true,
+            "rangeMin": 127,
+            "rangeMax": 127,
+            "precision": 23
+          },
+          "floatRenderTargets": [
+            {
+              "internalFormat": "RGBA32F",
+              "readType": "FLOAT",
+              "bytesPerPixel": 16,
+              "renderable": true,
+              "readback": true
+            },
+            {
+              "internalFormat": "RGBA16F",
+              "readType": "HALF_FLOAT",
+              "bytesPerPixel": 8,
+              "renderable": true,
+              "readback": true
+            }
+          ],
+          "warnings": []
+        },
+        "tolerances": {
+          "filmRaw": {
+            "absolute": 0.00002,
+            "relative": 0.000002,
+            "reason": "highp FP32 RGB/XYZ and Mitchell polynomial/log arithmetic; no storage precision loss"
+          },
+          "negativeDensity": {
+            "absolute": 0.00002,
+            "relative": 0.000002,
+            "reason": "highp FP32 curve/DIR arithmetic; RGBA32F density storage"
+          },
+          "paperLogExposure": {
+            "absolute": 0.00002,
+            "relative": 0.000002,
+            "reason": "81 highp spectral transmissions, float receiver table and logarithm"
+          },
+          "paperDensity": {
+            "absolute": 0.00003,
+            "relative": 0.000002,
+            "reason": "paper log-exposure error propagated through explicit 256-entry fitted curves"
+          },
+          "printRgb": {
+            "absolute": 0.00003,
+            "relative": 0.000002,
+            "reason": "second 81-term integral, FP32 OkLab/OkLch and sRGB encoding; RGBA32F output"
+          }
+        },
+        "textureLayouts": {
+          "filmTcLut": {
+            "width": 192,
+            "height": 192,
+            "channels": 3,
+            "source": "portraResource:filmTcLut",
+            "coordinate": "C-order [x * 192 + y] is uploaded as texel(y,x); Mitchell sampling uses texelFetch(y,x)",
+            "bytes": 589824
+          },
+          "filmLogExposure": {
+            "width": 256,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:filmLogExposure",
+            "coordinate": "x=curve index; strictly increasing log10 exposure",
+            "bytes": 4096
+          },
+          "filmNormalizedCurves": {
+            "width": 256,
+            "height": 3,
+            "channels": 1,
+            "source": "portraResource:filmNormalizedCurves",
+            "coordinate": "x=curve index, y=RGB channel",
+            "bytes": 12288
+          },
+          "filmDirCurves": {
+            "width": 256,
+            "height": 3,
+            "channels": 1,
+            "source": "portraResource:filmDirCurves",
+            "coordinate": "x=curve index, y=RGB channel",
+            "bytes": 12288
+          },
+          "filmDirMatrix": {
+            "width": 3,
+            "height": 3,
+            "channels": 1,
+            "source": "portraResource:filmDirMatrix",
+            "coordinate": "texel(receiver,donor) = C-order [donor * 3 + receiver]; supplied to the film-development pass as donor-row uniforms",
+            "bytes": 144
+          },
+          "filmChannelDensity": {
+            "width": 81,
+            "height": 1,
+            "channels": 3,
+            "source": "portraResource:filmChannelDensity",
+            "coordinate": "x=wavelength index 0..80; RGB=CMY density",
+            "bytes": 1296
+          },
+          "filmBaseDensity": {
+            "width": 81,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:filmBaseDensity",
+            "coordinate": "x=wavelength index 0..80",
+            "bytes": 1296
+          },
+          "filmSpectralValidMask": {
+            "width": 81,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:filmSpectralValidMask",
+            "coordinate": "x=wavelength index; zero means no transmitted light",
+            "bytes": 1296
+          },
+          "paperLogExposure": {
+            "width": 256,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:paperLogExposure",
+            "coordinate": "x=curve index; strictly increasing log10 exposure",
+            "bytes": 4096
+          },
+          "paperFittedCurves": {
+            "width": 256,
+            "height": 3,
+            "channels": 1,
+            "source": "portraResource:paperFittedCurves",
+            "coordinate": "x=curve index, y=RGB channel",
+            "bytes": 12288
+          },
+          "paperChannelDensity": {
+            "width": 81,
+            "height": 1,
+            "channels": 3,
+            "source": "portraResource:paperChannelDensity",
+            "coordinate": "x=wavelength index 0..80; RGB=CMY density",
+            "bytes": 1296
+          },
+          "paperBaseDensity": {
+            "width": 81,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:paperBaseDensity",
+            "coordinate": "x=wavelength index 0..80",
+            "bytes": 1296
+          },
+          "paperSpectralValidMask": {
+            "width": 81,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:paperSpectralValidMask",
+            "coordinate": "x=wavelength index; zero means no transmitted light",
+            "bytes": 1296
+          },
+          "enlargerReceiver": {
+            "width": 81,
+            "height": 1,
+            "channels": 3,
+            "source": "derived:enlargerReceiver",
+            "coordinate": "x=wavelength; CPU-derived filtered enlarger * paper sensitivity",
+            "bytes": 1296
+          },
+          "scanReceiver": {
+            "width": 81,
+            "height": 1,
+            "channels": 3,
+            "source": "derived:scanReceiver",
+            "coordinate": "x=wavelength; D50 * CMFs / luminance normalization",
+            "bytes": 1296
+          },
+          "cam16LGrid": {
+            "width": 64,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:cam16LGrid",
+            "coordinate": "x=lightness index; CPU normalized grid coordinate",
+            "bytes": 1024
+          },
+          "cam16HGrid": {
+            "width": 720,
+            "height": 1,
+            "channels": 1,
+            "source": "portraResource:cam16HGrid",
+            "coordinate": "x=hue index; local cell fraction avoids absolute-index cancellation",
+            "bytes": 11520
+          },
+          "cam16Cmax": {
+            "width": 720,
+            "height": 64,
+            "channels": 1,
+            "source": "portraResource:cam16Cmax",
+            "coordinate": "texel(h,l) = C-order [l * 720 + h]",
+            "bytes": 737280
+          }
+        },
+        "fixtures": [
+          {
+            "fixture": "gray-ramp16",
+            "width": 16,
+            "height": 16,
+            "stages": {
+              "filmRaw": {
+                "maxAbs": 1.7881393432617188e-7,
+                "meanAbs": 7.16730331381162e-8,
+                "maxRelative": 0.0000014176608989646638,
+                "violations": 0,
+                "worstIndex": 766,
+                "actual": 0.7347410321235657,
+                "expected": 0.7347412109375,
+                "firstActual": [
+                  -1.2596043348312378,
+                  -1.2652586698532104,
+                  -1.287843942642212
+                ],
+                "firstExpected": [
+                  -1.2596043348312378,
+                  -1.2652587890625,
+                  -1.287843942642212
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 RGB/XYZ and Mitchell polynomial/log arithmetic; no storage precision loss"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "negativeDensity": {
+                "maxAbs": 4.76837158203125e-7,
+                "meanAbs": 1.617396871248881e-7,
+                "maxRelative": 0.0000011097929237383597,
+                "violations": 0,
+                "worstIndex": 755,
+                "actual": 1.060288429260254,
+                "expected": 1.0602879524230957,
+                "firstActual": [
+                  0.2630546987056732,
+                  0.093393974006176,
+                  0.039241086691617966
+                ],
+                "firstExpected": [
+                  0.26305466890335083,
+                  0.09339390695095062,
+                  0.03924109414219856
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 curve/DIR arithmetic; RGBA32F density storage"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperLogExposure": {
+                "maxAbs": 4.76837158203125e-7,
+                "meanAbs": 1.6542617231607437e-7,
+                "maxRelative": 0.000009995861713250714,
+                "violations": 0,
+                "worstIndex": 754,
+                "actual": -0.36895498633384705,
+                "expected": -0.36895450949668884,
+                "firstActual": [
+                  0.7415722012519836,
+                  0.7396666407585144,
+                  0.5874542593955994
+                ],
+                "firstExpected": [
+                  0.7415722012519836,
+                  0.7396666407585144,
+                  0.5874541997909546
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "81 highp spectral transmissions, float receiver table and logarithm"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperDensity": {
+                "maxAbs": 0.0000010728836059570312,
+                "meanAbs": 1.617396871248881e-7,
+                "maxRelative": 0.0000047404524868317,
+                "violations": 0,
+                "worstIndex": 724,
+                "actual": 1.3265093564987183,
+                "expected": 1.3265082836151123,
+                "firstActual": [
+                  2.4235775470733643,
+                  2.1035189628601074,
+                  1.9252501726150513
+                ],
+                "firstExpected": [
+                  2.4235775470733643,
+                  2.1035189628601074,
+                  1.9252500534057617
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "paper log-exposure error propagated through explicit 256-entry fitted curves"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "printRgb": {
+                "maxAbs": 7.748603820800781e-7,
+                "meanAbs": 1.943747823437055e-7,
+                "maxRelative": 0.0000020529665366454525,
+                "violations": 0,
+                "worstIndex": 765,
+                "actual": 0.8485466241836548,
+                "expected": 0.8485473990440369,
+                "firstActual": [
+                  0.026311593130230904,
+                  0.05840729922056198,
+                  0.06975682079792023
+                ],
+                "firstExpected": [
+                  0.026311539113521576,
+                  0.058407291769981384,
+                  0.06975682079792023
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "second 81-term integral, FP32 OkLab/OkLch and sRGB encoding; RGBA32F output"
+                },
+                "finite": true,
+                "passed": true
+              }
+            },
+            "passed": true,
+            "readback": {
+              "calls": 5,
+              "bytes": 20480
+            },
+            "timingsMs": {
+              "cpu": 2.6000000089406967,
+              "gpuRender": 3.7000000029802322,
+              "gpuReadback": 1.699999988079071
+            }
+          },
+          {
+            "fixture": "green8",
+            "width": 8,
+            "height": 8,
+            "stages": {
+              "filmRaw": {
+                "maxAbs": 7.152557373046875e-7,
+                "meanAbs": 2.582867940266927e-7,
+                "maxRelative": 0.0000010953361408624184,
+                "violations": 0,
+                "worstIndex": 191,
+                "actual": -0.6530018448829651,
+                "expected": -0.6530011296272278,
+                "firstActual": [
+                  -0.8614057302474976,
+                  0.33683979511260986,
+                  -0.6530018448829651
+                ],
+                "firstExpected": [
+                  -0.8614057898521423,
+                  0.33683979511260986,
+                  -0.6530011296272278
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 RGB/XYZ and Mitchell polynomial/log arithmetic; no storage precision loss"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "negativeDensity": {
+                "maxAbs": 3.5762786865234375e-7,
+                "meanAbs": 2.5580326716105145e-7,
+                "maxRelative": 0.0000021579724627916224,
+                "violations": 0,
+                "worstIndex": 190,
+                "actual": 1.3320555686950684,
+                "expected": 1.3320552110671997,
+                "firstActual": [
+                  0.36856117844581604,
+                  1.3320555686950684,
+                  0.1208401694893837
+                ],
+                "firstExpected": [
+                  0.3685610294342041,
+                  1.3320552110671997,
+                  0.12084043025970459
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 curve/DIR arithmetic; RGBA32F density storage"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperLogExposure": {
+                "maxAbs": 1.7881393432617188e-7,
+                "meanAbs": 1.4901161193847656e-7,
+                "maxRelative": 3.823228591143323e-7,
+                "violations": 0,
+                "worstIndex": 189,
+                "actual": 0.5597996115684509,
+                "expected": 0.5597997903823853,
+                "firstActual": [
+                  0.5597996115684509,
+                  -0.5248928070068359,
+                  0.3897534906864166
+                ],
+                "firstExpected": [
+                  0.5597997903823853,
+                  -0.5248926877975464,
+                  0.3897533416748047
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "81 highp spectral transmissions, float receiver table and logarithm"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperDensity": {
+                "maxAbs": 8.344650268554688e-7,
+                "meanAbs": 2.8560558954874676e-7,
+                "maxRelative": 0.0000011149285024224608,
+                "violations": 0,
+                "worstIndex": 191,
+                "actual": 1.7235393524169922,
+                "expected": 1.7235385179519653,
+                "firstActual": [
+                  2.3215227127075195,
+                  0.020047713071107864,
+                  1.7235393524169922
+                ],
+                "firstExpected": [
+                  2.3215227127075195,
+                  0.020047690719366074,
+                  1.7235385179519653
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "paper log-exposure error propagated through explicit 256-entry fitted curves"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "printRgb": {
+                "maxAbs": 1.5273690223693848e-7,
+                "meanAbs": 7.078051567077637e-8,
+                "maxRelative": 0.00000932701174259404,
+                "violations": 0,
+                "worstIndex": 189,
+                "actual": 0.016375606879591942,
+                "expected": 0.01637575961649418,
+                "firstActual": [
+                  0.016375606879591942,
+                  0.5520379543304443,
+                  0.28449204564094543
+                ],
+                "firstExpected": [
+                  0.01637575961649418,
+                  0.5520379543304443,
+                  0.2844921052455902
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "second 81-term integral, FP32 OkLab/OkLch and sRGB encoding; RGBA32F output"
+                },
+                "finite": true,
+                "passed": true
+              }
+            },
+            "passed": true,
+            "readback": {
+              "calls": 5,
+              "bytes": 5120
+            },
+            "timingsMs": {
+              "cpu": 0.3999999910593033,
+              "gpuRender": 1.2999999970197678,
+              "gpuReadback": 1.5
+            }
+          },
+          {
+            "fixture": "srgb-synthetic64",
+            "width": 64,
+            "height": 64,
+            "stages": {
+              "filmRaw": {
+                "maxAbs": 4.172325134277344e-7,
+                "meanAbs": 7.554115200036904e-8,
+                "maxRelative": 0.00004305297165598397,
+                "violations": 0,
+                "worstIndex": 12141,
+                "actual": -0.40407994389533997,
+                "expected": -0.40407952666282654,
+                "firstActual": [
+                  -0.1141231507062912,
+                  -0.17771396040916443,
+                  -0.2747020423412323
+                ],
+                "firstExpected": [
+                  -0.11412307620048523,
+                  -0.17771390080451965,
+                  -0.2747020721435547
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 RGB/XYZ and Mitchell polynomial/log arithmetic; no storage precision loss"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "negativeDensity": {
+                "maxAbs": 5.960464477539062e-7,
+                "meanAbs": 1.1633771161238353e-7,
+                "maxRelative": 0.0000016167629021008217,
+                "violations": 0,
+                "worstIndex": 12236,
+                "actual": 0.6377054452896118,
+                "expected": 0.6377048492431641,
+                "firstActual": [
+                  0.8361514210700989,
+                  0.6116248369216919,
+                  0.415824294090271
+                ],
+                "firstExpected": [
+                  0.836151659488678,
+                  0.6116247773170471,
+                  0.4158238470554352
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "highp FP32 curve/DIR arithmetic; RGBA32F density storage"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperLogExposure": {
+                "maxAbs": 4.637986421585083e-7,
+                "meanAbs": 1.247784287746375e-7,
+                "maxRelative": 0.00048613670683284797,
+                "violations": 0,
+                "worstIndex": 12235,
+                "actual": 0.019609978422522545,
+                "expected": 0.019610442221164703,
+                "firstActual": [
+                  0.05476745590567589,
+                  0.1319338083267212,
+                  0.1969381421804428
+                ],
+                "firstExpected": [
+                  0.0547671839594841,
+                  0.1319338083267212,
+                  0.1969384104013443
+                ],
+                "tolerance": {
+                  "absolute": 0.00002,
+                  "relative": 0.000002,
+                  "reason": "81 highp spectral transmissions, float receiver table and logarithm"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "paperDensity": {
+                "maxAbs": 0.0000020265579223632812,
+                "meanAbs": 3.1686310345927876e-7,
+                "maxRelative": 0.0000026156607455820235,
+                "violations": 0,
+                "worstIndex": 12173,
+                "actual": 0.8654078841209412,
+                "expected": 0.8654058575630188,
+                "firstActual": [
+                  0.7981389760971069,
+                  0.8995233774185181,
+                  1.166691541671753
+                ],
+                "firstExpected": [
+                  0.7981374859809875,
+                  0.8995234966278076,
+                  1.166692852973938
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "paper log-exposure error propagated through explicit 256-entry fitted curves"
+                },
+                "finite": true,
+                "passed": true
+              },
+              "printRgb": {
+                "maxAbs": 7.636845111846924e-7,
+                "meanAbs": 1.7943724136178693e-7,
+                "maxRelative": 0.00010889044059123115,
+                "violations": 0,
+                "worstIndex": 12135,
+                "actual": 0.008557292632758617,
+                "expected": 0.008556528948247433,
+                "firstActual": [
+                  0.3914318084716797,
+                  0.31888487935066223,
+                  0.22753474116325378
+                ],
+                "firstExpected": [
+                  0.3914325535297394,
+                  0.3188847601413727,
+                  0.22753432393074036
+                ],
+                "tolerance": {
+                  "absolute": 0.00003,
+                  "relative": 0.000002,
+                  "reason": "second 81-term integral, FP32 OkLab/OkLch and sRGB encoding; RGBA32F output"
+                },
+                "finite": true,
+                "passed": true
+              }
+            },
+            "passed": true,
+            "readback": {
+              "calls": 5,
+              "bytes": 327680
+            },
+            "timingsMs": {
+              "cpu": 10.200000002980232,
+              "gpuRender": 2.0999999940395355,
+              "gpuReadback": 6.500000029802322
+            }
+          }
+        ],
+        "benchmarks": [
+          {
+            "width": 256,
+            "height": 256,
+            "format": "RGBA32F",
+            "setupMs": 33.80000001192093,
+            "uploadMs": 0.9000000059604645,
+            "packInputMs": 2.2999999970197678,
+            "filmMs": 0.4000000059604645,
+            "paperMs": 0.29999999701976776,
+            "scanMs": 0.20000000298023224,
+            "firstRenderMs": 5.200000002980232,
+            "outputReadbackMs": 3.0999999940395355,
+            "repeatPrintMs": [
+              0.29999999701976776,
+              0.30000001192092896
+            ],
+            "repeatPrintStagesMs": [
+              {
+                "paperMs": 0.20000000298023224,
+                "scanMs": 0.09999999403953552
+              },
+              {
+                "paperMs": 0.20000000298023224,
+                "scanMs": 0
+              }
+            ],
+            "repeatPrintReadbackCalls": 0,
+            "cpuFirstRenderMs": 125,
+            "textureBytes": 7686672,
+            "setupTextureBytes": 1395216,
+            "frameTextureBytes": 7340032,
+            "cpuPackedInputBytes": 786432,
+            "readbackBytesPerStage": 1048576,
+            "readbackCalls": 16,
+            "memoryScope": "Exact logical RGBA texture allocation plus the temporary packed upload; excludes driver alignment, shader/program overhead, browser GC and process RSS. Readback is separate and explicit.",
+            "outputChecksum": 207790196.1819839,
+            "finite": true,
+            "releasedTextureBytes": 1395216
+          }
+        ],
+        "lifecycle": {
+          "textureBytesBeforeRelease": 1396752,
+          "textureBytesAfterRelease": 1395216,
+          "setupTextureBytes": 1395216,
+          "budgetRejected": true,
+          "textureBudgetRejected": true,
+          "contextLossEvent": "WebGL context lost; no spectral result was substituted",
+          "lostRejected": true,
+          "disposedRejected": true,
+          "lostExtension": true,
+          "finalTextureBytes": 0,
+          "readbackFormat": "FLOAT",
+          "unsupported": {
+            "noWebGl": true,
+            "noFloat": true,
+            "noSilentFallback": true
+          }
+        },
+        "failures": []
+      }
+    }
+  ]
+}

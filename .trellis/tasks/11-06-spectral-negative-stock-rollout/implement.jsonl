@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load frontend pre-development requirements and quality gates for stock migration."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Define versioned film/paper resource registry and strict source/profile validation."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve settings/recipe compatibility and render-result identity across stocks."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve local-only processing, bounded allocations, fallback and export behavior."}
+{"file":".trellis/tasks/11-06-webgl2-spectral-migration/research/negative-stock-registry.md","reason":"Use exact film/paper identities, filters, source hashes and supported/blocked mapping evidence."}
+{"file":".trellis/tasks/11-06-webgl2-spectral-migration/research/phase-a-feasibility.md","reason":"Reuse the validated GPU lifecycle, precision limits and performance evidence."}
+{"file":".trellis/tasks/11-06-spectral-negative-print-prototype/research/numerical-validation.md","reason":"Reuse the validated fixed Portra numeric pipeline and keep historical discrepancies explicit."}

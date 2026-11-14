@@ -1,0 +1,28 @@
+{
+  "id": "webgl2-spectral-migration",
+  "name": "webgl2-spectral-migration",
+  "title": "Validate WebGL2 spectral rendering and migrate FilmFrame film looks",
+  "description": "Build a WebGL2 spectral negative-to-print path with CPU parity, measured performance and bounded resources, integrate it into FilmFrame with CPU fallback, then incrementally migrate all supported negative film stocks.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "frontend",
+  "package": null,
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-11-06",
+  "completedAt": null,
+  "branch": "codex/spectral-negative-print-prototype",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-06-spectral-negative-stock-rollout"
+  ],
+  "parent": "11-06-integrate-spektralab-negative",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

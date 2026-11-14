@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "sourceRevision": "3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+  "method": "Independent NumPy SVD least-squares on packed valid film dye/base spectra; all fixture file SHA-256 values checked.",
+  "stocks": [
+    {
+      "filmId": "kodak_portra_800_push1",
+      "setupSha256": "9e0bf68066ebe07e01b65f4979e7b28b50bfaba4a8fc7ac1222eebfc2b9d1f42",
+      "profileSha256": "dac9cbcd2442442d9dee90bd2d6a28dcc4b996635dcac0b44ac8ecd32c4b3a4f",
+      "filterCcmY": [
+        0.0,
+        66.06061571084823,
+        68.03951693663969
+      ],
+      "fixturesPass": true,
+      "fixtureCount": 18,
+      "validWavelengths": 59,
+      "svdCmy": [
+        -0.20657930818020262,
+        -0.546419826012304,
+        -0.9006454045793187
+      ],
+      "maxBaseResidual": 0.26500110271417954,
+      "rmse": 0.07120875225760942,
+      "rank": 3,
+      "conditionNumber": 1.1709426584462816,
+      "physicalResidualAccepted": true
+    },
+    {
+      "filmId": "kodak_portra_800_push2",
+      "setupSha256": "29d299a96e0644a8a737b1628ad995fe07372035ab369e65d8f6039e0f7bfd0a",
+      "profileSha256": "5ee01e4a00c157721738314313a43b46fcd5dae62ed3a7e4730f9054b66f6282",
+      "filterCcmY": [
+        0.0,
+        66.28037920033391,
+        69.59113087748631
+      ],
+      "fixturesPass": true,
+      "fixtureCount": 18,
+      "validWavelengths": 59,
+      "svdCmy": [
+        -0.20657930818020262,
+        -0.546419826012304,
+        -0.9006454045793187
+      ],
+      "maxBaseResidual": 0.26500110271417954,
+      "rmse": 0.07120875225760942,
+      "rank": 3,
+      "conditionNumber": 1.1709426584462816,
+      "physicalResidualAccepted": true
+    }
+  ]
+}

@@ -19,6 +19,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Hook Guidelines](./hook-guidelines.md) | Hook lifecycle and extraction patterns | Current |
 | [State Management](./state-management.md) | Session, derived and persistent state | Current |
 | [Quality Guidelines](./quality-guidelines.md) | Tests, accessibility and review gates | Current |
+| [Spectral Rendering](./spectral-rendering.md) | Stock identity, lazy resources, CPU/WebGL2 and numerical validation | Current |
 | [Type Safety](./type-safety.md) | Domain types and runtime validation | Current |
 
 ---

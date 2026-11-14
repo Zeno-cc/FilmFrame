@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Preserve browser workflow, resource ownership and test conventions"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify asynchronous state and artifact ownership"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply browser, Worker, numerical and regression checks"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Preserve exact spectral identities and CPU/WebGL2 lifecycle"}
+{"file":".trellis/spec/backend/index.md","reason":"Preserve access, deployment and release boundaries"}
+{"file":".trellis/spec/backend/access-control.md","reason":"Verify access/session/proxy correctness without weakening security"}
+{"file":".trellis/spec/backend/release-process.md","reason":"Verify release and updater behavior without publication"}
+{"file":".trellis/spec/guides/index.md","reason":"Verify findings against real call paths and trust boundaries"}
+{"file":".trellis/tasks/11-14-project-quality-audit/prd.md","reason":"Keep repairs evidence-backed and preserve unrelated work"}

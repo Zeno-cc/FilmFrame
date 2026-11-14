@@ -134,8 +134,14 @@ SECURE_COOKIES=true
   null`; that value is accepted only when `Sec-Fetch-Site: same-origin` is also
   present. A `null` Origin with another or missing Fetch Metadata value remains
   forbidden. Development keeps the local HTTP host/port behavior. A missing
-  Origin is allowed to continue to the required Cookie/nonce check. Origin is
-  checked before the redemption rate limiter so cross-site traffic cannot spend
+  Origin is allowed to continue to the required Cookie/nonce check. When
+  `SECURE_COOKIES=false` outside production, `publicOriginForRequest(config,
+  request)` derives the redemption, refresh, CSRF and WebAuthn expected origin
+  from the validated request Host and HTTP protocol, including its port. It
+  rejects other hosts and does not trust `X-Forwarded-Host`; production always
+  keeps the fixed configured HTTPS origin. The proxy must preserve the actual
+  development Origin rather than rewriting it to HTTPS.
+  Origin is checked before the redemption rate limiter so cross-site traffic cannot spend
   another browser's quota. The public `/auth/redeem` OpenResty location must
   explicitly forward `Origin $http_origin`, `Sec-Fetch-Site $http_sec_fetch_site`,
   and `X-Forwarded-Proto https`.

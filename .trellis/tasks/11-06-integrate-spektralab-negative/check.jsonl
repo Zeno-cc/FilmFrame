@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify local-only behavior, resource budgets, Worker cancellation/fallback, settings identity and browser regressions."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review controlled accessible settings and desktop/mobile behavior without duplicated workflow policy."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Review stale-result rejection, immutable updates, recipe compatibility and complete runtime resource cleanup."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check typed numeric boundaries, discriminated settings, finite-number validation and no unsafe contract bypasses."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Review the complete approved scope, numerical/performance gates, compatibility requirements and source sections that automatic truncation may omit."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Compare numerical tests and disclosed approximations against the actual upstream film/print/scan pipeline; reject negative-inversion or parity misrepresentation."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/filmframe-integration-boundaries.md","reason":"Check every touched renderer, storage and lifecycle contract against current FilmFrame evidence."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md","reason":"Audit GPL/CC notices, spectral/artwork provenance, excluded scope and independent visual acceptance if film edges change."}
+{"file":".trellis/tasks/11-06-spectral-license-provenance/prd.md","reason":"Verify all distribution gates and the existing FilmFrame asset inventory rather than assuming a license file clears historical rights."}

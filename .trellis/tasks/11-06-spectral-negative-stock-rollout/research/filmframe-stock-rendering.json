@@ -1,0 +1,122 @@
+{
+  "results": [
+    {
+      "filmType": "KODAK PORTRA 160",
+      "profileId": "kodak_portra_160",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK PORTRA 400",
+      "profileId": "kodak_portra_400",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK PORTRA 800",
+      "profileId": "kodak_portra_800",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK EKTAR 100",
+      "profileId": "kodak_ektar_100",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK GOLD 200",
+      "profileId": "kodak_gold_200",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "GC 400 KODAK",
+      "profileId": "kodak_ultramax_400",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "FUJI C200",
+      "profileId": "fujifilm_c200",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "FUJI X-TRA 400",
+      "profileId": "fujifilm_xtra_400",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "FUJI PRO 400H",
+      "profileId": "fujifilm_pro_400h",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK VISION3 50D",
+      "profileId": "kodak_vision3_50d",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK VISION3 200T",
+      "profileId": "kodak_vision3_200t",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK VISION3 250D",
+      "profileId": "kodak_vision3_250d",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    },
+    {
+      "filmType": "KODAK VISION3 500T",
+      "profileId": "kodak_vision3_500t",
+      "rendered": true,
+      "dimensions": {
+        "width": 1397,
+        "height": 1286
+      }
+    }
+  ],
+  "errors": []
+}

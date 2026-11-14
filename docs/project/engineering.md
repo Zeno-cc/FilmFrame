@@ -37,12 +37,12 @@ sidecar 的必需配置见 `server/access/.env.example`。本地 HTTP 只能在�
 ## 构建与质量门禁
 
 ```bash
-npm test                         # 根 Vitest：27 文件、196 项测试
+npm test                         # 根 Vitest；数量以当前运行结果为准
 npm run typecheck
 npm run build
-npm run check                   # 根测试 + 类型检查 + Vite 生产构建
+npm run check                   # 根测试 + 光谱数值校验 + 类型检查 + Vite 生产构建
 
-npm --prefix server/access test # Node test：89 项，要求 Node 22
+npm --prefix server/access test # Access 测试，要求 Node 22
 npm run check:access            # sidecar 测试 + 类型检查 + 构建
 npm run check:all               # 前端和 sidecar 完整检查
 
@@ -51,7 +51,7 @@ npm run check:release           # 可复用的完整 pre-tag 发布门禁
 git diff --check
 ```
 
-`server/access/tests/all.test.ts` 在单一 Node test 进程中导入 9 个测试模块，并将 concurrency 固定为 1。这样既覆盖 SQLite 并发事务，又避免 `better-sqlite3` 在多测试子进程退出时发生本机不稳定。
+`server/access/tests/all.test.ts` 在单一 Node test 进程中导入 10 个测试模块，并将 concurrency 固定为 1。这样既覆盖 SQLite 并发事务，又避免 `better-sqlite3` 在多测试子进程退出时发生本机不稳定。
 
 根 `tsconfig.json` 明确排除 `server/access`；根构建不会误用浏览器 TypeScript 配置检查 Express 代码，`check:all` 会显式检查两边。
 
@@ -72,7 +72,7 @@ docker compose ps
 npm run verify:deployment -- --live
 ```
 
-前端镜像使用 Node 20 build stage 和 Nginx runtime。Access 镜像使用 Node 22；build stage 安装 `python3`、`make`、`g++` 并从源码构建 `better-sqlite3`，runtime 不保留编译工具。
+前端镜像使用 Node 22 build stage 和 Nginx runtime。Access 镜像使用 Node 22；build stage 安装 `python3`、`make`、`g++` 并从源码构建 `better-sqlite3`，runtime 不保留编译工具。
 
 Compose 安全合同：
 

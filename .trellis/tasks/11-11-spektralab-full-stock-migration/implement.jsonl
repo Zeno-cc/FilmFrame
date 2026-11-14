@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Reuse exact stock identity, physical-density validation and CPU/GPU boundaries"}
+{"file": ".trellis/tasks/11-06-spectral-negative-stock-rollout/prd.md", "reason": "Preserve validated stock migration and unsupported boundaries"}
+{"file": ".trellis/tasks/11-07-physical-135-film-replacement/research/default-migration-contract.md", "reason": "Preserve completed default migration, rollback and capability boundaries"}
+{"file": "ops/provenance/README.md", "reason": "Resolve remaining distribution blockers without treating technical tests as rights clearance"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/prd.md", "reason": "Apply full catalog and independent imaging requirements"}
+{"file": ".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md", "reason": "Use pinned upstream evidence and licensing boundaries"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/research/upstream-catalog-map.md", "reason": "Implement only source-backed additions and explicit capability boundaries"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/research/pro400h-density-boundary.md", "reason": "Apply upstream Pro400H finite-sample CMY behavior and preserve approximate-edge evidence"}

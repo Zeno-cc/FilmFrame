@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Independently verify full-stock production and release evidence"}
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Audit resource identity, hole-density and imaging contracts"}
+{"file": ".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md", "reason": "Check upstream resource and licensing boundaries"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/prd.md", "reason": "Verify all catalog, imaging and release acceptance criteria"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/research/upstream-catalog-map.md", "reason": "Verify every upstream and FilmFrame stock mapping"}
+{"file": ".trellis/tasks/11-11-spektralab-full-stock-migration/research/pro400h-density-boundary.md", "reason": "Verify upstream-aligned Pro400H physical rendering and approximate-edge boundary"}

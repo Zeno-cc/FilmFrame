@@ -14,6 +14,8 @@ git diff --check
 
 `npm run check` runs Vitest, strict TypeScript checking, and the production Vite build. Playwright covers the local browser workflow separately.
 
+Run browser groups serially. Use `npm run test:e2e:preview` for production asset workflows: it builds first and Playwright starts its own preview server without reusing an existing one. Keep development-only `.ts` module diagnostics in the default config; preview explicitly excludes those cases rather than counting module-loading failures as imaging failures. Derive same-origin assertions from `test.info().project.use.baseURL`, and accept content-hashed production resource chunks with their stable resource-name prefix. Do not run a second browser group concurrently with GPU acceptance tests.
+
 ## Required Patterns
 
 - Add focused Vitest coverage for pure services, state transitions, normalization, budgets, and routing policy.
@@ -22,6 +24,24 @@ git diff --check
 - Preserve local-only privacy: no image upload, telemetry, or external processing path.
 - Check resource ownership for every new Object URL, timer, Worker request, or event listener.
 - Check desktop, tablet, and 390px mobile behavior for layout changes.
+- Keep `processImage(fileOrSource, settings, dateOverride, previewUrlFallback,
+  transform, renderBudgetLimits)` argument roles consistent across App, Worker
+  client and direct engine calls. Never pass a preview URL in the transform
+  slot. Worker/forced-main comparisons must use the same transform, frame seed,
+  output MIME and image source, and compare actual artifact pixels.
+  A constructed Worker and a finished image do not prove Worker success: the
+  ordinary failure path can complete the same render on the main thread. Bind
+  the final develop request's ID and spectral backend to the Worker's successful
+  response, reject failed responses and record fallback as an asserted count,
+  not an exception thrown from an asynchronous event callback. Instrument WebGL2
+  in the context that actually creates it, normally the Worker; require a real
+  WebGL2 context, float color-buffer support and a successful FLOAT readback,
+  not just a `getContext` call. Observe the return value of the production
+  `getError()` call; never call `getError()` from test instrumentation after
+  `readPixels`, because doing so consumes the error the renderer must inspect. Compare large typed arrays inside the browser
+  and return hashes/difference statistics instead of serializing every channel
+  through Playwright. If navigation is needed between two renders, use a
+  test-owned temporary cache and delete it in a test teardown.
 
 ### Scenario: Local Static HEIC/HEIF Import
 
@@ -286,6 +306,7 @@ function getReal135SprocketColor(
 - Valid `#RRGGBB` -> normalize to lowercase and persist.
 - Missing value -> omit the override and preserve the renderer's existing sprocket appearance.
 - Invalid stored string, short HEX, or non-string -> ignore it without replacing the fallback.
+- An explicitly present `undefined` property clears an existing override. The settings normalizer must retain that own property through `mergeSettings`; JSON persistence omits it naturally. Do not pass an entire full-settings object as a merge patch when clearing an optional field.
 - Registered flattened template without a valid mask -> fail asset validation before release.
 - Runtime mask-load failure -> continue rendering with the source-template holes unchanged.
 
@@ -737,6 +758,13 @@ await generateFilmStrip(images, settings);
 evaluateBatchAdmission({ operation: 'strip', stripCanvas, canvasLimits });
 await generateFilmStrip(images, settings, canvasLimits);
 ```
+
+### Spectral Film Stocks
+
+Read [Spectral Rendering Contracts](./spectral-rendering.md) when changing the
+spectral registry, film/paper resources or shared CPU/WebGL2 aperture renderer.
+Run `npm run check` and `npm run test:e2e`; `check` includes the source-specific
+stock numerical validator.
 
 ## Accessibility Review
 

@@ -13,7 +13,7 @@
 | `styles.css` | Tailwind v4 source、token/base/component 样式 | 扫描根组件与 `components/` |
 | `package.json` | 前端脚本和根级聚合检查 | `check:access`、`check:all`、`verify:deployment` 已接入 |
 | `tsconfig.json` | 浏览器 TypeScript 配置 | 明确排除独立的 `server/access` 包 |
-| `Dockerfile` | 前端多阶段构建，最终由 Nginx 提供 `dist/` | Node 20 build stage；运行镜像不含源码工具链 |
+| `Dockerfile` | 前端多阶段构建，最终由 Nginx 提供 `dist/` | Node 22 build stage；运行镜像不含源码工具链 |
 | `nginx.conf` | 静态容器路由、健康检查和安全响应头 | 受保护资源统一 `private, no-store`，不能改回公开 immutable 缓存 |
 | `compose.yaml` | 静态容器、access sidecar、私有网络与 SQLite 卷 | 两个端口都只绑定 `127.0.0.1` |
 | `.env.example` | Compose 非秘密配置模板 | 真实值写本地 `.env`，不得提交 |

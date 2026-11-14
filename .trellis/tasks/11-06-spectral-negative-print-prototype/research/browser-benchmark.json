@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "date": "2026-11-06",
+  "scope": "Isolated synthetic CPU Float32Array numeric benchmark; not production UI/render timing.",
+  "configuration": {
+    "film": "Kodak Portra 400",
+    "paper": "Kodak Portra Endura",
+    "input": "scene-linear ProPhoto RGB",
+    "output": "sRGB with measured OkLch compression",
+    "spatialEffects": false,
+    "stochasticEffects": false,
+    "grain": false,
+    "templates": false,
+    "gpu": false,
+    "wasm": false,
+    "runtimeImageRequests": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "totalMemoryBytes": 17179869184,
+    "node": "v26.7.0",
+    "playwright": "1.61.1",
+    "browser": "chromium",
+    "browserVersion": "149.0.7827.55",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.7827.55 Safari/537.36"
+  },
+  "requests": {
+    "count": 14,
+    "external": []
+  },
+  "harnessErrors": [],
+  "records": [
+    {
+      "width": 256,
+      "height": 256,
+      "setupMs": 3.2000000029802322,
+      "perSizeSetupMs": 1.3999999985098839,
+      "firstRenderMs": 127.89999999850988,
+      "repeatedPrintMs": [
+        94.10000000149012,
+        95.10000000149012
+      ],
+      "repeatedPrintMeanMs": 94.60000000149012,
+      "inputBytes": 786432,
+      "stageBytes": 786432,
+      "peakArrayEstimateBytes": 7079832,
+      "peakArrayEstimateScope": "first render source + five stage planes, reprint log + density + scan output, and receiver; excludes fixed JSON resources, RGBA/canvas and GC overlap",
+      "staticSetupBytes": 1302672,
+      "canvasBytes": 262144,
+      "heapBefore": 12227615,
+      "heapAfter": 22103207,
+      "wavelengthIterations": 5308416,
+      "spectralIntegralIterations": 10616832,
+      "outputChecksum": 727962003.9067755,
+      "overBudgetRejected": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "setupMs": 3.2000000029802322,
+      "perSizeSetupMs": 0.9000000059604645,
+      "firstRenderMs": 3556.6999999955297,
+      "repeatedPrintMs": [
+        3049.10000000149,
+        3103.7999999970198
+      ],
+      "repeatedPrintMeanMs": 3076.449999999255,
+      "inputBytes": 24883200,
+      "stageBytes": 24883200,
+      "peakArrayEstimateBytes": 223950744,
+      "peakArrayEstimateScope": "first render source + five stage planes, reprint log + density + scan output, and receiver; excludes fixed JSON resources, RGBA/canvas and GC overlap",
+      "staticSetupBytes": 1302672,
+      "canvasBytes": 8294400,
+      "heapBefore": 46989323,
+      "heapAfter": 259120301,
+      "wavelengthIterations": 167961600,
+      "spectralIntegralIterations": 335923200,
+      "outputChecksum": 448934225.2797028,
+      "overBudgetRejected": true
+    }
+  ],
+  "comparison": {
+    "left": "legacy byte-space neutral contrast reference, not production filmEngine",
+    "right": "spectral Portra 400 -> Endura pointwise pipeline",
+    "maxAbsoluteByteDifference": 95,
+    "meanAbsoluteByteDifference": 23.656026204427082,
+    "differentPixels": 98304,
+    "pixels": 98304
+  },
+  "errors": []
+}

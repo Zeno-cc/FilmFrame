@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Verify exact resource binding, lazy loading, backend failures, numerical stages and resource cleanup without truncated spec context."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify real rendering, fallback, settings identity, bounded resources and export behavior for every migrated stock."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check typed registry/resource metadata and no unsupported substitutions or unchecked source records."}
+{"file":".trellis/tasks/11-06-webgl2-spectral-migration/research/negative-stock-registry.md","reason":"Audit exact replace/add/blocked semantics, filters, viewing/reference illuminants and licenses."}
+{"file":".trellis/tasks/11-06-spectral-negative-print-prototype/research/numerical-validation.md","reason":"Require source-specific numerical fixtures and don't claim Portra fixtures validate other films."}
+{"file":".trellis/tasks/11-06-spectral-license-provenance/prd.md","reason":"Verify source digests, profile notices and unresolved distribution blockers remain explicit."}

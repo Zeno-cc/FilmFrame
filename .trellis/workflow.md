@@ -43,7 +43,7 @@ Every task has its own directory under `.trellis/tasks/{MM-DD-name}/` holding `t
 
 ```bash
 # Task lifecycle
-python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <dir>]
+python3 ./.trellis/scripts/task.py create "<title>" --description "<deliverable>" [--slug <name>] [--parent <dir>]
 python3 ./.trellis/scripts/task.py start <name>          # set active task (session-scoped when available)
 python3 ./.trellis/scripts/task.py current --source      # show active task and source
 python3 ./.trellis/scripts/task.py finish                # clear active task (triggers after_finish hooks)
@@ -57,7 +57,7 @@ python3 ./.trellis/scripts/task.py list-archive
 # and `start` refuses while a seeded manifest is still empty — sub-agents would run with
 # zero spec context. Pass `start --allow-empty-context` when that is intentional.
 python3 ./.trellis/scripts/task.py add-context <name> <action> <file> <reason>
-python3 ./.trellis/scripts/task.py list-context <name> [action]
+python3 ./.trellis/scripts/task.py list-context <name>
 python3 ./.trellis/scripts/task.py validate <name>
 
 # Task metadata
@@ -69,8 +69,6 @@ python3 ./.trellis/scripts/task.py set-scope <name> <scope>
 python3 ./.trellis/scripts/task.py add-subtask <parent> <child>
 python3 ./.trellis/scripts/task.py remove-subtask <parent> <child>
 
-# PR creation
-python3 ./.trellis/scripts/task.py create-pr [name] [--dry-run]
 ```
 
 > Run `python3 ./.trellis/scripts/task.py --help` to see the authoritative, up-to-date list.
@@ -172,7 +170,7 @@ Use a parent task when one user request contains several independently verifiabl
 
 Use child tasks for deliverables that can be planned, implemented, checked, and archived independently. Parent/child structure is not a dependency system: if one child must wait for another, write that ordering in the child `prd.md` / `implement.md` and keep each child's acceptance criteria testable.
 
-Create new children with `task.py create "<title>" --slug <name> --parent <parent-dir>`. Link existing tasks with `task.py add-subtask <parent> <child>`, and unlink mistakes with `task.py remove-subtask <parent> <child>`.
+Create new children with `task.py create "<title>" --description "<deliverable>" --slug <name> --parent <parent-dir>`. Link existing tasks with `task.py add-subtask <parent> <child>`, and unlink mistakes with `task.py remove-subtask <parent> <child>`.
 
 <!-- Per-turn breadcrumb: shown when there is no active task (before Phase 1) -->
 
@@ -325,7 +323,7 @@ Goal: classify the request, get task-creation consent when a task is needed, and
 Create the task directory only after task-creation consent. The command sets status to `planning`, writes `task.json`, creates a default `prd.md`, and auto-targets the new task when session identity is available:
 
 ```bash
-python3 ./.trellis/scripts/task.py create "<task title>" --slug <name>
+python3 ./.trellis/scripts/task.py create "<task title>" --description "<deliverable>" --slug <name>
 ```
 
 `--slug` is the human-readable name only. Do **not** include the `MM-DD-` date prefix; `task.py create` adds that prefix automatically.
@@ -717,5 +715,5 @@ Supported events: `after_create / after_start / after_finish / after_archive`. N
 
 For the workflow state machine's runtime contract, the locations of all status writers, pseudo-statuses (`no_task` / `stale_<source_type>`), the hook reachability matrix, and other deep details, see:
 
-- `.trellis/spec/cli/backend/workflow-state-contract.md` — runtime contract + writer table + test invariants
-- `.trellis/scripts/inject-workflow-state.py` — actual parser (reads workflow.md only, no embedded text)
+- `.codex/hooks/inject-workflow-state.py` and `.zcode/hooks/inject-workflow-state.py` — platform parsers for workflow.md breadcrumbs
+- `.trellis/scripts/common/active_task.py` — session-scoped current-task lookup and runtime pointers

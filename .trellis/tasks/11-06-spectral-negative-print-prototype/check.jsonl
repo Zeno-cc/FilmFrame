@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify allocation bounds, no remote image processing, meaningful tests and unchanged legacy runtime behavior."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Review finite dimension/pixel guards, typed float-density and alpha fixture boundaries."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Check numerical baseline provenance, omitted stages, performance evidence and the UI go/no-go gate."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Verify stage order, color-space assumptions, reference comparisons and disclosed numerical/resource limitations."}
+{"file":".trellis/tasks/11-06-spectral-license-provenance/prd.md","reason":"Check source digests, GPL/CC notices and unresolved provenance are not represented as cleared."}

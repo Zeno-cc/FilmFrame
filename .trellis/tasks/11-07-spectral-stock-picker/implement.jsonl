@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Use controlled components, existing design tokens, icons and accessible mobile/focus patterns."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Clean up picker document listeners, timers and focus lifecycle."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Preserve browser workflow and accessibility regression gates."}
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Use lightweight support registry without loading spectral resources or changing stock semantics."}

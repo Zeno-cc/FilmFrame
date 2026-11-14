@@ -51,7 +51,7 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 ## Accessibility
 
 - Icon-only controls require an accessible name and usually a `title` tooltip.
-- Dialogs and sheets use `ModalSurface`, which handles Escape, focus trapping, initial focus, and focus restoration.
+- Dialogs and sheets use `ModalSurface`, which handles Escape, focus trapping, initial focus, and focus restoration. Focus-trap candidates must have a rendered layout box (`getClientRects().length > 0`) as well as enabled semantics; responsive CSS may hide a button without `hidden`/`aria-hidden`, and it must not receive focus at tablet widths.
 - Use native roles and controls: buttons for commands, checkbox for inclusion, range for zoom/grain, tabs for views.
 - Preserve `focus-visible` styles, `aria-live` status feedback, and `prefers-reduced-motion` behavior.
 - Touch actions must remain at least 44px high where the current mobile UI guarantees it.
@@ -60,6 +60,14 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 
 - When an access-page anchor is styled with the shared `.button` class, make the control itself `display:inline-flex;align-items:center;justify-content:center`; aligning only the parent row does not vertically center the anchor text inside its min-height box.
 - Keep the anchor and its companion button at the same clickable height, and verify both the desktop and 390px mobile layouts.
+
+### Custom Film Stock Picker
+
+- Use a native button trigger and `listbox`/`option` semantics for custom stock menus. Roving focus moves the active option only; selection requires click, Enter or Space and must not implicitly enable spectral mode.
+- Support Arrow/Home/End navigation and printable-character typeahead. A space in an active multiword query belongs to the query; Space selects only when no query is active or after its reset interval, while Enter always selects. Clear the query on new menu sessions.
+- Handle Escape/Tab on both trigger and options because opening focus may not have settled yet. Escape restores the trigger without closing an enclosing Sheet; Tab closes without stealing normal focus order.
+- Keep compact capability emblems decorative (`aria-hidden`) and provide the support status through the option's accessible name. Preserve a 44px touch target for the info control even if its visible glyph is smaller.
+- Do not import spectral resource JSON to render picker metadata; use the lightweight registry. Keep explanatory cards inline rather than nesting another modal in the mobile settings Sheet.
 
 ### Dialog Keyboard Shortcuts
 

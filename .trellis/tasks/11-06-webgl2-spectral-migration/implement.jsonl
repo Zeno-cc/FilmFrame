@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load mandatory frontend quality checks and module ownership before WebGL2 implementation."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Place GPU/render services, harness and UI within established FilmFrame boundaries."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve render identity, async cancellation, latest-state and Object URL ownership."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Define typed backend/resource settings and runtime validation for WebGL capabilities and stock registry."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve local-only processing, bounded allocations, Worker fallback, export and real-browser tests."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Reuse the established spectral pipeline, insertion boundary and source/licensing constraints."}
+{"file":".trellis/tasks/11-06-spectral-negative-print-prototype/research/numerical-validation.md","reason":"Use the CPU implementation as the numerical oracle and preserve documented historical-baseline differences."}
+{"file":".trellis/tasks/11-06-spectral-negative-print-prototype/research/browser-benchmark.json","reason":"Compare measured GPU performance against actual 256x256 and 1080p CPU timing and memory evidence."}

@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load the required frontend quality and module checklist before creating the isolated numeric prototype."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Place pure numeric services and tests within established service/test boundaries without adding a new application layer."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Define typed float-density, validation and fixture APIs without unsafe untrusted-input assertions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Maintain bounded allocations, local-only processing and meaningful real-browser validation; no production runtime changes."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Follow the approved prototype-first scope, required full-report sections, baseline gates and licensing boundaries."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Port the confirmed scene-positive film/negative-density/print/scan pipeline and measure its exact resource costs."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/filmframe-integration-boundaries.md","reason":"Keep the prototype isolated and understand future Worker/main and memory contracts without enabling UI."}
+{"file":".trellis/tasks/11-06-spectral-license-provenance/prd.md","reason":"Record every imported input's license/provenance and never imply global distribution clearance."}

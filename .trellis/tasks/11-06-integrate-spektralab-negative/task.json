@@ -1,0 +1,32 @@
+{
+  "id": "integrate-spektralab-negative",
+  "name": "integrate-spektralab-negative",
+  "title": "Integrate SpektraLab negative-film capabilities into FilmFrame",
+  "description": "Research SpektraLab negative/positive film conversion, compare FilmFrame film model, and design a compatible incremental integration.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": "frontend",
+  "package": null,
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-11-06",
+  "completedAt": null,
+  "branch": "codex/spectral-negative-print-prototype",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-06-spectral-license-provenance",
+    "11-06-spectral-negative-print-prototype",
+    "11-06-spectral-look-ui-integration",
+    "11-06-physical-135-film-edge",
+    "11-06-webgl2-spectral-migration"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

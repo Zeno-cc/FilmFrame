@@ -1,0 +1,3258 @@
+{
+  "schema": 1,
+  "date": "2026-11-06",
+  "passes": true,
+  "scope": "11 exact color-negative/paper resource exports with source-specific exported-array numerical fixtures. No runtime/UI integration or full native effects parity.",
+  "execution": {
+    "command": [
+      "/private/tmp/filmframe-spectral-python-20261111/bin/python",
+      "-I",
+      "/Users/zacheryxu/Code_NoIcloud/FilmFrame-main/scripts/spectral/export_stock_pair_resources.py",
+      "--upstream",
+      "/tmp/filmframe-spektrafilm-source/spektrafilm-3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+      "--resources",
+      "/tmp/filmframe-portra-push-export-20261111/resources",
+      "--report",
+      "/tmp/filmframe-portra-push-export-20261111/report.json",
+      "--compatibility-setup",
+      "/Users/zacheryxu/Code_NoIcloud/FilmFrame-main/services/spectral/resources/portra-setup.json"
+    ],
+    "isolatedPython": true,
+    "upstream": "/private/tmp/filmframe-spektrafilm-source/spektrafilm-3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+    "resources": "/private/tmp/filmframe-portra-push-export-20261111/resources",
+    "compatibilitySetup": "/Users/zacheryxu/Code_NoIcloud/FilmFrame-main/services/spectral/resources/portra-setup.json"
+  },
+  "environment": {
+    "python": "3.13.12 (main, Feb  3 2026, 17:53:27) [Clang 17.0.0 (clang-1700.6.3.2)]",
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "numpy": "2.4.2",
+    "scipy": "1.17.1",
+    "colour": "0.4.6",
+    "numba": "0.68.1",
+    "opt-einsum": "3.4.0"
+  },
+  "source": {
+    "revision": "3bb2c2d2801ff68b92019cf1dbcbb133d60832bc",
+    "codeFiles": {
+      "tests/conftest.py": "6e3a63720c4937a22cfd622c88b9a56033c99b535fcdafe99eaf90b40c1e55e8",
+      "src/spektrafilm/runtime/pipeline.py": "22d3772529270f936363ddfc5ae8f30e4ee2fa2a8d562ef359242d6de728f4e8",
+      "src/spektrafilm/runtime/params_builder.py": "edc4537e2b1e021eea4a46e746550185525f9bcc25610ae577f936ad513d99c2",
+      "src/spektrafilm/runtime/params_schema.py": "3373d4cbc31476041dd5ae071ff00445313ac1a2d9d5e3517cf13dc5e87e18fa",
+      "src/spektrafilm/runtime/stages/filming.py": "e5f7acc4a5d90b1452ff08cb8aee13dbeb28d08e9c6a31eff4471df5dcc6aa3e",
+      "src/spektrafilm/runtime/stages/printing.py": "6d47514f230c65ed60b0012be93277057bac4d3dd16089123aaa0ce99c0a25b0",
+      "src/spektrafilm/runtime/stages/scanning.py": "30078ef985e731b4b0150ed310ec1e2870fc6f7e037f5876c9afa2188b2cc99f",
+      "src/spektrafilm/model/develop.py": "41dfe710e89188dcdc87b5ad87c56095efa44f3dbc9393095f95762e2c1d0c83",
+      "src/spektrafilm/model/couplers.py": "706a1832cdfa0399b45e9a246b4c29ef669d42bf4d679080fb0346cf6ec5fcf3",
+      "src/spektrafilm/model/color_filters.py": "175aa801e228484880805e84af66bf1005fe916860fa4c36b955b4f5967579a7",
+      "src/spektrafilm/model/illuminants.py": "757608544bd603bfcf26db24c70d84ec9618569fb26bdfe6bf4e7362b62e4676",
+      "src/spektrafilm/utils/spectral_upsampling.py": "6c51273383c6aa5538c3c742dfd46a6660300c8211936bfbbc498c64e60ef6ea",
+      "src/spektrafilm/utils/gamut_compression.py": "4f7e6b48f8fd582c5ed3bb9559cf55a2c32be8b637cf90532b7979719fd13924",
+      "src/spektrafilm/utils/morph_curves.py": "f082d40c69f8f8c70f4d94ae947becf907609f2f56426c2fa7b9dd3006d4a6c9",
+      "src/spektrafilm/utils/fast_interp_lut.py": "520c649ee63c4131ac178b45f363dc6e83130a5c0b03dc259d46347dabbe4e2f"
+    },
+    "profiles": {
+      "fujifilm_c200": "30db07d88090aadc62e03d18c2c51f67a20a1673390c69f99933b7ed5406d2c8",
+      "fujifilm_pro_400h": "da1be731ab79fb5535c43042494fa7298c942179abb68270b928aa012c629b31",
+      "fujifilm_xtra_400": "5f2a3642c7c8db5e750d7366c34b47d24b89ad78d2abe41da4b5282fd4286e58",
+      "kodak_ektar_100": "60acbd46c75005771569eafb97f534a4495e9d4e1e9c1e419b90cea2676ec7cf",
+      "kodak_gold_200": "aa8a0c1c7851fface3752f968cdf6c6d74a26fc9756a4460d3155d2382506b7c",
+      "kodak_portra_160": "1bc9b65a6940f3a4381e8d14d0ac43594aff9495051992ce4d7408e761549992",
+      "kodak_portra_400": "b5cdc73dbec8f462f488bca70bedf23fd13ce79969c0457e8ac2a2565d92bf5d",
+      "kodak_portra_800": "5b0c6e861c6273a2ecdf552525e80738037918e650a0dc206e095acfd02f8b43",
+      "kodak_portra_800_push1": "dac9cbcd2442442d9dee90bd2d6a28dcc4b996635dcac0b44ac8ecd32c4b3a4f",
+      "kodak_portra_800_push2": "5ee01e4a00c157721738314313a43b46fcd5dae62ed3a7e4730f9054b66f6282",
+      "kodak_ultramax_400": "248b78bdcc4fdbe864e30f193f900059ecd98cbdb276c88ad8f6f5b520137901",
+      "kodak_portra_endura": "e3bb6069e02d088d8080d38ce28035816038f62786e2aff9176bf4aeeb4820a0",
+      "fujifilm_crystal_archive_typeii": "0db98e5b8e2ed5248696e62bc39b7f21459a8812d64049b1275d7be995af873b"
+    },
+    "neutralPrintFiltersSha256": "8bbf8d8db76aecdc9e94bc0b1e31f3329553eeda56d210ab36294fa5e4bf3b13",
+    "tables": {
+      "src/spektrafilm/data/luts/spectral_upsampling/irradiance_xy_tc.npy": "52f90c724811f5fab80769f8548bf24d08a521eb09e65ab6e016893258d2a783",
+      "src/spektrafilm/data/filters/heat_absorbing/schott/KG3.csv": "7654aa57fa8e42ae280e8d679ae9ebf8cef48ed5cbe6c2ab43eba1c6608f3d1f"
+    },
+    "exporterSha256": "2098c4d776564644fbc6420a693c59509a437757098573e503dbdf910ee9108f"
+  },
+  "tolerances": {
+    "filmRaw": {
+      "atol": 2e-08,
+      "rtol": 2e-09
+    },
+    "negativeDensity": {
+      "atol": 2e-08,
+      "rtol": 2e-09
+    },
+    "paperLogExposure": {
+      "atol": 2e-08,
+      "rtol": 2e-09
+    },
+    "paperDensity": {
+      "atol": 5e-08,
+      "rtol": 5e-09
+    },
+    "printRgb": {
+      "atol": 1e-07,
+      "rtol": 1e-08
+    }
+  },
+  "toleranceMeaning": "abs(exported-array reconstruction - pinned upstream) <= atol + rtol * abs(pinned upstream), per element; finite values and equal shapes checked first.",
+  "commonTablePayloadSha256": {
+    "xyzWhiteSrgb": "cc35b94b74fa6d51c8bbe1061e0c0f0023d31bb2b43cd2e6e7c627d14d4d35be",
+    "cam16LGrid": "cb9ec363b64777de162a0086c030fe145d472fe661185e0dadcad2ab5ea30ae9",
+    "cam16HGrid": "bb810d8557abddac869b12daa15e7381226e771fa76a630be38ec46f28f0fbbb",
+    "cam16Cmax": "df537e9b50c3a7b4bed54a26d5b7dd190701716e985b444a04df805752cd5cac",
+    "oklabXyzToLms": "880e3d7346d3658038bcb62b4fdc5e70186fce2e97eaa988f30165421aee0971",
+    "oklabLmsToXyz": "2cd3f9971b8efff849497a551236ceea9187ead0c6c6bc7676983cc3104f7ff8",
+    "oklabLmsToLab": "da94092dda9defb070ecf6b986d69d4883ab4eeb2ec890ffccb2fa379798f2e3",
+    "oklabLabToLms": "5fa1eeb06921989a1b1031e9f748765da15dc8732513b3d938d805c99f71c41c"
+  },
+  "stocks": [
+    {
+      "key": "kodak_portra_160__kodak_portra_endura",
+      "filmId": "kodak_portra_160",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "replace-look",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        59.967376846322814,
+        53.21333784015279
+      ],
+      "midGrayNormalization": 0.9397466912050915,
+      "setup": "kodak_portra_160__kodak_portra_endura/setup.json",
+      "setupSha256": "152c2a725df0231940266a8a6546a0cc3c0d994c9892693ffe1fbd203f92f24d",
+      "fixtureManifest": "kodak_portra_160__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_portra_400__kodak_portra_endura",
+      "filmId": "kodak_portra_400",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "compatibility-fixture",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        51.56801468495496,
+        52.53400422349596
+      ],
+      "midGrayNormalization": 0.8357499244020924,
+      "setup": "kodak_portra_400__kodak_portra_endura/setup.json",
+      "setupSha256": "09c250e40381273d22dab5b794b5c79c9d625535ee572a12c81c49ab5383e1b6",
+      "fixtureManifest": "kodak_portra_400__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_portra_800__kodak_portra_endura",
+      "filmId": "kodak_portra_800",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "replace-look",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        65.88803030875636,
+        66.08336378019627
+      ],
+      "midGrayNormalization": 1.1688324384042645,
+      "setup": "kodak_portra_800__kodak_portra_endura/setup.json",
+      "setupSha256": "ff7531bc985c7d2383b1ab98e3299083396c44708d564c57eb9e78d52fa0b900",
+      "fixtureManifest": "kodak_portra_800__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_portra_800_push1__kodak_portra_endura",
+      "filmId": "kodak_portra_800_push1",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "add",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        66.06061571084823,
+        68.03951693663969
+      ],
+      "midGrayNormalization": 1.1887931022208669,
+      "setup": "kodak_portra_800_push1__kodak_portra_endura/setup.json",
+      "setupSha256": "9e0bf68066ebe07e01b65f4979e7b28b50bfaba4a8fc7ac1222eebfc2b9d1f42",
+      "fixtureManifest": "kodak_portra_800_push1__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_portra_800_push2__kodak_portra_endura",
+      "filmId": "kodak_portra_800_push2",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "add",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        66.28037920033391,
+        69.59113087748631
+      ],
+      "midGrayNormalization": 1.2023460934921957,
+      "setup": "kodak_portra_800_push2__kodak_portra_endura/setup.json",
+      "setupSha256": "29d299a96e0644a8a737b1628ad995fe07372035ab369e65d8f6039e0f7bfd0a",
+      "fixtureManifest": "kodak_portra_800_push2__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_gold_200__kodak_portra_endura",
+      "filmId": "kodak_gold_200",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "replace-look",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        58.66106013923236,
+        55.551852192967594
+      ],
+      "midGrayNormalization": 1.0116394352255922,
+      "setup": "kodak_gold_200__kodak_portra_endura/setup.json",
+      "setupSha256": "17e4830e095d1c1c6f52848498ee80592595a14680c1af9ff521e71d140cc3b6",
+      "fixtureManifest": "kodak_gold_200__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_ektar_100__kodak_portra_endura",
+      "filmId": "kodak_ektar_100",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "replace-look",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        74.44438537985663,
+        60.742113278496966
+      ],
+      "midGrayNormalization": 1.1765021904485382,
+      "setup": "kodak_ektar_100__kodak_portra_endura/setup.json",
+      "setupSha256": "0ed95394e8906c9d3b254201a9daf5728f564335054c7154c0712a82ec0ebc31",
+      "fixtureManifest": "kodak_ektar_100__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "kodak_ultramax_400__kodak_portra_endura",
+      "filmId": "kodak_ultramax_400",
+      "paperId": "kodak_portra_endura",
+      "migrationStatus": "replace-look",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        58.66256771946224,
+        59.17049757909685
+      ],
+      "midGrayNormalization": 1.0074212878942563,
+      "setup": "kodak_ultramax_400__kodak_portra_endura/setup.json",
+      "setupSha256": "6105899fb631c018a569daa08721f3e057d87bde81a9d8531e12059386cbea9c",
+      "fixtureManifest": "kodak_ultramax_400__kodak_portra_endura/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "fujifilm_c200__fujifilm_crystal_archive_typeii",
+      "filmId": "fujifilm_c200",
+      "paperId": "fujifilm_crystal_archive_typeii",
+      "migrationStatus": "add",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        85.91380393854578,
+        108.32018060451946
+      ],
+      "midGrayNormalization": 2.0164604420943166,
+      "setup": "fujifilm_c200__fujifilm_crystal_archive_typeii/setup.json",
+      "setupSha256": "c06e7c425c683ed329e10160a8b580cb3796ce6bc32e596617782d7002148e14",
+      "fixtureManifest": "fujifilm_c200__fujifilm_crystal_archive_typeii/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "fujifilm_xtra_400__fujifilm_crystal_archive_typeii",
+      "filmId": "fujifilm_xtra_400",
+      "paperId": "fujifilm_crystal_archive_typeii",
+      "migrationStatus": "add",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        85.85051495120246,
+        109.0956393008583
+      ],
+      "midGrayNormalization": 1.8847324198393087,
+      "setup": "fujifilm_xtra_400__fujifilm_crystal_archive_typeii/setup.json",
+      "setupSha256": "0644f29ba6776b12ab680cb0aefda7a886bf300c67dffb0ef007a6f2ffec4dfb",
+      "fixtureManifest": "fujifilm_xtra_400__fujifilm_crystal_archive_typeii/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    },
+    {
+      "key": "fujifilm_pro_400h__fujifilm_crystal_archive_typeii",
+      "filmId": "fujifilm_pro_400h",
+      "paperId": "fujifilm_crystal_archive_typeii",
+      "migrationStatus": "add",
+      "referenceIlluminant": "D55",
+      "viewingIlluminant": "D50",
+      "enlargerCcmY": [
+        0.0,
+        48.15365594794165,
+        50.73525280937112
+      ],
+      "midGrayNormalization": 1.0974198812640814,
+      "setup": "fujifilm_pro_400h__fujifilm_crystal_archive_typeii/setup.json",
+      "setupSha256": "a6be112bccaa8121326a3a31946116bd3047848c59dbd66b68d395b193f86ccb",
+      "fixtureManifest": "fujifilm_pro_400h__fujifilm_crystal_archive_typeii/fixtures/manifest.json",
+      "numericalValidationPasses": true
+    }
+  ],
+  "fixtureDetails": {
+    "kodak_portra_160__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.885780586188048e-16,
+              "meanAbs": 8.35558474262162e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "3dc2c881f8e6b8e9ca28b8e1198b666aac20d71a40b05be0f44a6b464925837d",
+              "reconstructedPayloadSha256": "2b20e27970dd52985191e549bb40c909add482d8217019ec4a86160a16b807af"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.3306690738754696e-16,
+              "meanAbs": 8.615793264018141e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "45ddd14e556327d864729062fab7c086951500d1977a837383276d46279d3ddc",
+              "reconstructedPayloadSha256": "bdd2cc583a42e73addf0fb81ad7d4c28eee54cc02d9a43c4134cbf406fdf8122"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2000683780044596e-10,
+              "meanAbs": 7.395448446342878e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "7cb56de4924ef5aa102496d25ea5dcc708304e8eb8c663897503238ea2548824",
+              "reconstructedPayloadSha256": "2ecf74ed8c292fed59e2ec461e0876ccf7f655d486f651776ec9b88643d5d2a7"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0150691398536082e-10,
+              "meanAbs": 6.895500779165638e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "ecd7a52f9d339ceaee180c67db5f9d6f90b4dce50ade11193102f60c2d8f5eed",
+              "reconstructedPayloadSha256": "5ee53009fad776fd898b0b0e76cb44305814bd3b1ea41d71b04529e7665edebb"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0630105129472156e-09,
+              "meanAbs": 9.970931834820303e-11,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "128f6658ccf897b86ac6ff622adeea51fb0a837a16e0bc71747e227074423eef",
+              "reconstructedPayloadSha256": "92695c22b1b3c36c47b77bbf83d1bab1bac735d0517fc916396c9721ea4d536e"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.661338147750939e-16,
+              "meanAbs": 2.9605947323337506e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "878a07ba29760c6ce448ca563a8921d963dc4c55d6446957f85eac62d01b7d5a",
+              "reconstructedPayloadSha256": "f32572530c760abb778880ded80bdef895e17e0ea03091b001fd4f97d6aad47e"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.828670879282072e-16,
+              "meanAbs": 1.942890293094024e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "f7ef3c0dcf9978c9f51a4a23fe35398696f3f1ec86ce1f7b402349e5e285fb43",
+              "reconstructedPayloadSha256": "e73388f06971796df19cde6adb23e5a939b75315e05bcf1f13049f441cbca0c4"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.359476916768415e-11,
+              "meanAbs": 3.38661043652877e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "5c8c1cc3b5438ac8924a11e1be80f758af60e124d923e272168c11f9e0ced731",
+              "reconstructedPayloadSha256": "a35491fe40899205c0445903804b1047c1dfae69ecbc25591b5af99bd7da90a2"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.180267491690984e-11,
+              "meanAbs": 4.0719908926215943e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "6dffc3c974db7748ee695debf59d3ae3deb6ca3e512810d43a85c571b356d0bb",
+              "reconstructedPayloadSha256": "f4110d401582880ed1e4f4682b8dcb2105707ba9cf5637f68375be226e290634"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.7679211700437634e-10,
+              "meanAbs": 2.2731384829999257e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "dcd0bf3a6f84d9b59122a630e6844072cbf5373615c14f255edbc70a987fac93",
+              "reconstructedPayloadSha256": "885cfc024173d5ce4b0f94f44880c22a6a10045689462bd93813253bc7241aee"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1102230246251565e-15,
+              "meanAbs": 1.274208603213589e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "9446a74904555ca4fbcca7c47ef72923e5404b89478e653ddabd4e910a357e24",
+              "reconstructedPayloadSha256": "d760f61de6b2a6b90babca635a3adfe9cec5cbb3d089a1938030761c43b39d69"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.771561172376096e-16,
+              "meanAbs": 1.0825758692267762e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "1f695babc309a563f143ae471121ddf5a7f77129fe5572793fa953d78a30ffc6",
+              "reconstructedPayloadSha256": "63de3aefe035c07bfb298a22e6af7f08a1de3e1be199020f454ded45c5408ef7"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1475009831229954e-10,
+              "meanAbs": 3.734983052073909e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "b399d385b7c8033c8b684ebf08dc2eeaf4cd7fbfb6e34654d28ddfc6edd28ed6",
+              "reconstructedPayloadSha256": "0dea949d2645562b2a349e0d11cafca2bd66af64d04387c6ac7b33b03800571d"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0461476129819403e-10,
+              "meanAbs": 5.841424703609728e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "ff1136639444dd64e0a6db5aefe567a27f1467414f01db3e43e6a940b30bb5fe",
+              "reconstructedPayloadSha256": "f207b9b7a1d57091847d85dc024b67fa5808c9f3b8f182f1024fae8c8f0bff9b"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.295626272934669e-09,
+              "meanAbs": 3.3579378001607173e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "5ea617dda6aec6899054c0243e29c86d303bdbe993202347e302fa5e7bc32bcd",
+              "reconstructedPayloadSha256": "4bd2d6140757ba80bbbcc04dc7730572b3907b2a3a3971e33cf0d6dfb584ec0b"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_portra_400__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.885780586188048e-16,
+              "meanAbs": 9.483155002006545e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "37a359a374621ec1716f1da277bfa3e20abcb8b61df3248ed5dbac94e7da8324",
+              "reconstructedPayloadSha256": "e172f74808d9df5da030144583ca1e67ab009b4c1e9f8c40d13d8738f8fa9404"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 1.0408340855860843e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "b5f952a781209a5675255908da828feedb244a2010fd526582e58a42b1a21480",
+              "reconstructedPayloadSha256": "cd86ad5efea9764c55b4edc71f195edf6aed86c0db8c443397849531df155264"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.194940257853716e-10,
+              "meanAbs": 7.36534302876272e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "eee2119858e5acd89b82986addd86085c224b5c1457c3df72c12ad83b4570543",
+              "reconstructedPayloadSha256": "426d2095906729967bceb9dc412d20a52ad0bad6c8faaaf0d496c5816fdb4c52"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0185430276976604e-10,
+              "meanAbs": 6.879416336360207e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "89875e81d3534b49fa607fa33e60bc2219af56d4f957aee82a674a7d2ff20ba5",
+              "reconstructedPayloadSha256": "35f9f65ee0f8e89a16f327451350f3804f85b1ad1d150acb3a439901869bf640"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0835662089814235e-09,
+              "meanAbs": 1.015341011499175e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "75918907a2deb44ebaffedf813788119d129b6e35be8577be259debf0b48bd88",
+              "reconstructedPayloadSha256": "3b7b29859b0aadc163d49af882c0baa84b8659f9d4c0f1847f28ccab2a23b334"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.551115123125783e-16,
+              "meanAbs": 2.4054832200211723e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "671659d3858dded8fc00e81e24eaf1a2fb011084dc3f816d62305c8ab8bcb418",
+              "reconstructedPayloadSha256": "d58b83ee7b7bd9b3fd21582e357c2d78797f5768f148fc71f5e8caaf3161d60f"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.498001805406602e-16,
+              "meanAbs": 1.5728159515523052e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "c1cb136f2e960a03b108a1bd0769527cc51554acdc95a1917beccf309adbba6d",
+              "reconstructedPayloadSha256": "e491d07f9905acdc12ae0fdcd4d3c19a64bbefcd5eaa64815622513bd8c8a5db"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.325806710729466e-11,
+              "meanAbs": 3.682195289419118e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "afe474ca557c25fa50648b7f18feba19aad5d05519cea736f3fd026b3e5244ba",
+              "reconstructedPayloadSha256": "8e0fe1b584d8dd6681fd26e21b7b09a4bce40b08be18170648b75f879b9c74a9"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.622988268922825e-11,
+              "meanAbs": 3.80448913113914e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "cd64f1ebb0879b27e067cbc74d37a9a6f1ba0d8ad23a62b96b94c2e1795256ef",
+              "reconstructedPayloadSha256": "49625761c07bec57cdfa033cfef89b3bcd3124765d5dcbce115dce5d3ed31957"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.454608460933372e-10,
+              "meanAbs": 2.0557732830865186e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "636e441a0f3daf6b954172ae9bd6d654f6331b7bcd090462826193f6f4c5976d",
+              "reconstructedPayloadSha256": "77e91cfc63617310370c40cf3a7a190ded89c94f7d82b4a0e6bfcf9748ffeaf4"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 9.992007221626409e-16,
+              "meanAbs": 1.3375440801229507e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "4008167a6204e240bbc889ae7ed3bdb6753c1f1acc85f3ac7eb84ba7aeeb4274",
+              "reconstructedPayloadSha256": "262da2ff69ad5aecaa40e8c477e7c9cfc29ca777e5da024573d15872b8260bff"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.881784197001252e-16,
+              "meanAbs": 1.0834793710371808e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "4a783e61573655f71b3a7234ac49b7d2eb66eabb41af5713fe735a1a530d9bc0",
+              "reconstructedPayloadSha256": "098cba14af4ab21aa40bcd670458bdf0eb81e6d4ce42e41fe98877aec4314cd8"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1555129075802029e-10,
+              "meanAbs": 3.69760237731257e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "aa509bce078ed421319e9b2527e920e0d990750b0c0cb0a9155bd827d2f8e33a",
+              "reconstructedPayloadSha256": "269ba0760dac1ead4beb46761aafb092e4239413232234754de856851cb8a789"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0468392819262817e-10,
+              "meanAbs": 5.687715865417461e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "23b09044ab68308da8ea467af74b30ee65b13869f7f59b79a2b92503482e9991",
+              "reconstructedPayloadSha256": "9539268df0b7879dcf050d25555f130d66417a04c9d1d7e737f2cdce9f795ba2"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2812721023047757e-09,
+              "meanAbs": 3.3973755982129403e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "920668076709868917503be89bbdaeea6343b608d7be7a16ad77f274b6a0b55f",
+              "reconstructedPayloadSha256": "4aaafb6dd7c17fe06d4d21a91ecef9d617f7d86447dcd01a73ae11bd6aeb6d6b"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_portra_800__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 7.170190367370803e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "f5951948e1d9462522f6abb7cc2fb98533c73dee2083f7a3aad8e41d63e00cd5",
+              "reconstructedPayloadSha256": "f7694103347fe16315b0be3d4f0a898b3987f6b138bc3b54cb4954f49ec3690a"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 8.789265611615822e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "be97023164ff63c89b5852ac717d5be72591a3978ba6e88045deac14b4391606",
+              "reconstructedPayloadSha256": "3375a830b01a730ad308a38a1541a0a165cfc36d3a6838a9e058cd0b3ce0ff12"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1308981529012385e-10,
+              "meanAbs": 7.091453899793487e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "12768bf05c588bded8feb515f233ed690ccb1facc8425f57166bc56aa1053dc5",
+              "reconstructedPayloadSha256": "d4e5b1ac4810e1d58157c0a9cc977d77c94abf58c29622eb78b4818964330ed9"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.047383291208348e-10,
+              "meanAbs": 6.997350586688637e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "4371f2ca76172ab55e4fd094fe9a43187d46d034a38ade314c915f894b67289a",
+              "reconstructedPayloadSha256": "104ccaafe2a76a73512c0f249eb3787d6d6c8c9d9a12248849782104c5c83758"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.052662304545926e-09,
+              "meanAbs": 9.943529824761137e-11,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "74482379ede1c2c509bdae5b302bbea4fa04fc9854ae33231a47d59db6089231",
+              "reconstructedPayloadSha256": "f515ec3ba9c351cb43b423f3e97fed48dd7a25d064eb279a9967bbc5391d7349"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 1.4802973661668753e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "c2dd820d369e7a283d7048f84e75a9c7092f01a7ec7d31f304f172df4504e4e6",
+              "reconstructedPayloadSha256": "bcb2b69181a69b8558b0ba8431964ce4a3ebc30a5be17a59c2be943a1c2b316e"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.6653345369377348e-16,
+              "meanAbs": 5.551115123125783e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "cd72132df7f087607b1fb57ec2a8beade59cd2fb444dc227620a002ab5c3c11a",
+              "reconstructedPayloadSha256": "443a62c9e48c68b21defac3ffb5b1b557b81ed9263ed47fa5fd49b0b40af94b3"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.938233486688318e-11,
+              "meanAbs": 3.8956005088408574e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "86f8df8c8e567caf54cdd265552ba9089aa323805879ed57ece569ae7dee1e06",
+              "reconstructedPayloadSha256": "4a1af221e5b1ac6131556ac11b7e7bd3ba81283d93e525fcaf948cae818cde0d"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.359265891653365e-11,
+              "meanAbs": 3.5282656426124013e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "8351e53aa12b020ebe440ca2b8b51630e6ce408d8446e2690ce5b64270db4f43",
+              "reconstructedPayloadSha256": "1190e54b78d2cfd1b100d656ba0c8f26a2f706accf4b1bfe83b9182fdf9d8e52"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.9569257325713352e-10,
+              "meanAbs": 1.6917001942802953e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "4847de90df0c608fedba79eea80cab0f52b1fe4c9e76954278f0a55037c0d1a7",
+              "reconstructedPayloadSha256": "7791bcd4cae8389d96a0a9eb73cb49925d44cb8627eafaa88d34bbbac7da106d"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3322676295501878e-15,
+              "meanAbs": 1.3601316253830653e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "03840decb24ccdd6cc3ea6cad52e191351d39f4ef38959f093f8b7ae4b22132f",
+              "reconstructedPayloadSha256": "62127ca3c0816018cf8f4b25bc92eb42683196dcef8a458ea9963a5b829281c8"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 9.43689570931383e-16,
+              "meanAbs": 1.1160054362117458e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "ec78b5aac9ab2b52957e1df9303e258609ed249e7c1a083e5fa2a9bef820b748",
+              "reconstructedPayloadSha256": "aed435517a0f8e436b00cbe310d86d5e7238728bd0501307021efe4a1db7904f"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0890122137396929e-10,
+              "meanAbs": 3.675072586993964e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "da06639b913b3e4b0dfe682bf731e7c88ad903eac6a8118c12ee4e67cb7f4cd0",
+              "reconstructedPayloadSha256": "540dece3d9d53bafa5939bc251cce49b88c8a3d2d9d80e2942bcbc8997025b1e"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0474998646259337e-10,
+              "meanAbs": 5.851096806138341e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "4c56dbf6583b575033785a35915ce3ac4cba6c557d9c2fd73533328795783c7f",
+              "reconstructedPayloadSha256": "b788c629ec7fdbc5c07cbbe034e2573ff20ee4928c779fa056e01b51913a7d68"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2697882051382336e-09,
+              "meanAbs": 3.319863075174371e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "0f600a9d9d0513e20b1335708b61d044e05391dfafeab859f3eaa30adbf38180",
+              "reconstructedPayloadSha256": "6629c5eb39a26820d6ab3fce0212af8b5651a0048e23d28bd9ff99c46de53fbf"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_portra_800_push1__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 7.170190367370803e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "f5951948e1d9462522f6abb7cc2fb98533c73dee2083f7a3aad8e41d63e00cd5",
+              "reconstructedPayloadSha256": "f7694103347fe16315b0be3d4f0a898b3987f6b138bc3b54cb4954f49ec3690a"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.551115123125783e-16,
+              "meanAbs": 1.0538445116559103e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "319318413a436d017df080c000213785bd43b004bb40e91acb0ba11498f13219",
+              "reconstructedPayloadSha256": "cafdd1ce078a28eb7ac83a53d7614d64dac7e242a8a218ea3e0620688df5d28e"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3121914665958911e-10,
+              "meanAbs": 7.823256965566276e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "02c0c7ed0e6dd1e656aadc9b4993652582cdde69bd9209621d64a484852f95e3",
+              "reconstructedPayloadSha256": "932433991924487c24965443de86462a273d58c84b24770c3481e5825f2b2811"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0111683712565878e-10,
+              "meanAbs": 6.551525381232048e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "9b099bfa107e8ae8657a3aa602f3b2c6cebb01706f44b38dd5ff52db66fbb4b5",
+              "reconstructedPayloadSha256": "ee8439c87036c3d1125f3f9b52d968a403ce3dea6753fe48144bdc9ff4c07103"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1436957769728195e-09,
+              "meanAbs": 1.0900107494845231e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "2d6f1c735cce1d1381bdf4e6471088b37b0f1c288e8a58a32e3c8d1e47de3c19",
+              "reconstructedPayloadSha256": "7e0fd4fe5d5a7f3405d9de6c9e6130abe1d860a68fde72c0d91afda4b78fa4e2"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 1.4802973661668753e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "c2dd820d369e7a283d7048f84e75a9c7092f01a7ec7d31f304f172df4504e4e6",
+              "reconstructedPayloadSha256": "bcb2b69181a69b8558b0ba8431964ce4a3ebc30a5be17a59c2be943a1c2b316e"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.0816681711721685e-16,
+              "meanAbs": 1.249000902703301e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "f249b7ebc5f9e38abcd61877aa85bdf3528151fb1bf961e788ee9638b7a8d6b5",
+              "reconstructedPayloadSha256": "812482fa3943bb9ba54ba443f6c79fa10989d4f3a7bb82c7f9da6866e53e2488"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0673811834394087e-10,
+              "meanAbs": 4.283205271941407e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "0278ed8da50c574456e708fc299b47e593096c8de0f2cf705f974f7bc9b4f921",
+              "reconstructedPayloadSha256": "a4dd457a80e3b3d20a3ad8dee2f58f71731cf033071bbc62bef17a44c22a4a94"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.938682878792179e-11,
+              "meanAbs": 2.652341309546576e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "7ede3bd0695d5b024b12686e61d8b3da27d0461169b4b3f48122393ff8b20871",
+              "reconstructedPayloadSha256": "7325da2cb7fe3448bc8799a10ab72805f9788845bd220aef683c509e9f67dca2"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.8216500530243707e-10,
+              "meanAbs": 1.4719270247098848e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "86caca7e71692462785629c19a1b115825ca3ebb1c7f93522194d1c67e098226",
+              "reconstructedPayloadSha256": "21f168554ee5ad78c696c0aa9942568a60d5fd140b28775f9bd510ff29827f9a"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3322676295501878e-15,
+              "meanAbs": 1.3601316253830653e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "03840decb24ccdd6cc3ea6cad52e191351d39f4ef38959f093f8b7ae4b22132f",
+              "reconstructedPayloadSha256": "62127ca3c0816018cf8f4b25bc92eb42683196dcef8a458ea9963a5b829281c8"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1102230246251565e-15,
+              "meanAbs": 1.2041872129072337e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "61e685bdd1df576d155d64e5f56dd89adc23245239f81f7d2713208dafe4c11a",
+              "reconstructedPayloadSha256": "f2c2187f6ba032c164ca9753bd79180ef9f61fb9dafb3aeafbebbceef197dcbd"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.4187861996362017e-10,
+              "meanAbs": 3.794880093036893e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "46cb56835cb8b14a4e8eb954116ae7473b6df331ef0b4929d8b4221649708a94",
+              "reconstructedPayloadSha256": "66c505f47b8d37455ebbde04d4dac4ac1a86680c8cc22d2fd325cf15f3220430"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0385370341481348e-10,
+              "meanAbs": 5.1898504536875695e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "e4044d084ebb9cb968afb9348abb69ffb0356a447b4754fc26e3d0e9fc59cf2d",
+              "reconstructedPayloadSha256": "c7d518de752542b2b52fe456b8734772a0dd10f40dd0efaf86de0322699c3c21"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.7804803187360108e-09,
+              "meanAbs": 3.547232727911318e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "17c1458e986ed5539e2ab0b59191324fdc42bc29cd126fd66a12b988d625561e",
+              "reconstructedPayloadSha256": "cd73524cf64b87b2531a30985ca68fb9f7b82bc87940400c511a12db282d22c9"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_portra_800_push2__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 7.170190367370803e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "f5951948e1d9462522f6abb7cc2fb98533c73dee2083f7a3aad8e41d63e00cd5",
+              "reconstructedPayloadSha256": "f7694103347fe16315b0be3d4f0a898b3987f6b138bc3b54cb4954f49ec3690a"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.881784197001252e-16,
+              "meanAbs": 1.209969624493823e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "fab0e73a70c995d1014cd39bac8f0afeb382952005a70589b76fe88f757453d9",
+              "reconstructedPayloadSha256": "190d937d52b6eb5a70bc06231f72822929e03c35befce393451a3da588458434"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.4732781661308536e-10,
+              "meanAbs": 8.429541215800955e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "3561f56b490498c837e0170b70b6ac427357fa782d953ca8d6cd3f74d04d090e",
+              "reconstructedPayloadSha256": "316d5ba1a8e17c8b577c061f2902e8ce2d08ed9c4ef4d873d6533d5f3217156a"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0015621665360186e-10,
+              "meanAbs": 6.047117841190275e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "9c1b4f0a91e336665fb04642f2094eb64a12aa7d4381b5e355da9ce8d3bb4fe2",
+              "reconstructedPayloadSha256": "8f17a725e95d49c4d8bb408633e1141b12c269080b5b289928458e0582bddba2"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.161829646378898e-09,
+              "meanAbs": 1.1410436311087846e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "6602736777052a17664accd9c51667de8d37f4d2493e4eae2d5b58bd9ff93ca3",
+              "reconstructedPayloadSha256": "f750ea275f4217f4b75773a924e9dc33badac112e530c897cdbd054cc951b491"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 1.4802973661668753e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "c2dd820d369e7a283d7048f84e75a9c7092f01a7ec7d31f304f172df4504e4e6",
+              "reconstructedPayloadSha256": "bcb2b69181a69b8558b0ba8431964ce4a3ebc30a5be17a59c2be943a1c2b316e"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.5265566588595902e-16,
+              "meanAbs": 5.088522196198634e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "9600607193793210a78378ae8239b656354940c70bfa9b9fad9509ca44d01c6b",
+              "reconstructedPayloadSha256": "2cabb612643b8cd46bd22f474139b8b3fa681dc6ba2399cde9f30009f3e15f63"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2591266917993948e-10,
+              "meanAbs": 4.8904306530298904e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "29af8cca96f3e4b480f7ff41948d26ae2bbb1d813ee610e3048dfb39069cf312",
+              "reconstructedPayloadSha256": "bef0cf2d932a14e44b2771e7db2289ae51fd509b72aaad6a8f7bf9a5a784acff"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.5380282864826427e-11,
+              "meanAbs": 2.109228532572634e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "b6315e7f38ca07b5b4824d41746b22a76800d65444ef2016ad7ad5f3e2b0293d",
+              "reconstructedPayloadSha256": "53274b0f0105a039373747306b59847c78b6117fa6af46210ef5cd6da6b96401"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.761576995384928e-10,
+              "meanAbs": 1.406690689857252e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "e02822781dafecec6e151b12202548ec8c13f8241b82e680c8845d00fc600e91",
+              "reconstructedPayloadSha256": "fe5a5e892ae1754129e54796ebc2c299093ef3f6a07cc0d067c1fa1e046d8994"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3322676295501878e-15,
+              "meanAbs": 1.3601316253830653e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "03840decb24ccdd6cc3ea6cad52e191351d39f4ef38959f093f8b7ae4b22132f",
+              "reconstructedPayloadSha256": "62127ca3c0816018cf8f4b25bc92eb42683196dcef8a458ea9963a5b829281c8"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3322676295501878e-15,
+              "meanAbs": 1.284418173671161e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "d9f0ee55113c529cbb10a381b831f4586308047ae568176a8ac5487d2fff92a4",
+              "reconstructedPayloadSha256": "50daa36fb05e4caa84f911f91c989a9c275db0bf9fa4e83419b885553e44cde0"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.9611579027412063e-10,
+              "meanAbs": 4.013025891025447e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "103e7bbaeb6eacccc13e686aa8a6531a1de265a6ee7ec6c6e16768faa7dddfd9",
+              "reconstructedPayloadSha256": "cf67741c7f57ad611e0beedda8171ea1d139618c39eb3f955478b0b54026aadb"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0321199450658014e-10,
+              "meanAbs": 4.892251642406974e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "fecdf2c9c0fab55b9e64937b5dfbe0c45f1cee6c404de4444270b447863968bb",
+              "reconstructedPayloadSha256": "dd47dffc3dceb951b0385240bc9c8ac32297c4021578a111f09f01d7e0998c75"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.264821552522278e-09,
+              "meanAbs": 3.7243835821637334e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "b68733ee3e4323761ea27586ac430da2fd3318e26ab0fd8a9c68f4b73e9e87a2",
+              "reconstructedPayloadSha256": "8518d48c65913f7bf497ce267f3c99b14c9f589ea70dd7c0cf2d36be7df6d7bb"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_gold_200__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 9.078386190945291e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "2393fcdae6fd5e2e4de3c126709f0334bfe5dd60a58c7e5970d6feaf1b318e5c",
+              "reconstructedPayloadSha256": "5b5be2964bf99ca3edc6cc4d810ac4fd0b87e5bde29b64cf7d8e1409a8edb043"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 8.326672684688674e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "734c886ae82f6bcacba311dcfdaf1e793392723c8a555b6864f8af0832d43afa",
+              "reconstructedPayloadSha256": "dd3f0b84947e207982fee0686fd361aecc0c68d840255e979898e1539683d31d"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.175605723879869e-10,
+              "meanAbs": 7.280376525889883e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "9dbd805259749e0cf23e79738da674e464638926f3b2e16287f94bcb891c3fbb",
+              "reconstructedPayloadSha256": "2be4f532ebb3d18e3f6ca1f3e62c7594d959f0f67f4cd1d422355a3eed488631"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0134915129356159e-10,
+              "meanAbs": 6.906805682938e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "0eb46d3246c044e8226194c03c23bb3296a8dfe9ecf57bb9e45f0a0257edaf72",
+              "reconstructedPayloadSha256": "929c73031920afe9e154854ad30af6898fd680732cc8ab3272ad9e93680051a3"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0795734028956616e-09,
+              "meanAbs": 1.0163853786382404e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "a9158812a88aca9074f22eb9f776d7c94dacf2f0cffa9d7513710856f579cf09",
+              "reconstructedPayloadSha256": "3465217e40c2fa6d306e9665cec9476126a38d164592421babd1cc97c0e71949"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.771561172376096e-16,
+              "meanAbs": 3.3306690738754696e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "7ca7057efdd6719796a6fcf8b0ba92a2600bccd0dca86e32f0b3b6f8ee027ce9",
+              "reconstructedPayloadSha256": "0678d71b8f017b45a220b237d1d2f0be3deac27e9fdf6b26235f4aa451d2b787"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.942890293094024e-16,
+              "meanAbs": 6.47630097698008e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "44844c8119c8d624502187a657e66fb9bb04ffc61b0b1df48b3ea496e330523a",
+              "reconstructedPayloadSha256": "5640f617d88cc04712c5358993a6dff5915595ef7a40b456f8d2713a19c9aae1"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.992995154637583e-11,
+              "meanAbs": 3.707798882738681e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "4b719b6013505c80d7ff0fbddbe42de302eed92803e8f98b5ef3849a524e133e",
+              "reconstructedPayloadSha256": "10aba6516ff19d2717094769f997d629206ac2e752273d9e6b140da7f12d09af"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.062200824137221e-11,
+              "meanAbs": 4.606331982515144e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "9e712c71a2782a09e4b8f27d5c97bdc7c67c861a2a7112137db2067e9e8dc8c3",
+              "reconstructedPayloadSha256": "57172911c9f9f049efb904448d74be0042914327a166537d10aecfa4b43d13c7"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.490264188776848e-10,
+              "meanAbs": 2.4168915942664643e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "120955325aaac2fd77e6f93f0e065bb58a732aff30f0f253f89921465365a387",
+              "reconstructedPayloadSha256": "523ca14f0307219d3a1ead7f5a065b45635a562b23e09d67cee44c6c1b272ebf"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0547118733938987e-15,
+              "meanAbs": 1.4209598847685542e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "2546c228fbcef4795d86d3c3a70c2c8e871367895b33e1f4260494e10ed9c20e",
+              "reconstructedPayloadSha256": "773b8f5c5acd2841703d3f2e2b6dba6fbe4ed224e59abb7914d6ede2dd7aff02"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.881784197001252e-16,
+              "meanAbs": 1.0122834283772993e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "ed627b6d0a31488972e0c34be243661f144e9f726a309c8c8e86736c16720020",
+              "reconstructedPayloadSha256": "64daa7ac33929f7be0f48a3ce200c6d4fc9e7781fad01dcbf944d9d2152ff784"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1336653837901167e-10,
+              "meanAbs": 3.6813715731430843e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "1681b713b24449d4c797caa9de6e417fa0db49fbb9453d4e3ce5f0713ac53eb9",
+              "reconstructedPayloadSha256": "9aee5087e21b6f2760f3a1303fbd9ffb99b6ce069ded3bcbdc9e79b11c83dab5"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0452150256412551e-10,
+              "meanAbs": 5.713022633094256e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "d50a0fcfca83ef706e8c2bbb355616753aaef60d24c391802adcd9236ea9b045",
+              "reconstructedPayloadSha256": "baf59650eb6f4caa0480c21feb1ae22b3e6d8985aa423e452e3d54c273733afc"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2595864351538921e-09,
+              "meanAbs": 3.39158592712483e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "5021fe0a44ee843805c95c3111230667895e6fd8518d6e51d5dd6d45dd823ea6",
+              "reconstructedPayloadSha256": "117564dfe50325661a8b1193c2dd98259f08b74e31e57d20ea96dbe1da524e9d"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_ektar_100__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.885780586188048e-16,
+              "meanAbs": 9.367506770274758e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "8c91d6dc9efcbdeb4d5cfa72c846a25dc82dee3cede7d29d033f562e4d632e2f",
+              "reconstructedPayloadSha256": "f90058e2f00015779e7fe073da4fabddce4ada1a64de9b9fdeecbffb6d0459ee"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.551115123125783e-16,
+              "meanAbs": 8.92659788679732e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "c44a735f171fd6e4df5dc63a9154f8e6ec164bdaa55943f21ff64d98f2171286",
+              "reconstructedPayloadSha256": "aaffe9abebe1f74d34e41f0a1ed0941a9d0fab00d0c0f78dc34ac7da4b2f6893"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1763390261876339e-10,
+              "meanAbs": 7.365014616696659e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "dfb5de0aab677256c5b663b03b7c9518c67a2f59a0be77394249c66d2ea98d90",
+              "reconstructedPayloadSha256": "bccdc47b1a10381505967b200eb6667e76072e938309f41204a36efa11f549de"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.001410065981645e-10,
+              "meanAbs": 6.86960141549342e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "63fef649dbb2e2aaeb4b47e24af2f279f303f5e6b1408ad7ba4744190ccde858",
+              "reconstructedPayloadSha256": "1b15d2926f30086a27bb0644634a1b60c174e70168cc749213d5e90b88d185cd"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.086303963448998e-09,
+              "meanAbs": 9.991113087322774e-11,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "ef73533eea235ae06f8ccc06a5c72889fd3b68da4a292b32d94b38da564b296c",
+              "reconstructedPayloadSha256": "4ad6f1a4812a76f951e92e36a003c5a036a0836e2f1a96391103fed22c37ca5a"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.771561172376096e-16,
+              "meanAbs": 2.9605947323337506e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "35028855434d99e0ef4c90f8f7304e6a230eb4277cac3f0eb49f7605009ee152",
+              "reconstructedPayloadSha256": "d5c287569c257979afe0ff78e53ff53766d37f7b2446be94b87f928759dac553"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 1.4802973661668753e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "d72069277e94d9381d12566af19600e588ad969fa2214e15ae124417294861d9",
+              "reconstructedPayloadSha256": "2c30991feecf48d52c523e21e57a8a354e10c01bfbde88696e056d0c8d132c79"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.695810655405921e-11,
+              "meanAbs": 3.274806352019747e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "1117b117530211a56f4b013c76fa98eb888f3f20e3f27254a6441134525776a8",
+              "reconstructedPayloadSha256": "64fba6b301f6e2beca50efcdd70b2ef4f59ab2bcccd1a7454774b603ec1f564a"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.50841333552188e-11,
+              "meanAbs": 3.2743354324201355e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "cd7e6d9f485333b683175d966727f4a61d975a4656d9c8d4ecd234d021ae6e80",
+              "reconstructedPayloadSha256": "452994fea5f6e2010e30b0f98147578da9914c07e36e3ccae6ac4842c59f29b6"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.1852714082726266e-10,
+              "meanAbs": 1.7995386893584117e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "2cf8e26bcc43fb92571662c109b87bb795bec2e0a140f1ea39f96eb30bad4c18",
+              "reconstructedPayloadSha256": "a072b70ec7a5886a13a626a56ab6bbe2b6ff6090b42e11f85dec014365b2fce9"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1102230246251565e-15,
+              "meanAbs": 1.28622517729197e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "7223857e7f9452c24764766d98e16f1d62a505045c1a3d64ce6153081c2fea2c",
+              "reconstructedPayloadSha256": "981dfd1b79f2c3d60d5d9930d4edd326ffad79ea55de4aa17fb7015ed285ae60"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.216449660063518e-16,
+              "meanAbs": 1.102633609417758e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "4834dc3311129140257ef193657795d70dc8ebf39038297a38a766ab274f703d",
+              "reconstructedPayloadSha256": "0f5b2f699a7387879d85323fb364da10be5ee8dca98ed95bbf1b0cd54905a3dc"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1250600451262471e-10,
+              "meanAbs": 3.7210475129950626e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "e678c8430cecc2858595eba19df42ccc94497bde42b08ee02ad435adb9749ab9",
+              "reconstructedPayloadSha256": "a51e0d8b9acc3c6d7312f284e185285919397d3e7928b4f9597ec0bc7243ecbb"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0497946956178339e-10,
+              "meanAbs": 5.570350665827275e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "95124d53d0042acc2ab42b846541ab6e86fe8860ed79ab66e754a5c817657e83",
+              "reconstructedPayloadSha256": "17e724f9267f7f6e4f79bd4c65fd5a5c868644e24278127cc8093bd3f1a6acb3"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1990290843533202e-09,
+              "meanAbs": 3.3389217744274856e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "9ff4e4f9ee0d73c8848a84b39ff65d6ee84e017706cb9d5cead34c909cc90d21",
+              "reconstructedPayloadSha256": "5dfc139ddc7fa56b9f7385baf256d2d118b1a422d7949cd588f82c93f0896609"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "kodak_ultramax_400__kodak_portra_endura": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 9.049474133012343e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "0a37463fda57081a778611a3bbc69f7ca70887d4b71d1cb0de94b670dce98320",
+              "reconstructedPayloadSha256": "b6d8fcc6ed8d351818310d4bfef72d002e6092d88df95aaa7aba9a1f492cbb5b"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.220446049250313e-16,
+              "meanAbs": 6.967805961840175e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "352dedc716b32d8f27aa06e2929d008aed821b088c19a028073fd7b7cc5d3608",
+              "reconstructedPayloadSha256": "ab6b96b4757491a0c9174e2bad7eb1217b58063a51eec552e606cbeb1a4c6046"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1419271084278648e-10,
+              "meanAbs": 7.16334281388592e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "e862042e1f20cf1e5a5b402a30819867f09ff335131918a5dc3ba6e93707c9b3",
+              "reconstructedPayloadSha256": "96bbbabc7fd63985ec2b9bdbedfd11e6cd92ac2998d999fbe26f10e503e77483"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0179446174873874e-10,
+              "meanAbs": 6.954401348772492e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "84c7bfd1d2f1e7b9b802dd6c08023a30806d4917c54e95afd7c2785a1528ad2b",
+              "reconstructedPayloadSha256": "5b79257ae543c78ff075ba6ddf4b95526d330e6b88208dde0206d9c3d039b76f"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0572939745934207e-09,
+              "meanAbs": 9.958522519346961e-11,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "fbf1699097636a55dea80b2aac782d6bf0093b5b65b8d0974d01b9ce5217af2e",
+              "reconstructedPayloadSha256": "2a2ba08b778094295ee429b9faa267b1050d294ef80440bdee3fd51477a7e39d"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.661338147750939e-16,
+              "meanAbs": 3.515706244646329e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "4a08ae393c58c1910c44230651b00da323a6b8320d76900a41e7ab2ff42c4d83",
+              "reconstructedPayloadSha256": "06f3591f49b166f2c37a127c042df122b2c487a010f488e7b786a50acddb33b9"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.7755575615628914e-16,
+              "meanAbs": 2.220446049250313e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "fe6c1eac7488edd67c08dff46ccbd2b11b7c324b24922ab9c21427962f22fc50",
+              "reconstructedPayloadSha256": "bca1b9d43cd4ce33b9b8f39488b8734eea4cb59731981d61ad1f70627d53ca02"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.3217099877686e-11,
+              "meanAbs": 3.7921684311233626e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "25761498b896d2b885716063f9f91f5ed8e7a039d0881c4b8086b30422d79b1d",
+              "reconstructedPayloadSha256": "2e3fef86c98db7bc0d0db96a103423b2e2561037874d484f582c16d75a7f4b95"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.619732539903112e-11,
+              "meanAbs": 4.188273801849126e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "bd3fa528b539f19e46bed762f3535d8d19898452c929f958614db8c7bc7c41ae",
+              "reconstructedPayloadSha256": "476668db2996d4bd2d3bea472e0b6c8ed399d8d0abb331c364b18c673044f94e"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.590034853255929e-10,
+              "meanAbs": 2.0839199810218645e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "bdf31c4a0658422d96dabc4c460791f85704bf487acdf17e33d32e078235941c",
+              "reconstructedPayloadSha256": "a733aa43b8011e5ce4540f8d749027e28d23297752ba9a1cc18b4d2149247296"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1102230246251565e-15,
+              "meanAbs": 1.3546880269753778e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "406baf49876b4f5bc2ee550f41b936070afba52d763d86d2376fe6cd032e815a",
+              "reconstructedPayloadSha256": "f015ef0a9712ceae6eb8678bf264813630eaddc472d0f55b217b71e18c76edfe"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.216449660063518e-16,
+              "meanAbs": 1.0834793710371808e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "3ccaba96eaf113f39818b1fb71dea902af74c5a2a316b371375d0ecec0bd984a",
+              "reconstructedPayloadSha256": "1e87411a473ab0f4ea190259a46929a93da40e4f9a84ae4bb0e1fd26c401e6ff"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1034551050670416e-10,
+              "meanAbs": 3.689069769799049e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "d4de3414e6ab722eff3153ce2a73d7b2bbdfe2b0522043f678c03cdde83fa43a",
+              "reconstructedPayloadSha256": "e915d44f4b6ede614fe5225ebbb3e7e18717cc879294c2ba48b8e31119d67ab6"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.0454326293540817e-10,
+              "meanAbs": 5.8131404926988393e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "c6e2d3a4209b4bda800487eb3d28f2a43e9476d12b4f743c9faa044df51fe3ad",
+              "reconstructedPayloadSha256": "cb25242aa27f545f143238395161aa8924094f0046e0b7c56b6edfe999890127"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2802433835279459e-09,
+              "meanAbs": 3.3579003217310693e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "7bddf9f4e6f879798d3da5a0686f14b726fd06c5646da9eb8599b5ba58bd235f",
+              "reconstructedPayloadSha256": "aa8a8a429e7657051361f9622c99a34c52546b0ca7be09176b7f39ea4cc000a0"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "fujifilm_c200__fujifilm_crystal_archive_typeii": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.885780586188048e-16,
+              "meanAbs": 9.222946480610024e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "3774cec0e36b5f40515ea99fc583449f8524c4490ead70768439d62eca2805b3",
+              "reconstructedPayloadSha256": "d502ac0691e3a40242584b93e14538c1bd015e33e1b8f407a3b1546508e34394"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.551115123125783e-16,
+              "meanAbs": 1.0928757898653885e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "6c4b6ef64f3828c3391dae03d20aeabe4700fdac947b77f10f32a1e438fa104a",
+              "reconstructedPayloadSha256": "576c1237c8ca7160153ebaf6d0b697f517c0d27f6d56aca61431417e03ceb5af"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3386142194704576e-10,
+              "meanAbs": 7.879106366191306e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "38b73551cbc71a224918674c19ae8d4b527f5ee3942b04f02c4376077aa55598",
+              "reconstructedPayloadSha256": "d50667cc0fe5c564b07d67f4a23f9459a3adf4ee311137c1443ea29b3821311d"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1236733765684903e-10,
+              "meanAbs": 7.07763979079327e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "5a78f092579287dfe441e13e5b1a678f646cfa9db95827c93dcef2962035d111",
+              "reconstructedPayloadSha256": "b328d1c1d7c992ae29a79d4d123d746a5f9876d20464c9e2870ed30c32004663"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3190493801384928e-09,
+              "meanAbs": 1.1322570189012855e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "9b6168a68978e8c19f35b0aaa6c37d2e92db033ca6906d70017d3ea13d8fc857",
+              "reconstructedPayloadSha256": "899c75218b38771920760d2bda8c2d7eb46cd9361db98e1640073372b326cf4a"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 2.0354088784794536e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "0a972d58ab32951265f5dab2c149f5fbe6296ec81830d87b9d99c74eea45257f",
+              "reconstructedPayloadSha256": "672a3d0b844f63cb577a5b63a70b5a8492ff43587f8b08d0e1a2e3fe040c09dd"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.220446049250313e-16,
+              "meanAbs": 1.1102230246251565e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "e7657558ff3453de1182d4019d39b06219cc788d316fcdb8282c1fefeb665ec1",
+              "reconstructedPayloadSha256": "cdd09b9becdaca2e34f94a2976063f4ca1b622568cb33ad4add43be36e453f91"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.4542789195104433e-10,
+              "meanAbs": 5.836490550118849e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "8a0824981bd67817c88f910c95d16967629e182bd7ac19c1fbf607c696015a76",
+              "reconstructedPayloadSha256": "d5dbf90b4605d3fbffbbe351a1f7e71ac6bf68204e5b88768ac1272e141d54be"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.4115599234496585e-11,
+              "meanAbs": 2.6806329147162817e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "32f99860d89e8b3bad8f327a3502766f38117ea404e178fe504adb6cf416c09e",
+              "reconstructedPayloadSha256": "53f722b250d76cded79f048fee4a0fe79bb1f448cae2e279093018bb32a2bf44"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.322411624649078e-10,
+              "meanAbs": 1.0734259892989743e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "5aaabcc57f2f3257abb6cf48c85b5d3cfc83f316ba71a39005386bfc0759acfc",
+              "reconstructedPayloadSha256": "c4799120ccdd397ae9efb594ad39abf279ddffeb39d7a98887695d16ca8fda98"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2212453270876722e-15,
+              "meanAbs": 1.340216469071538e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "d01264c60e777bd81565adbed1130645760dab41f68efe7ca97f756d857c0206",
+              "reconstructedPayloadSha256": "d774c52dc184cdecc3f828a71b99f2d147716189d54b175ad14bb413c2bc7fd2"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.771561172376096e-16,
+              "meanAbs": 1.2038258121830717e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "0087cdb42b20bcb5f88281b530a161e9fab70da1af4bb93a64f1cdbc7f59c988",
+              "reconstructedPayloadSha256": "3170043aeab1ca1a9b8b38c138c54afedf29027221961d1448fb0a0df9ba816f"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2958856210332215e-10,
+              "meanAbs": 3.864222696832652e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "56885ae503f284741cbc8a594063485e849297530f47d9d3c09e57e42816d367",
+              "reconstructedPayloadSha256": "8c9edccf5d0fe80c902f1c822cded9daa9f9b331b279e12684ba1a16b4d5970e"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.195062937497937e-10,
+              "meanAbs": 6.042492894930973e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "7337e08c2db81cbff07852efad8c9ea9c7a959e690869b901083c956138a6701",
+              "reconstructedPayloadSha256": "d95a595beaf7930195814bb3fa97cbd80e059876d6a390b499f2579092a341e1"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.8403302215475037e-09,
+              "meanAbs": 3.7599270186664994e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "0909c43edde10bdfc212a1bd3a16482939d8c6d0b88121920908c74c37bad00c",
+              "reconstructedPayloadSha256": "626eb0c0a8a13f1645262e89dc3530c0168a37845c2376baf28491b568c75a2c"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "fujifilm_xtra_400__fujifilm_crystal_archive_typeii": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 7.603871236365005e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "452bea5dccde242179e6efe90a6979512d2dec579d633a4607090b030433749f",
+              "reconstructedPayloadSha256": "d3da18eeae4625aa6c1d301ac3b4baf5f427a41cae91e3c1ff627a4959e1f38c"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.996003610813204e-16,
+              "meanAbs": 1.3241722533289627e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "8ed25ba2658e3d95c9781c74737e7e5a104977140d233d2a2cdc75f06b4a9abd",
+              "reconstructedPayloadSha256": "95cbc846d72c5b95f7daf00bdd7e6cfe2a3590a118b791c9e99d6659c288b09e"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.422789663863e-10,
+              "meanAbs": 8.215272357068686e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "09ad7a8b3f1af8fb2908bed1f8178a3096c15417de96154a5e3b9b1b38dedef3",
+              "reconstructedPayloadSha256": "b53fe4a040d7b64ecf65c407ab168da19b0c4909e611d64018b7ccb797845cf6"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.116539083412249e-10,
+              "meanAbs": 6.885106467885889e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "db6210a3588fbd67094b8c587c6919d43ed141b85003f0bd953ea601f8fdbb17",
+              "reconstructedPayloadSha256": "62974e9404e7a9ba050023eef3cf14e28bf17902c23213de7c548dda6e0cdd24"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.318200541777781e-09,
+              "meanAbs": 1.1609909315752713e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "61bf88d6ad7cf3332773b6ef6aa70615c67fb6e44f50f4d96e800194e5063a8e",
+              "reconstructedPayloadSha256": "59d15f0d2c2582d7aa6a03e321c135b8b205dc93d3307e3df45881f0dc5e0bb8"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.661338147750939e-16,
+              "meanAbs": 4.070817756958907e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "d6ac615a2718b426b4085b5fd9e9a7ba0e7a7226030d7e8bea3bb8cf5914f930",
+              "reconstructedPayloadSha256": "41b78f3d94a92ea853b8c473676866de0fe3c09e5a367a8f346d3194d09982dc"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 6.661338147750939e-16,
+              "meanAbs": 3.284409781182755e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "48059c09dfa592ba94698402858cdba5ded3a1ab057ee34ba3de35f280a4b169",
+              "reconstructedPayloadSha256": "3e223150157e7558b382a36978c7d6af6aaea9aa82ee1bd5f176dbfcc872897a"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.7771129012800202e-10,
+              "meanAbs": 6.827730973194927e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "85341bca5cd952fbd2c7f6f0cab6725aa2602ee7f989ce21bfe68c9013e51ae4",
+              "reconstructedPayloadSha256": "f8c622ef5ce8cd80212d6ec784711fec5624b7bfd0f12313dd841b2b23adc27f"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.6711521883271416e-11,
+              "meanAbs": 1.61073180256673e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "38bca6e66d25f50a0cea85fae5da18ff1e542902fdc82b21e48981f06fa69279",
+              "reconstructedPayloadSha256": "640c2cb2364a5a6a01130260be6dd56f5b12d0ac9307f69f8e90fe5471b0eb02"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3805573351177713e-10,
+              "meanAbs": 1.117803292057425e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "355ae377062b78b2410dce14a3dc60684894fa9cc15033168fdb7bcb5ba42003",
+              "reconstructedPayloadSha256": "3beb9b37a5bc45c202ccd94b44006ac9dc9f3fb09222b984394ed089bb00dff3"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2212453270876722e-15,
+              "meanAbs": 1.3286897623809857e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "fa9fda16bbf243ec1dbf17f2649ff6a1daa0473127153d7ba58e171008758684",
+              "reconstructedPayloadSha256": "7ec754fd483a129d64c6a8d17d1e6dfc97d4e76bb207943bf8dc966bda76a824"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.881784197001252e-16,
+              "meanAbs": 1.3280573111137026e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "8aa1db2b691ebad75bb7f20c380cb371375bc4f9bc17c57cd6888512b84e9eaf",
+              "reconstructedPayloadSha256": "698ec94593ee7762ab2f779cfdb4a501e7da3d59653a86f33d37965c2811c9b3"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.3728274073088187e-10,
+              "meanAbs": 3.934072606787026e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "8519c97f7b4824dc62a056c4033453d0cf95fb1c4f2277e354e8045e33d9a6ac",
+              "reconstructedPayloadSha256": "e2c54a6b391743bb9829ee10a6b575b854db69b0e2ce4bc41c32cc29c989e7a2"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1975376246198266e-10,
+              "meanAbs": 5.7780648628705474e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "36b687f2dac12bd0390407352a850910420463c15c65fda36216b42e02014406",
+              "reconstructedPayloadSha256": "0125b99d5db6c7357ab31e095b8c116e99895d78c8765d8cd35349b0585254bd"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 2.1805918737349828e-09,
+              "meanAbs": 3.9204645691686465e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "969ad6dc236d3c82c436fc6fb7f3f0551f974935af1099683b484442b3eb416f",
+              "reconstructedPayloadSha256": "d63e351d142de5a049cedc553672ede0f3569e9d6e84bbb5e92cdcf608b5ad9b"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    },
+    "fujifilm_pro_400h__fujifilm_crystal_archive_typeii": {
+      "cases": {
+        "gray_ramp_16": {
+          "input": {
+            "shape": [
+              16,
+              16,
+              3
+            ],
+            "payloadSha256": "0914711cc2c0a0beac9ec37b7c431d7312b3e9327a1a00c216c503c176fabe80"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 7.430398888767324e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "2b7c05b2ea1b1be56ebeb8a1a33c17f0ebc3260332d8818d963e4db4e2aed61a",
+              "reconstructedPayloadSha256": "19ab0e8acebf44fc8dc860f524d8077c0956218ebea3ae20f1e0d01babbb60aa"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.3306690738754696e-16,
+              "meanAbs": 8.326672684688674e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "3d7fedf18f7bbd3b9b4665416b9a327d28b0c83d1fac6f7545aa125d6afb7002",
+              "reconstructedPayloadSha256": "890cd9fb3f654063ead2c0d61d3f331fea9394b20b68cb57579e08d782e06cc2"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1552137024750664e-10,
+              "meanAbs": 7.201560167068484e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "20c700421f19303a41785908a345592dd21a1555ee0e6da62da453071548551b",
+              "reconstructedPayloadSha256": "8632974fa85db91de80ba19c9505dbc8f8b9aeaa1c74f0400c49d278145624ab"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1515000064576952e-10,
+              "meanAbs": 7.655698138509896e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "36b6b7596132387fa80c9e1a73214ccc8b236f5ad2518afe2a757097dd43ce17",
+              "reconstructedPayloadSha256": "f975461b200f4c932f094e48b7ebaf27e5e5e6516d333f0524f1163fa4e06750"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.321632758094493e-09,
+              "meanAbs": 1.1119007530385287e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 768,
+              "upstreamPayloadSha256": "09a0d5e1c4ee16e6394b86fc7c7d96e81b5966e16b4c30677a288ebf69b31464",
+              "reconstructedPayloadSha256": "476f45c5f44a58f4bcdac4a02d74dc522382eaada5819247ea46051318ff5253"
+            }
+          }
+        },
+        "green_patch_8": {
+          "input": {
+            "shape": [
+              8,
+              8,
+              3
+            ],
+            "payloadSha256": "1c2e5dc1fda360c736698013cdb802a59b1c2cac63f9a97d47ff4fd45cd73055"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 4.440892098500626e-16,
+              "meanAbs": 2.7755575615628914e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "e2978310593b9f8b1c65e5b38470c3e2b4c0f7b80d747763c9326d65d1699d55",
+              "reconstructedPayloadSha256": "59d89c7ffc8bd7278206de4bdf6e01a0a66b71e595f692d29f5e96d155031483"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 3.885780586188048e-16,
+              "meanAbs": 2.0354088784794536e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "9a2320a9953cba5622f8fd3ef08940eaafe7d0bbc4ae49cad64c9c64ef859fc0",
+              "reconstructedPayloadSha256": "f2e63c8a9aa4536a9a335da1356ed1787d7accba8801b505e4feefc012c0ed4b"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1005907296635087e-10,
+              "meanAbs": 4.440877295526965e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "ed6d71eb97d0d13631ccb68276e11e4ae652869e0872a0e148f8f88f62e10701",
+              "reconstructedPayloadSha256": "3cb5601e0a87bfc5e06bb99048ed3cf95ed2541d8a71a1000e6dc6609dd3ea25"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 5.664280156025825e-11,
+              "meanAbs": 2.4234133218688687e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "dacb6e90b27433cd2b0a8e400b31f3aa4db45a850cd1de35b974a9fa1a4ff522",
+              "reconstructedPayloadSha256": "9fe3b28ab3255abf8a3fdeff7c5828cdb5ff0a89a16f3f6164844c558628bc93"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.4512246959696995e-10,
+              "meanAbs": 1.1256189788126185e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 192,
+              "upstreamPayloadSha256": "12ab9986ef1b6a5b629b2a933c583c377b231501424c7cbf6da84d8f70353285",
+              "reconstructedPayloadSha256": "91c02db029dae753f8b2473472b68e58a819809536e9b5da6f9cc44bd2f3359e"
+            }
+          }
+        },
+        "synthetic_srgb64": {
+          "input": {
+            "shape": [
+              64,
+              64,
+              3
+            ],
+            "payloadSha256": "e1c2280313c669195822b3688afae5b1de0ff95350c09acbd881e37b8564a1a1"
+          },
+          "stages": {
+            "filmRaw": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 8.881784197001252e-16,
+              "meanAbs": 1.2694200436184447e-16,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "b69fc280df4c064826ac3289301d9059ef4bfb0ecde46aac3b59de56adbfe3fe",
+              "reconstructedPayloadSha256": "6b19b2d7720f7770a71df19d94710cad7571f8ca9ed2d3244eb995042dd863b9"
+            },
+            "negativeDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 7.771561172376096e-16,
+              "meanAbs": 9.533751103389203e-17,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "0c10a120bce784a889a3bc9c4188888a791cd0482ee0e415c63c7cea6a52ccc6",
+              "reconstructedPayloadSha256": "c0cde9ee26710e5cbf2348a408d15fdb408a8cbca57ff404f413b43c61eb5997"
+            },
+            "paperLogExposure": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.1209849715143605e-10,
+              "meanAbs": 3.673156890185422e-11,
+              "atol": 2e-08,
+              "rtol": 2e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "215f9acefc1f32262c0b6dc82ba8c01fa8ad6cb642e373ddd27f5189639da463",
+              "reconstructedPayloadSha256": "84a76d35d9e6657bf3bed0a3c615f367bc4d0a7dde71dc7e1e1f390a982fc6cf"
+            },
+            "paperDensity": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.2004652827357631e-10,
+              "meanAbs": 6.290388645443605e-11,
+              "atol": 5e-08,
+              "rtol": 5e-09,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "1951ebacc1f1edcd6e48a600bd9161df88d2c03d854cf9a8b08705d093a3ae45",
+              "reconstructedPayloadSha256": "88cd734c4338856c318ee5714e01f6f5fc67e2278b24a84294b9873979625044"
+            },
+            "printRgb": {
+              "passes": true,
+              "violations": 0,
+              "maxAbs": 1.5975949452240457e-09,
+              "meanAbs": 3.5554231345433115e-10,
+              "atol": 1e-07,
+              "rtol": 1e-08,
+              "elementCount": 12288,
+              "upstreamPayloadSha256": "e99a55fc9fc87b450abe5ac9a023127d3e3727c3403e6a6ad3cfa84a4932c756",
+              "reconstructedPayloadSha256": "d6c616f1745843a1a48808c65ae0df5dc719ecdb5076f4d57686b7fec22e0818"
+            }
+          }
+        }
+      },
+      "tolerances": {
+        "filmRaw": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "negativeDensity": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperLogExposure": {
+          "atol": 2e-08,
+          "rtol": 2e-09
+        },
+        "paperDensity": {
+          "atol": 5e-08,
+          "rtol": 5e-09
+        },
+        "printRgb": {
+          "atol": 1e-07,
+          "rtol": 1e-08
+        }
+      },
+      "passes": true,
+      "scope": "Exported-array reconstruction compared with independently executed pinned upstream stages; not a TypeScript/GPU/native-effects comparison."
+    }
+  },
+  "compatibility": {
+    "kodak_portra_400__kodak_portra_endura": {
+      "resourceSha256": "16f6217f8f1fa81c7064d5926f3ab4344f088a18520fd71e260c80fbbe5febd5",
+      "identicalLegacyArrayPayloads": {
+        "filmTcLut": {
+          "oldPayloadSha256": "04c7f09ca59f981690babafeced7db66c4b3fb6ec66d17e87d3f61afb9ed4e69",
+          "newPayloadSha256": "04c7f09ca59f981690babafeced7db66c4b3fb6ec66d17e87d3f61afb9ed4e69",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 110592
+        },
+        "filmLogExposure": {
+          "oldPayloadSha256": "ad182a301d03b3792eb723d1f41df89c2c8574a71cf75cad5057d8f0ee6b63f8",
+          "newPayloadSha256": "ad182a301d03b3792eb723d1f41df89c2c8574a71cf75cad5057d8f0ee6b63f8",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 256
+        },
+        "filmNormalizedCurves": {
+          "oldPayloadSha256": "d9d136e8f969e8842addfb95ab6884b303cf0a681106c98990000e6c18e5625a",
+          "newPayloadSha256": "d9d136e8f969e8842addfb95ab6884b303cf0a681106c98990000e6c18e5625a",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 768
+        },
+        "filmRawCurves": {
+          "oldPayloadSha256": "cde56132253bcc03627652b7eef49e19c314e37312d5f43a2c19a2dad0d0a78d",
+          "newPayloadSha256": "cde56132253bcc03627652b7eef49e19c314e37312d5f43a2c19a2dad0d0a78d",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 768
+        },
+        "filmDirCurves": {
+          "oldPayloadSha256": "e37e0229da9cd27b9a44aca8ff7f332a22c9a277ea114c4fa0d049ff858ba710",
+          "newPayloadSha256": "e37e0229da9cd27b9a44aca8ff7f332a22c9a277ea114c4fa0d049ff858ba710",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 768
+        },
+        "filmDirMatrix": {
+          "oldPayloadSha256": "6d8d0e3681e38507f3338f6e5367b3fed8327454e20dbba07c4ff7d709808e4a",
+          "newPayloadSha256": "6d8d0e3681e38507f3338f6e5367b3fed8327454e20dbba07c4ff7d709808e4a",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "filmLogSensitivity": {
+          "oldPayloadSha256": "de0c9b1572b9ebd33c82ad3c5668d13ae2b8abdc45068530a09b481abead5798",
+          "newPayloadSha256": "de0c9b1572b9ebd33c82ad3c5668d13ae2b8abdc45068530a09b481abead5798",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 243
+        },
+        "filmChannelDensity": {
+          "oldPayloadSha256": "fa0b1f0024f2fd2e21f2d18e6fcfc16995b469788d38af1df2f7c19be4bb1dd4",
+          "newPayloadSha256": "fa0b1f0024f2fd2e21f2d18e6fcfc16995b469788d38af1df2f7c19be4bb1dd4",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 243
+        },
+        "filmBaseDensity": {
+          "oldPayloadSha256": "31a613782a62c92f3db756e44fcfa857bc4ffc72f366f2ca49e3f8564f1a0296",
+          "newPayloadSha256": "31a613782a62c92f3db756e44fcfa857bc4ffc72f366f2ca49e3f8564f1a0296",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "filmSpectralValidMask": {
+          "oldPayloadSha256": "75061b7c55509eaf6e62fa1787743682a25dce699c751d35b65f387402e02225",
+          "newPayloadSha256": "75061b7c55509eaf6e62fa1787743682a25dce699c751d35b65f387402e02225",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "paperSpectralValidMask": {
+          "oldPayloadSha256": "ee33eff665f50e6869030d0c689a3b56f96c4eed4fe737de523d8392fc85695a",
+          "newPayloadSha256": "ee33eff665f50e6869030d0c689a3b56f96c4eed4fe737de523d8392fc85695a",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "paperLogExposure": {
+          "oldPayloadSha256": "ad182a301d03b3792eb723d1f41df89c2c8574a71cf75cad5057d8f0ee6b63f8",
+          "newPayloadSha256": "ad182a301d03b3792eb723d1f41df89c2c8574a71cf75cad5057d8f0ee6b63f8",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 256
+        },
+        "paperFittedCurves": {
+          "oldPayloadSha256": "7774448a905dc2655065b9d5813f861419549193cd0f31446a8b58c4f15fb078",
+          "newPayloadSha256": "7774448a905dc2655065b9d5813f861419549193cd0f31446a8b58c4f15fb078",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 768
+        },
+        "paperLogSensitivity": {
+          "oldPayloadSha256": "3886832052bba596f8a7f8627ae08df524aa29ec12d5e92df6017990b2d940b2",
+          "newPayloadSha256": "3886832052bba596f8a7f8627ae08df524aa29ec12d5e92df6017990b2d940b2",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 243
+        },
+        "paperChannelDensity": {
+          "oldPayloadSha256": "460144332d24dac5a3c0487422f070cb6c349e98b3d22ea925116efba96e9047",
+          "newPayloadSha256": "460144332d24dac5a3c0487422f070cb6c349e98b3d22ea925116efba96e9047",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 243
+        },
+        "paperBaseDensity": {
+          "oldPayloadSha256": "b8efea46f62e4797f1018c519eaa95c133bad6f202830e2cdb6cc34187928176",
+          "newPayloadSha256": "b8efea46f62e4797f1018c519eaa95c133bad6f202830e2cdb6cc34187928176",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "filteredEnlarger": {
+          "oldPayloadSha256": "4e75ba208aeed81c2779094746e5026da3e292d177ce2e31011f4e4653269efd",
+          "newPayloadSha256": "4e75ba208aeed81c2779094746e5026da3e292d177ce2e31011f4e4653269efd",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "d50": {
+          "oldPayloadSha256": "b24e8ea8b571ab24356630cf068c521900c822af09f3d2378b3de49c1592aa21",
+          "newPayloadSha256": "b24e8ea8b571ab24356630cf068c521900c822af09f3d2378b3de49c1592aa21",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 81
+        },
+        "cmfs": {
+          "oldPayloadSha256": "67353d5763477a0c39ea061f37b46c4c7bfc768f963aebd151ec0830f62903a1",
+          "newPayloadSha256": "67353d5763477a0c39ea061f37b46c4c7bfc768f963aebd151ec0830f62903a1",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 243
+        },
+        "proPhotoToXyzD55Cat16": {
+          "oldPayloadSha256": "2dc8342a8bd63defc81c381b52f6857a2c72a3ba676ed5a3117fca42ff0679a8",
+          "newPayloadSha256": "2dc8342a8bd63defc81c381b52f6857a2c72a3ba676ed5a3117fca42ff0679a8",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "xyzD50ToSrgbCat02": {
+          "oldPayloadSha256": "8f0fb4d48ac8855f8e973a91ccb6bf82a303ea72a97b8dd54230fc04839beecf",
+          "newPayloadSha256": "0a4b9889954d6cfa62a47f6ee02708e623526ce752886433408f8f1aaf791c76",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 8.881784197001252e-16,
+          "meanAbs": 2.444032630598435e-16,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "srgbToProPhoto": {
+          "oldPayloadSha256": "f1446aa50b81fafb71f87d41885d0b95fd99fab1f9e0040a38d10865a9ba64ac",
+          "newPayloadSha256": "f1446aa50b81fafb71f87d41885d0b95fd99fab1f9e0040a38d10865a9ba64ac",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "srgbToXyz": {
+          "oldPayloadSha256": "eafcecbd45bf2075fc36e8a0f38ca71f4937c3e5b91470984b3341bc325aa1a8",
+          "newPayloadSha256": "eafcecbd45bf2075fc36e8a0f38ca71f4937c3e5b91470984b3341bc325aa1a8",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "xyzToSrgb": {
+          "oldPayloadSha256": "1a00864a6f181eed7a5eafe9bb66ea43b9e4ee5f1e8df883fdedbdd9ab99de8f",
+          "newPayloadSha256": "1a00864a6f181eed7a5eafe9bb66ea43b9e4ee5f1e8df883fdedbdd9ab99de8f",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "xyzWhiteSrgb": {
+          "oldPayloadSha256": "cc35b94b74fa6d51c8bbe1061e0c0f0023d31bb2b43cd2e6e7c627d14d4d35be",
+          "newPayloadSha256": "cc35b94b74fa6d51c8bbe1061e0c0f0023d31bb2b43cd2e6e7c627d14d4d35be",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 3
+        },
+        "cam16LGrid": {
+          "oldPayloadSha256": "cb9ec363b64777de162a0086c030fe145d472fe661185e0dadcad2ab5ea30ae9",
+          "newPayloadSha256": "cb9ec363b64777de162a0086c030fe145d472fe661185e0dadcad2ab5ea30ae9",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 64
+        },
+        "cam16HGrid": {
+          "oldPayloadSha256": "bb810d8557abddac869b12daa15e7381226e771fa76a630be38ec46f28f0fbbb",
+          "newPayloadSha256": "bb810d8557abddac869b12daa15e7381226e771fa76a630be38ec46f28f0fbbb",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 720
+        },
+        "cam16Cmax": {
+          "oldPayloadSha256": "df537e9b50c3a7b4bed54a26d5b7dd190701716e985b444a04df805752cd5cac",
+          "newPayloadSha256": "df537e9b50c3a7b4bed54a26d5b7dd190701716e985b444a04df805752cd5cac",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 46080
+        },
+        "oklabXyzToLms": {
+          "oldPayloadSha256": "880e3d7346d3658038bcb62b4fdc5e70186fce2e97eaa988f30165421aee0971",
+          "newPayloadSha256": "880e3d7346d3658038bcb62b4fdc5e70186fce2e97eaa988f30165421aee0971",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "oklabLmsToXyz": {
+          "oldPayloadSha256": "2cd3f9971b8efff849497a551236ceea9187ead0c6c6bc7676983cc3104f7ff8",
+          "newPayloadSha256": "2cd3f9971b8efff849497a551236ceea9187ead0c6c6bc7676983cc3104f7ff8",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "oklabLmsToLab": {
+          "oldPayloadSha256": "da94092dda9defb070ecf6b986d69d4883ab4eeb2ec890ffccb2fa379798f2e3",
+          "newPayloadSha256": "da94092dda9defb070ecf6b986d69d4883ab4eeb2ec890ffccb2fa379798f2e3",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        },
+        "oklabLabToLms": {
+          "oldPayloadSha256": "5fa1eeb06921989a1b1031e9f748765da15dc8732513b3d938d805c99f71c41c",
+          "newPayloadSha256": "5fa1eeb06921989a1b1031e9f748765da15dc8732513b3d938d805c99f71c41c",
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 0.0,
+          "meanAbs": 0.0,
+          "atol": 1e-12,
+          "rtol": 1e-12,
+          "elementCount": 9
+        }
+      },
+      "baselines": {
+        "film_raw_portra_endura_gray_ramp16": {
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 5.551115123125783e-16,
+          "meanAbs": 1.7621899310131065e-16,
+          "atol": 1e-06,
+          "rtol": 0.0015,
+          "elementCount": 768,
+          "npzSha256": "8e7a7f72f3b14ce5cb473ff11fa5f1058a6a8e26054facaec1a0957ae17214fc",
+          "outputPayloadSha256": "b87f94120e376277a206962ad2c312446423c02b99a4cdea92f38d2cd80e55ff",
+          "historicalExpectedPass": true
+        },
+        "negative_density_portra_endura_gray_ramp16": {
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 6.661338147750939e-16,
+          "meanAbs": 1.6017280094852518e-16,
+          "atol": 1e-06,
+          "rtol": 0.0015,
+          "elementCount": 768,
+          "npzSha256": "05b3e914e9b24c0743a4042841379157ae4ed8752726fe55e027e6de786fd124",
+          "outputPayloadSha256": "4982e183186191ab89fbf03d6c7cc78d4e397fd0e296aebf2a1ec74fd0915d72",
+          "historicalExpectedPass": true
+        },
+        "print_rgb_portra_endura_gray_ramp16": {
+          "passes": false,
+          "violations": 48,
+          "maxAbs": 0.007130636018971126,
+          "meanAbs": 0.0004400957459287584,
+          "atol": 1e-06,
+          "rtol": 0.0015,
+          "elementCount": 768,
+          "npzSha256": "4345814abe4c516618963c186a5c3f019eae01c7eec0654c25e0b93fff604311",
+          "outputPayloadSha256": "bcb82e8d714be8d62e21c3727e123c016a4c0fc3853b495153a6619bc91d5f8d",
+          "historicalExpectedPass": false
+        },
+        "print_rgb_portra_endura_green_patch8": {
+          "passes": true,
+          "violations": 0,
+          "maxAbs": 3.247402347028583e-15,
+          "meanAbs": 1.4525417905512465e-15,
+          "atol": 1e-06,
+          "rtol": 0.0015,
+          "elementCount": 192,
+          "npzSha256": "a115fdebed2347f3106e6ec17e38fd3e3dd82721880b892507601595576b4399",
+          "outputPayloadSha256": "e1737ef99db2897fe69cc9f8704af7d348ebfca80997e49575d2be7d016fc961",
+          "historicalExpectedPass": true
+        }
+      },
+      "historicalLimitation": "The committed gray print-RGB baseline retains 48 darkest-column violations under current upstream OkLch; no baseline was regenerated or hidden."
+    }
+  },
+  "limitations": [
+    "Only D55-referenced still color negatives printed to D50-viewed Portra Endura or Fuji Crystal Archive Type II are covered.",
+    "Grain, halation/scatter, spatial DIR diffusion, glare, lens/scanner blur and unsharp mask are disabled. Full native SpektraFilm/SpektraLab effects parity is not claimed.",
+    "Fixtures compare exported-array numerical reconstruction with pinned upstream float64 stages. They do not establish TypeScript, WebGL, FilmFrame UI, template, browser or export parity.",
+    "Portra 400's historical darkest-column gray print-RGB discrepancy remains explicitly recorded; current controlled upstream fixtures are distinct from that historical baseline.",
+    "Hanatos irradiance and measured KG3 redistribution remain unresolved. Profile/table attribution does not grant public distribution clearance; the global manifest was not modified.",
+    "X-Tra 400 is a distinct stock, not a Superia 400 substitute. Missing exact stocks, B&W, slide films and exact CineStill halation remain outside this rollout."
+  ],
+  "licensing": {
+    "code": "Derived numeric exporter: GPL-3.0-or-later; spektrafilm by Andrea Volpato.",
+    "profilesAndDerivatives": "CC BY-SA 4.0, Andrea Volpato; source, license URL and modification notices retained.",
+    "colourScience": "colour-science 0.4.6, BSD-3-Clause.",
+    "distribution": "BLOCKED pending Hanatos/KG3 provenance and the separate global FilmFrame asset/license review."
+  },
+  "nextSteps": {
+    "runtime": "A separately owned typed registry/resource decoder must validate these generated shapes/digests before use; runtime registration and browser checks are not performed here.",
+    "vision3": "Deferred. Generalize K75P viewing and D55/T reference transforms, exact Kodak 2383 paper arrays/filter pairs, then independently export and validate each Vision3 pair before any registration."
+  }
+}

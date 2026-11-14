@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Review browser behavior and quality gates"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Review async state and ownership repairs"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review tests, Worker and rendering lifecycle"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Review spectral identities and CPU/GPU contracts"}
+{"file":".trellis/spec/backend/access-control.md","reason":"Review access/security invariants"}
+{"file":".trellis/spec/backend/release-process.md","reason":"Review operations behavior without publication"}
+{"file":".trellis/spec/guides/index.md","reason":"Verify reported findings against actual call paths"}
+{"file":".trellis/tasks/11-14-project-quality-audit/prd.md","reason":"Check fixed and open items separately"}

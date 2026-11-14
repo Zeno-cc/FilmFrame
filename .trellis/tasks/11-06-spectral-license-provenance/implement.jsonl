@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load frontend quality requirements for notices, docs and any validation script changes."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Place provenance tooling outside runtime public assets and follow established project organization."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve local-only privacy and testable release/asset contracts."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/implementation-contract.md","reason":"Apply the user's GPL/CC decision while retaining release-blocking asset and spectral-data review."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md","reason":"Verify source/profile/spectral-data license distinctions and required attribution/changelog obligations."}
+{"file":".trellis/tasks/11-06-integrate-spektralab-negative/research/spektralab-film-edge-and-licensing.md","reason":"Inventory existing FilmFrame assets and exclude unresolved SpektraLab artwork/fonts/trademarks."}

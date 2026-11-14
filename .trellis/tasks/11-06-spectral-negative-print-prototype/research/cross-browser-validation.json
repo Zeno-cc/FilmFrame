@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "date": "2026-11-06",
+  "scope": "Focused synthetic numeric checks at gray-ramp16 and green-patch8. No 1080p benchmark or production UI claim.",
+  "configuration": "Portra 400 -> Portra Endura, Float32Array, exact two 81-wavelength integrals, OkLch output, no GPU/WASM/grain/templates",
+  "results": [
+    {
+      "browser": "firefox",
+      "status": "passed",
+      "platform": "darwin",
+      "arch": "arm64",
+      "externalRequests": [],
+      "consoleErrors": [],
+      "browserVersion": "151.0",
+      "result": {
+        "gray": {
+          "filmRawMaxAbs": 3.5519862606747665e-8,
+          "negativeDensityMaxAbs": 8.566081177718843e-9,
+          "printRgbMaxAbs": 0.000010200531536774804,
+          "printRgbMeanAbs": 0.000005674921754998212,
+          "violations": 0
+        },
+        "green": {
+          "maxAbs": 0.000012954305936896393,
+          "meanAbs": 0.000008714592787564349,
+          "violations": 0
+        },
+        "renderMs": 15,
+        "finite": true
+      }
+    },
+    {
+      "browser": "webkit",
+      "status": "passed",
+      "platform": "darwin",
+      "arch": "arm64",
+      "externalRequests": [],
+      "consoleErrors": [],
+      "browserVersion": "26.5",
+      "result": {
+        "gray": {
+          "filmRawMaxAbs": 3.5519862606747665e-8,
+          "negativeDensityMaxAbs": 8.566081177718843e-9,
+          "printRgbMaxAbs": 0.000010200531536774804,
+          "printRgbMeanAbs": 0.000005674921754998212,
+          "violations": 0
+        },
+        "green": {
+          "maxAbs": 0.000012954305936896393,
+          "meanAbs": 0.000008714592787564349,
+          "violations": 0
+        },
+        "renderMs": 20,
+        "finite": true
+      }
+    }
+  ]
+}
