@@ -1,4 +1,6 @@
 import { expect, test, type Request } from '@playwright/test';
+import { getRecipeInspector, selectRecipeControl } from './recipeControls';
+import { isDocumentedPublicGalleryRequest } from './publicRequests';
 
 // 32px static RGB fixture encoded with libheif/heif-enc for portable decoder coverage.
 const STATIC_HEIC = Buffer.from(
@@ -16,6 +18,7 @@ test('a static HEIC still converts locally, previews, and develops', async ({ pa
   const externalRequests: string[] = [];
   const unexpectedMutations: string[] = [];
   page.on('request', request => {
+    if (isDocumentedPublicGalleryRequest(request)) return;
     const url = new URL(request.url());
     if (['http:', 'https:'].includes(url.protocol) && url.origin !== applicationOrigin) {
       externalRequests.push(request.url());
@@ -39,9 +42,7 @@ test('a static HEIC still converts locally, previews, and develops', async ({ pa
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  const inspector = getRecipeInspector(page);
   const fileInput = page.locator('input[type="file"]');
   await expect(fileInput).toHaveAttribute(
     'accept',
@@ -55,6 +56,8 @@ test('a static HEIC still converts locally, previews, and develops', async ({ pa
   await expect(page.getByRole('img', { name: 'portable-static.heic' })).toBeVisible({
     timeout: 30_000,
   });
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await selectRecipeControl(page, '成像方式', 'legacy');
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(1, {
     timeout: 30_000,

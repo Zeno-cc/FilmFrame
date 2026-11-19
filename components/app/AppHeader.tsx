@@ -1,5 +1,5 @@
 import type { OutputMode } from '../../types';
-import { DownloadIcon, SettingsIcon, UploadIcon } from '../icons/FilmFrameIcons';
+import { SettingsIcon } from '../icons/FilmFrameIcons';
 import { FilmLogoIcon } from './FilmFrameAppIcons';
 import { MoreMenu } from './MoreMenu';
 import { SessionMeter } from './SessionMeter';
@@ -8,13 +8,11 @@ export interface AppHeaderProps {
   imageCount: number;
   processedCount?: number;
   outputMode?: OutputMode;
-  hasDownloadableResult?: boolean;
+  hasPhotos?: boolean;
   processing?: boolean;
   exporting?: boolean;
   busyLabel?: string;
   settingsOpen?: boolean;
-  onAddPhotos: () => void;
-  onExport: () => void;
   onOpenSettings: (trigger?: HTMLButtonElement) => void;
   onReset: () => void;
   onOpenSupport: () => void;
@@ -28,13 +26,11 @@ export function AppHeader({
   imageCount,
   processedCount = 0,
   outputMode = 'single',
-  hasDownloadableResult = false,
+  hasPhotos = imageCount > 0,
   processing = false,
   exporting = false,
   busyLabel,
   settingsOpen = false,
-  onAddPhotos,
-  onExport,
   onOpenSettings,
   onReset,
   onOpenSupport,
@@ -68,36 +64,19 @@ export function AppHeader({
         </div>
 
         <div className="hidden items-center gap-2 min-[768px]:flex">
-          <button
-            type="button"
-            onClick={onAddPhotos}
-            disabled={controlsDisabled}
-            className="ff-header-control inline-flex min-h-11 items-center gap-2 px-3.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <UploadIcon />
-            添加照片
-          </button>
-          {hasDownloadableResult && (
+          {hasPhotos && (
             <button
               type="button"
-              onClick={onExport}
-              disabled={controlsDisabled}
-              className="ff-header-control ff-header-control--primary inline-flex min-h-11 items-center gap-2 px-3.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={event => onOpenSettings(event.currentTarget)}
+              aria-label="打开调整"
+              aria-expanded={settingsOpen}
+              aria-controls="mobile-settings-sheet"
+              className="ff-header-control inline-flex min-h-11 items-center gap-2 px-3 text-sm text-[var(--ff-paper-muted)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[1180px]:hidden"
             >
-              <DownloadIcon />
-              {exporting ? '正在导出' : '导出成片'}
+              <SettingsIcon />
+              调整
             </button>
           )}
-          <button
-            type="button"
-            onClick={event => onOpenSettings(event.currentTarget)}
-            aria-expanded={settingsOpen}
-            aria-controls="mobile-settings-sheet"
-            className="ff-header-control inline-flex min-h-11 items-center gap-2 px-3 text-sm text-[var(--ff-paper-muted)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[1180px]:hidden"
-          >
-            <SettingsIcon />
-            配方
-          </button>
           <MoreMenu
             onReset={onReset}
             onOpenSupport={onOpenSupport}
@@ -108,17 +87,19 @@ export function AppHeader({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={event => onOpenSettings(event.currentTarget)}
-          aria-label="打开暗房配方"
-          title="暗房配方"
-          aria-expanded={settingsOpen}
-          aria-controls="mobile-settings-sheet"
-          className="ff-header-control inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[768px]:hidden"
-        >
-          <SettingsIcon />
-        </button>
+        {hasPhotos && (
+          <button
+            type="button"
+            onClick={event => onOpenSettings(event.currentTarget)}
+            aria-label="打开调整"
+            title="调整"
+            aria-expanded={settingsOpen}
+            aria-controls="mobile-settings-sheet"
+            className="ff-header-control inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] min-[768px]:hidden"
+          >
+            <SettingsIcon />
+          </button>
+        )}
       </div>
     </header>
   );

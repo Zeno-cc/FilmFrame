@@ -35,39 +35,9 @@ body {
   position: relative;
 }
 
-/* Global grain — fixed, non-interactive, content stays brighter */
-body::before {
-  background-image: var(--ff-noise-tile);
-  background-repeat: repeat;
-  background-size: 180px 180px;
-  content: "";
-  inset: 0;
-  opacity: var(--ff-grain-opacity);
-  pointer-events: none;
-  position: fixed;
-  z-index: 50;
-}
-
-/* Warm vignette — lamp-edge falloff */
+body::before,
 body::after {
-  background:
-    radial-gradient(
-      ellipse 78% 70% at 50% 42%,
-      transparent 42%,
-      rgba(0, 0, 0, calc(var(--ff-vignette-strength) * 0.42)) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.18) 0%,
-      transparent 14%,
-      transparent 78%,
-      rgba(0, 0, 0, 0.28) 100%
-    );
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: fixed;
-  z-index: 49;
+  content: none;
 }
 
 button,

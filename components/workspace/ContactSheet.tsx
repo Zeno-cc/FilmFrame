@@ -55,8 +55,9 @@ export function ContactSheet({
 }: ContactSheetProps) {
   return (
     <ol
-      className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5 2xl:grid-cols-4 ${className}`}
-      aria-label={`接触印象，共 ${items.length} 张照片`}
+      className={`ff-contact-sheet grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5 2xl:grid-cols-4 ${className}`}
+      data-layout={items.length === 1 ? 'focus' : 'index'}
+      aria-label={`照片列表，共 ${items.length} 张照片`}
     >
       {items.map(view => (
         <li key={view.item.id} className="min-w-0">

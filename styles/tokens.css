@@ -1,51 +1,58 @@
+@font-face {
+  font-family: "FilmFrame Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/filmframe-display.woff") format("woff");
+}
+
 :root {
   color-scheme: dark;
 
-  --ff-bg-deep: #090807;
-  --ff-bg: #100e0b;
-  --ff-panel: #17140f;
-  --ff-panel-raised: #1f1b14;
-  --ff-panel-soft: #262117;
+  --ff-bg-deep: #101719;
+  --ff-bg: #171d20;
+  --ff-panel: #20292d;
+  --ff-panel-raised: #273237;
+  --ff-panel-soft: #303d42;
 
-  --ff-line: #403628;
-  --ff-line-soft: #2c261c;
-  --ff-line-strong: #6a5740;
+  --ff-line: #53676e;
+  --ff-line-soft: #35464c;
+  --ff-line-strong: #8ba3a9;
 
-  --ff-paper: #f2ead7;
-  --ff-paper-muted: #b7ac95;
-  --ff-paper-dim: #8a7f6c;
-  --ff-ink: #17130e;
+  --ff-paper: #e8e7df;
+  --ff-paper-muted: #b1bdbd;
+  --ff-paper-dim: #97a9ac;
+  --ff-ink: #1c2426;
 
-  --ff-amber: #d89a2b;
-  --ff-amber-hover: #eeb040;
-  --ff-amber-soft: rgba(216, 154, 43, 0.14);
-  --ff-amber-line: rgba(216, 154, 43, 0.56);
-  --ff-safelight: #8c312b;
-  --ff-safelight-soft: rgba(140, 49, 43, 0.16);
-  --ff-safelight-line: rgba(140, 49, 43, 0.7);
-  --ff-safelight-text: #df8a7f;
+  --ff-amber: #ed9b52;
+  --ff-amber-hover: #f4af6d;
+  --ff-amber-soft: rgba(237, 155, 82, 0.14);
+  --ff-amber-line: rgba(237, 155, 82, 0.65);
+  --ff-safelight: #a55247;
+  --ff-safelight-soft: rgba(165, 82, 71, 0.16);
+  --ff-safelight-line: rgba(197, 111, 97, 0.75);
+  --ff-safelight-text: #e6a296;
 
-  --ff-success: #7b8f6b;
-  --ff-success-text: #b9cba8;
-  --ff-success-soft: rgba(123, 143, 107, 0.14);
-  --ff-success-line: rgba(123, 143, 107, 0.58);
-  --ff-warning: #c18331;
-  --ff-warning-soft: rgba(193, 131, 49, 0.12);
-  --ff-warning-line: rgba(193, 131, 49, 0.72);
-  --ff-danger: #d26d5e;
-  --ff-danger-soft: rgba(210, 109, 94, 0.12);
-  --ff-danger-line: rgba(210, 109, 94, 0.66);
-  --ff-info: #8692a0;
-  --ff-info-soft: rgba(134, 146, 160, 0.12);
-  --ff-info-line: rgba(134, 146, 160, 0.5);
-  --ff-focus: #f0b33c;
-  --ff-overlay: rgba(5, 4, 3, 0.88);
+  --ff-success: #8da795;
+  --ff-success-text: #c0d6bd;
+  --ff-success-soft: rgba(141, 167, 149, 0.14);
+  --ff-success-line: rgba(141, 167, 149, 0.65);
+  --ff-warning: #e0ac64;
+  --ff-warning-soft: rgba(224, 172, 100, 0.12);
+  --ff-warning-line: rgba(224, 172, 100, 0.75);
+  --ff-danger: #e08b7d;
+  --ff-danger-soft: rgba(224, 139, 125, 0.12);
+  --ff-danger-line: rgba(224, 139, 125, 0.7);
+  --ff-info: #92afb4;
+  --ff-info-soft: rgba(146, 175, 180, 0.12);
+  --ff-info-line: rgba(146, 175, 180, 0.6);
+  --ff-focus: #f5b778;
+  --ff-overlay: rgba(7, 13, 15, 0.86);
 
-  --ff-font-display: "Songti SC", "STSong", "Noto Serif CJK SC",
-    "Source Han Serif SC", Georgia, serif;
-  --ff-font-ui: Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC",
-    "Microsoft YaHei", sans-serif;
+  --ff-font-display: "FilmFrame Display", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --ff-font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --ff-font-mono: "SFMono-Regular", Consolas, "Liberation Mono",
     ui-monospace, monospace;
 
@@ -60,26 +67,25 @@
   --ff-space-12: 48px;
   --ff-space-16: 64px;
 
-  --ff-radius-control: 3px;
-  --ff-radius-card: 5px;
-  --ff-radius-dialog: 7px;
+  --ff-radius-control: 4px;
+  --ff-radius-card: 6px;
+  --ff-radius-dialog: 8px;
   --ff-radius-round: 999px;
 
-  --ff-shadow-short: 0 10px 28px rgba(0, 0, 0, 0.34);
-  --ff-shadow-press: inset 0 1px 0 rgba(242, 234, 215, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
-  --ff-shadow-photo: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(242, 234, 215, 0.04);
-
-  --ff-grain-opacity: 0.045;
-  --ff-vignette-strength: 0.42;
-  --ff-safelight-wash: rgba(140, 49, 43, 0.045);
-  --ff-surface-sheen: linear-gradient(180deg, rgba(242, 234, 215, 0.035), transparent 34%, rgba(0, 0, 0, 0.12));
-  --ff-noise-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-  --ff-noise-tile: var(--ff-noise-image);
-  --ff-surface-inset: inset 0 1px 0 rgba(242, 234, 215, 0.045), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
-  --ff-surface-press: inset 0 1px 2px rgba(0, 0, 0, 0.32), inset 0 -1px 0 rgba(242, 234, 215, 0.04);
-  --ff-shadow-contact: 0 8px 22px rgba(0, 0, 0, 0.28);
-  --ff-shadow-paper: 0 6px 18px rgba(0, 0, 0, 0.24);
-  --ff-shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.42);
+  --ff-shadow-short: 0 10px 28px rgba(4, 12, 16, 0.3);
+  --ff-shadow-press: inset 0 1px 2px rgba(4, 12, 16, 0.28);
+  --ff-shadow-photo: 0 14px 34px rgba(4, 12, 16, 0.36);
+  --ff-grain-opacity: 0;
+  --ff-vignette-strength: 0;
+  --ff-safelight-wash: rgba(146, 175, 180, 0.035);
+  --ff-surface-sheen: none;
+  --ff-noise-image: none;
+  --ff-noise-tile: none;
+  --ff-surface-inset: none;
+  --ff-surface-press: inset 0 1px 2px rgba(4, 12, 16, 0.3);
+  --ff-shadow-contact: 0 8px 22px rgba(4, 12, 16, 0.26);
+  --ff-shadow-paper: 0 6px 18px rgba(4, 12, 16, 0.24);
+  --ff-shadow-lift: 0 18px 44px rgba(4, 12, 16, 0.38);
 
   --ff-motion-fast: 120ms;
   --ff-motion-base: 180ms;

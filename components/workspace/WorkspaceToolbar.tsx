@@ -3,19 +3,6 @@ import type { OutputMode } from '../../types';
 import { DownloadIcon, PlusIcon, TrashIcon } from '../icons/FilmFrameIcons';
 import { Button } from '../ui/Button';
 
-const MODE_COPY: Record<OutputMode, { eyebrow: string; title: string; description: string }> = {
-  single: {
-    eyebrow: 'CONTACT SHEET',
-    title: '接触印象',
-    description: '逐张查看、排序并冲洗这一卷照片。',
-  },
-  strip: {
-    eyebrow: 'FILM STRIP',
-    title: '连底长条',
-    description: '按当前顺序拼合整卷照片，生成连续胶片长条。',
-  },
-};
-
 export interface WorkspaceToolbarProps {
   outputMode: OutputMode;
   imageCount: number;
@@ -42,7 +29,7 @@ export function WorkspaceToolbar({
   includedCount = imageCount,
   processedCount = 0,
   stripStatusLabel,
-  description,
+  description = '选片、调整，然后把这一卷带回去。',
   statusSummary,
   controlsDisabled = false,
   canExport = false,
@@ -55,8 +42,6 @@ export function WorkspaceToolbar({
   onDeleteAll,
   className = '',
 }: WorkspaceToolbarProps) {
-  const copy = MODE_COPY[outputMode];
-
   const selectFromKeyboard = (event: KeyboardEvent<HTMLButtonElement>, mode: OutputMode) => {
     if (controlsDisabled) return;
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -72,22 +57,25 @@ export function WorkspaceToolbar({
 
   return (
     <header className={`ff-workspace-toolbar border-b border-[var(--ff-line-soft)] px-4 py-5 sm:px-6 lg:px-8 ${className}`}>
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
-          <p className="ff-lab-label text-[var(--ff-amber)]" aria-hidden="true">
-            {copy.eyebrow}
-          </p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="font-[var(--ff-font-display)] text-2xl leading-8 text-[var(--ff-paper)] sm:text-[28px] sm:leading-9">
-              {copy.title}
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="font-[var(--ff-font-display)] text-[26px] font-medium leading-9 tracking-[-0.025em] text-[var(--ff-paper)]">
+              照片工作台
             </h1>
             {statusSummary ? (
-              <span className="font-mono text-xs text-[var(--ff-paper-dim)]">{statusSummary}</span>
+              <span
+                className="text-xs text-[var(--ff-paper-muted)]"
+                data-testid="workspace-summary"
+                data-included-count={includedCount}
+                data-image-count={imageCount}
+                data-processed-count={processedCount}
+              >
+                {statusSummary}
+              </span>
             ) : null}
           </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ff-paper-muted)]">
-            {description ?? copy.description}
-          </p>
+          <p className="ff-workspace-toolbar__description mt-1 text-sm leading-6 text-[var(--ff-paper-muted)]">{description}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +91,7 @@ export function WorkspaceToolbar({
           ) : null}
           <Button
             id="workspace-add-photos"
-            variant="primary"
+            variant="secondary"
             leadingIcon={<PlusIcon />}
             onClick={onAddPhotos}
             disabled={controlsDisabled}
@@ -113,70 +101,62 @@ export function WorkspaceToolbar({
         </div>
       </div>
 
-      <div
-        className="mt-5 inline-grid min-h-11 w-full grid-cols-2 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-bg)] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)] sm:w-auto"
-        role="tablist"
-        aria-label="输出工作区"
-      >
-        <button
-          id="workspace-tab-single"
-          type="button"
-          role="tab"
-          aria-selected={outputMode === 'single'}
-          aria-controls="workspace-panel-single"
-          tabIndex={outputMode === 'single' ? 0 : -1}
-          disabled={controlsDisabled}
-          onClick={() => onOutputModeChange('single')}
-          onKeyDown={event => selectFromKeyboard(event, 'single')}
-          className="min-h-9 rounded-[3px] px-3 text-xs font-medium text-[var(--ff-paper-muted)] transition-colors aria-selected:bg-[var(--ff-amber-soft)] aria-selected:text-[var(--ff-amber)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
+        <div
+          className="ff-output-tabs inline-grid min-h-12 w-full grid-cols-2 sm:w-auto"
+          role="tablist"
+          aria-label="出片方式"
         >
-          单张成片 · {processedCount}/{includedCount}
-        </button>
-        <button
-          id="workspace-tab-strip"
-          type="button"
-          role="tab"
-          aria-selected={outputMode === 'strip'}
-          aria-controls="workspace-panel-strip"
-          tabIndex={outputMode === 'strip' ? 0 : -1}
-          disabled={controlsDisabled}
-          onClick={() => onOutputModeChange('strip')}
-          onKeyDown={event => selectFromKeyboard(event, 'strip')}
-          className="min-h-9 rounded-[3px] px-3 text-xs font-medium text-[var(--ff-paper-muted)] transition-colors aria-selected:bg-[var(--ff-amber-soft)] aria-selected:text-[var(--ff-amber)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          连底长条{stripStatusLabel ? ` · ${stripStatusLabel}` : ''}
-        </button>
+          <button
+            id="workspace-tab-single"
+            type="button"
+            role="tab"
+            aria-selected={outputMode === 'single'}
+            aria-controls="workspace-panel-single"
+            tabIndex={outputMode === 'single' ? 0 : -1}
+            disabled={controlsDisabled}
+            onClick={() => onOutputModeChange('single')}
+            onKeyDown={event => selectFromKeyboard(event, 'single')}
+          >
+            单张 <span className="ff-output-tabs__meta">{processedCount}/{includedCount}</span>
+          </button>
+          <button
+            id="workspace-tab-strip"
+            type="button"
+            role="tab"
+            aria-selected={outputMode === 'strip'}
+            aria-controls="workspace-panel-strip"
+            tabIndex={outputMode === 'strip' ? 0 : -1}
+            disabled={controlsDisabled}
+            onClick={() => onOutputModeChange('strip')}
+            onKeyDown={event => selectFromKeyboard(event, 'strip')}
+          >
+            胶片长条{stripStatusLabel ? <span className="ff-output-tabs__meta">{stripStatusLabel}</span> : null}
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {onSelectAll && onClearSelection ? (
+            <div className="flex flex-wrap gap-1" role="group" aria-label="选片范围">
+              <Button variant="ghost" onClick={onSelectAll} disabled={controlsDisabled || includedCount === imageCount}>全部入选</Button>
+              <Button variant="ghost" onClick={onClearSelection} disabled={controlsDisabled || includedCount === 0}>清空入选</Button>
+            </div>
+          ) : null}
+          {onDeleteAll ? (
+            <Button
+              variant="ghost"
+              leadingIcon={<TrashIcon size={16} />}
+              onClick={onDeleteAll}
+              disabled={controlsDisabled}
+              aria-label="删除全部照片"
+              title="删除全部照片"
+            />
+          ) : null}
+        </div>
       </div>
 
-      {imageCount > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--ff-line-soft)] pt-4">
-          <div className="min-w-0">
-            <p className="font-mono text-xs text-[var(--ff-paper-muted)]">入选 {includedCount} / {imageCount}</p>
-            {includedCount === 0 ? (
-              <p className="mt-1 text-xs text-[var(--ff-warning)]" role="status" aria-live="polite">请先选择至少一张照片</p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {onSelectAll && onClearSelection ? (
-              <div className="flex flex-wrap gap-2" role="group" aria-label="选片范围">
-                <Button variant="ghost" onClick={onSelectAll} disabled={controlsDisabled || includedCount === imageCount}>全部入选</Button>
-                <Button variant="ghost" onClick={onClearSelection} disabled={controlsDisabled || includedCount === 0}>清空入选</Button>
-              </div>
-            ) : null}
-            {onDeleteAll ? (
-              <div className="border-l border-[var(--ff-line)] pl-2">
-                <Button
-                  variant="danger"
-                  leadingIcon={<TrashIcon size={16} />}
-                  onClick={onDeleteAll}
-                  disabled={controlsDisabled}
-                >
-                  删除全部照片
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </div>
+      {includedCount === 0 ? (
+        <p className="mt-3 text-xs text-[var(--ff-warning)]" role="status" aria-live="polite">请先选择至少一张照片</p>
       ) : null}
     </header>
   );

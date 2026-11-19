@@ -19,39 +19,25 @@ export function SessionMeter({
   busyLabel,
   className = '',
 }: SessionMeterProps) {
-  const rollLabel = imageCount > 0
-    ? `ROLL ${String(rollNumber).padStart(2, '0')}`
-    : 'NEW ROLL';
-  const frameLabel = `${imageCount} ${imageCount === 1 ? 'FRAME' : 'FRAMES'}`;
-  const modeLabel = outputMode === 'strip' ? 'STRIP' : 'SHEET';
   const summary = imageCount === 0
     ? '新胶卷，本地处理'
     : `${imageCount} 张，${processedCount} 张已出片${localOnly ? '，仅本地处理' : ''}`;
 
   return (
-    <div
-      className={`ff-session-meter min-w-0 ${className}`}
-      role="group"
-      aria-label={summary}
-    >
-      <div className="ff-session-meter__dial hidden min-[1180px]:flex" aria-hidden="true">
-        <span className="ff-session-meter__chip ff-session-meter__chip--live">{rollLabel}</span>
-        <span className="ff-session-meter__chip">{frameLabel}</span>
-        <span className="ff-session-meter__chip">{modeLabel}</span>
-        {localOnly ? <span className="ff-session-meter__chip">LOCAL</span> : null}
-        {imageCount > 0 ? (
-          <span className="ff-session-meter__chip">
-            OUT {processedCount}/{imageCount}
-          </span>
-        ) : null}
+    <div className={`ff-session-meter min-w-0 ${className}`} role="group" aria-label={summary}>
+      <div className="ff-session-meter__dial" aria-hidden="true">
+        <span className="ff-session-meter__chip ff-session-meter__chip--live">
+          第 {String(rollNumber).padStart(2, '0')} 卷
+        </span>
+        <span>{imageCount} 张照片</span>
+        <span>{outputMode === 'strip' ? '胶片长条' : '单张'}</span>
+        {imageCount > 0 ? <span>{processedCount} 张已出片</span> : <span>仅本地处理</span>}
       </div>
-      <div className="truncate text-xs text-[var(--ff-paper-muted)] min-[1180px]:hidden" aria-hidden="true">
+      <div className="ff-session-meter__compact" aria-hidden="true">
         {imageCount > 0 ? `${imageCount} 张 · 本地处理` : '新胶卷 · 本地处理'}
       </div>
       {busyLabel && (
-        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {busyLabel}
-        </div>
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{busyLabel}</div>
       )}
     </div>
   );

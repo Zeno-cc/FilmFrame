@@ -30,7 +30,7 @@ export function PhotoCardActions({
   className = '',
 }: PhotoCardActionsProps) {
   return (
-    <div className={`flex min-h-12 items-center gap-1.5 border-y border-[var(--ff-line-soft)] px-3 py-1 ${className}`} aria-label={`${fileName} 操作`}>
+    <div className={`ff-photo-card__actions flex min-h-12 items-center gap-1.5 border-y border-[var(--ff-line-soft)] px-3 py-1 ${className}`} aria-label={`${fileName} 操作`}>
       <IconButton
         icon={<EyeIcon />}
         label={`查看 ${fileName}`}

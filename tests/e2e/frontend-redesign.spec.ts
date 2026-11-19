@@ -2,6 +2,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Download, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/aperture-mask-derived.png');
 const curationFixtures = [
@@ -44,52 +45,44 @@ async function countZipEntries(download: Download): Promise<number> {
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  await uploadCurationFixtures(page, 1);
+  await selectRecipeControl(page, '成像方式', 'legacy');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await page.getByRole('button', { name: '删除全部照片' }).click();
+  await page.getByRole('dialog', { name: '删除全部照片？' })
+    .getByRole('button', { name: '删除 1 张照片' }).click();
+  await page.getByRole('heading', { name: '让这一卷，慢慢显影' }).waitFor();
 });
 
-test('desktop empty darkroom exposes the new shell and inspector', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+test('desktop empty darkroom exposes one clear import action and a complete film frame', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
 
-  await expect(page.getByRole('heading', { name: '接触印象' })).toBeVisible();
-  await expect(page.getByLabel('新胶卷，本地处理')).toBeVisible();
   await expect(page.getByRole('heading', { name: '让这一卷，慢慢显影' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: '暗房配方' })).toBeVisible();
+  await expect(page.getByLabel('新胶卷，本地处理')).toBeVisible();
+  await expect(getRecipeInspector(page)).toBeVisible();
+  await expect(page.locator('.ff-empty-darkroom').getByRole('button', { name: '选择照片', exact: true })).toHaveCount(1);
+  await expect(page.locator('header').getByRole('button', { name: '添加照片' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: '移动端主要操作' })).toHaveCount(0);
+  await expect(page.getByText('照片示意 · 非胶片渲染结果', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '高级渲染设置' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '先添加图片' })).toHaveCount(0);
+
   const quote = page.getByTestId('photography-quote');
   await expect(quote.locator('blockquote')).not.toBeEmpty();
   await expect(quote.locator('cite')).not.toBeEmpty();
   await expect(quote).toHaveAttribute('aria-live', 'off');
   await expect(page.getByRole('button', { name: '换一句摄影名言' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /暂停名言轮播|继续名言轮播/ })).toHaveCount(0);
-  await expect(page.getByText(/照片仅在当前设备处理|名言语料由 Wikiquote/)).toHaveCount(0);
-  await expect.poll(async () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name))).not.toContainEqual(
+  expect(await page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name))).not.toContainEqual(
     expect.stringContaining('wikiquote.org'),
   );
 
-  const workspaceBounds = await page.locator('.ff-workspace').boundingBox();
-  const emptyDarkroomBounds = await page.locator('.ff-empty-darkroom').boundingBox();
-  if (!workspaceBounds || !emptyDarkroomBounds) throw new Error('Empty darkroom bounds are unavailable');
-  expect(emptyDarkroomBounds.x).toBeCloseTo(workspaceBounds.x, 1);
-  expect(emptyDarkroomBounds.width).toBeCloseTo(workspaceBounds.width, 1);
-
   const track = page.getByTestId('empty-darkroom-film-track');
   await expect(track).toBeVisible();
-  await expect(track).toHaveCSS('animation-name', 'ff-empty-film-transport');
-  await expect(track).toHaveCSS('animation-duration', '36s');
-  await expect(track).toHaveCSS('animation-timing-function', 'linear');
-  await expect(track).toHaveCSS('animation-iteration-count', 'infinite');
-  const exposureBackground = await page.locator('.ff-empty-darkroom__exposures').evaluate(element => {
-    const frame = element.firstElementChild;
-    if (!frame) throw new Error('Decorative 135 exposure frame is missing');
-    return {
-      color: getComputedStyle(frame).backgroundColor,
-      image: getComputedStyle(frame).backgroundImage,
-    };
-  });
-  expect(exposureBackground.color).toBe('rgba(72, 63, 49, 0.12)');
-  expect(exposureBackground.image).not.toContain('repeating-linear-gradient');
+  await expect(track).toHaveCSS('transition-property', 'none');
+  await expect(track).toHaveCSS('transition-duration', '0s');
+  await expect(page.getByTestId('empty-darkroom-exposure-frame')).toHaveCount(8);
+  await expect(page.getByRole('group', { name: '人文摄影示意' })).toBeVisible();
+  expect(new Set(await page.locator('.ff-empty-darkroom__photo').evaluateAll(images => images.map(image => image.getAttribute('src')))).size).toBeGreaterThan(1);
 
   const frameGeometry = await page.getByTestId('empty-darkroom-exposure-frame').first().evaluate(element => {
     const frame = element.getBoundingClientRect();
@@ -97,64 +90,54 @@ test('desktop empty darkroom exposes the new shell and inspector', async ({ page
     if (!trackElement) throw new Error('Decorative 135 film track is missing');
     const track = trackElement.getBoundingClientRect();
     return {
-      width: frame.width,
-      height: frame.height,
       ratio: frame.width / frame.height,
       topClearance: frame.top - track.top,
       bottomClearance: track.bottom - frame.bottom,
     };
   });
-  const railGeometry = await page.getByTestId('empty-darkroom-film-rail').evaluateAll(elements => elements.map(element => {
-    const rail = element.getBoundingClientRect();
-    const holes = getComputedStyle(element, '::before');
-    return {
-      top: rail.top,
-      bottom: rail.bottom,
-      height: rail.height,
-      holeHeight: holes.height,
-      holeBackground: holes.backgroundImage,
-    };
+  expect(frameGeometry.ratio).toBeCloseTo(1.5, 3);
+  expect(frameGeometry.topClearance).toBe(frameGeometry.bottomClearance);
+  const rails = await page.getByTestId('empty-darkroom-film-rail').evaluateAll(elements => elements.map(element => ({
+    height: element.getBoundingClientRect().height,
+    holeBackground: getComputedStyle(element, '::before').backgroundImage,
+  })));
+  expect(rails).toHaveLength(2);
+  expect(rails[0].height).toBe(rails[1].height);
+  expect(rails[0].holeBackground).toContain('repeating-linear-gradient');
+  const exposureReveal = page.locator('.ff-empty-darkroom__exposure-content').first();
+  await expect(exposureReveal).toHaveCSS('animation-name', 'none');
+  const demo = await page.locator('.ff-empty-darkroom__photo').first().evaluate((image: HTMLImageElement) => ({
+    loaded: image.complete && image.naturalWidth > 0,
+    ratio: image.parentElement!.getBoundingClientRect().width / image.parentElement!.getBoundingClientRect().height,
   }));
-  const negativeHeight = await track.evaluate(element => element.getBoundingClientRect().height);
-  expect(negativeHeight).toBe(332);
-  expect(frameGeometry.width).toBe(342);
-  expect(frameGeometry.height).toBe(228);
-  expect(frameGeometry.ratio).toBeCloseTo(1.5, 5);
-  expect(frameGeometry.topClearance).toBeCloseTo(52, 5);
-  expect(frameGeometry.bottomClearance).toBeCloseTo(52, 5);
-  expect(railGeometry).toHaveLength(2);
-  expect(railGeometry[0].height).toBe(52);
-  expect(railGeometry[1].height).toBe(52);
-  expect(railGeometry[0].bottom).toBeCloseTo(frameGeometry.topClearance + railGeometry[0].top, 5);
-  expect(railGeometry[1].top).toBeCloseTo(frameGeometry.bottomClearance + frameGeometry.height + railGeometry[0].top, 5);
-  expect(railGeometry[0].holeHeight).toBe('20px');
-  expect(railGeometry[0].holeBackground).toContain('repeating-linear-gradient');
-
-  const context = await page.getByTestId('empty-darkroom-context').boundingBox();
-  const negative = await track.boundingBox();
-  if (!context || !negative) throw new Error('Empty darkroom composition is missing');
-  expect(context.y).toBeGreaterThanOrEqual(negative.y + negative.height);
-
-  const transforms = await track.evaluate(element => {
-    const animation = element.getAnimations()[0];
-    if (!animation) throw new Error('Film transport animation is missing');
-    animation.pause();
-    animation.currentTime = 0;
-    const start = getComputedStyle(element).transform;
-    animation.currentTime = 1000;
-    const end = getComputedStyle(element).transform;
-    return { start, end };
+  expect(demo.loaded).toBe(true);
+  expect(demo.ratio).toBeCloseTo(1.5, 3);
+  const separatedRegions = await page.evaluate(() => {
+    const intro = document.querySelector('.ff-empty-darkroom__intro')!.getBoundingClientRect();
+    const film = document.querySelector('.ff-empty-darkroom__film')!.getBoundingClientRect();
+    return intro.right <= film.left || film.right <= intro.left || intro.bottom <= film.top || film.bottom <= intro.top;
   });
-  expect(transforms.end).not.toBe(transforms.start);
-  await track.evaluate(element => element.getAnimations()[0]?.play());
-  await expect(track).toHaveCSS('animation-play-state', 'running');
+  expect(separatedRegions).toBe(true);
 
-  const emptyDarkroom = page.locator('.ff-empty-darkroom');
-  await emptyDarkroom.hover();
-  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.locator('header').click({ position: { x: 4, y: 4 } });
   await page.mouse.move(0, 0);
-  await emptyDarkroom.getByRole('button', { name: '选择照片' }).focus();
-  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  const emptyDarkroom = page.locator('.ff-empty-darkroom');
+  const initialX = await track.evaluate(element => element.getBoundingClientRect().x);
+  await page.waitForTimeout(13_000);
+  const advancedX = await track.evaluate(element => element.getBoundingClientRect().x);
+  expect(advancedX).toBeLessThan(initialX);
+  await emptyDarkroom.hover();
+  await expect(track).toHaveCSS('transition-property', 'none');
+  await page.mouse.move(0, 0);
+  await emptyDarkroom.getByRole('button', { name: '选择照片' }).filter({ visible: true }).focus();
+  await expect(track).toHaveCSS('transition-property', 'none');
+
+  await page.setViewportSize({ width: 1180, height: 900 });
+  await expect(page.locator('.ff-empty-darkroom__demo-frame').first()).toBeVisible();
+  await expect(emptyDarkroom.getByRole('button', { name: '选择照片', exact: true })).toHaveCount(1);
+  await expect(page.locator('.ff-empty-darkroom__privacy')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1180);
 });
 
 test('empty darkroom film respects reduced motion, drag state, and mobile bounds', async ({ page }) => {
@@ -168,18 +151,20 @@ test('empty darkroom film respects reduced motion, drag state, and mobile bounds
   const film = page.locator('.ff-empty-darkroom__film');
   await expect(track).toHaveCSS('animation-name', 'none');
   await expect(track).toHaveCSS('will-change', 'auto');
-  await expect(page.locator('.ff-empty-darkroom').getByRole('button', { name: '选择照片' })).toBeVisible();
-  const mobileFrame = await page.getByTestId('empty-darkroom-exposure-frame').first().boundingBox();
-  if (!mobileFrame) throw new Error('Decorative 135 exposure frame is not visible');
-  expect(mobileFrame.width / mobileFrame.height).toBeCloseTo(1.5, 5);
-  const mobileNegative = await track.boundingBox();
-  const mobileContext = await page.getByTestId('empty-darkroom-context').boundingBox();
-  if (!mobileNegative || !mobileContext) throw new Error('Mobile empty darkroom composition is missing');
-  expect(mobileNegative.height).toBe(332);
-  expect(mobileContext.y).toBeGreaterThanOrEqual(mobileNegative.y + mobileNegative.height);
+  await expect(page.locator('.ff-empty-darkroom__exposure-content').first()).toHaveCSS('animation-name', 'none');
+  const importButton = page.locator('.ff-empty-darkroom').getByRole('button', { name: '选择照片' }).filter({ visible: true });
+  await expect(importButton).toHaveCount(1);
+  const buttonBounds = await importButton.boundingBox();
+  const frameBounds = await page.locator('.ff-empty-darkroom__demo-frame').first().boundingBox();
+  const privacyBounds = await page.locator('.ff-empty-darkroom__privacy').filter({ visible: true }).boundingBox();
+  if (!buttonBounds || !frameBounds || !privacyBounds) throw new Error('Mobile empty darkroom composition is missing');
+  expect(frameBounds.width / frameBounds.height).toBeCloseTo(1.5, 3);
+  expect(buttonBounds.y).toBeGreaterThan(frameBounds.y + frameBounds.height);
+  expect(privacyBounds.y + privacyBounds.height).toBeLessThan(844);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     await page.evaluate(() => window.innerWidth),
   );
+  await expect(page.getByRole('navigation', { name: '移动端主要操作' })).toHaveCount(0);
 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const dataTransfer = await page.evaluateHandle(() => {
@@ -214,16 +199,42 @@ test('photography quote updates locally at the next 24-hour boundary', async ({ 
   await expect(page.getByRole('button', { name: /暂停名言轮播|继续名言轮播/ })).toHaveCount(0);
 });
 
+test('settings keep the starting frame visible and named recipes retain their stock', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await uploadCurationFixtures(page, 1);
+  const inspector = getRecipeInspector(page);
+  const startingFrame = inspector.getByRole('spinbutton', { name: '起始帧号' });
+  await expect(startingFrame).toBeVisible();
+  await expect(inspector.getByLabel('帧号颜色')).toHaveCount(0);
+
+  const advancedTrigger = inspector.getByRole('button', { name: '高级渲染设置' });
+  await advancedTrigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(advancedTrigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(inspector.getByLabel('帧号颜色')).toBeVisible();
+  const contentId = await advancedTrigger.getAttribute('aria-controls');
+  await expect(inspector.locator(`#${contentId}`)).toBeVisible();
+
+  await inspector.getByRole('textbox', { name: '配方名称' }).fill('我的测试配方');
+  await inspector.getByRole('button', { name: '保存', exact: true }).click();
+  await inspector.getByRole('combobox', { name: '选择本地配方' }).selectOption({ label: '我的测试配方' });
+  const summary = inspector.getByRole('region', { name: '当前配方' });
+  await expect(summary).toContainText('我的测试配方');
+  await expect(summary).toContainText('KODAK GOLD 200');
+});
+
 test('mobile settings sheet traps the settings flow and closes with Escape', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const trigger = page.locator('header').getByRole('button', { name: '打开暗房配方' });
+  await uploadCurationFixtures(page, 1);
+  const trigger = page.locator('header').getByRole('button', { name: '打开调整' });
 
   await trigger.click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  const sheet = page.getByRole('dialog', { name: '调整' });
   await expect(sheet).toBeVisible();
   await sheet.getByRole('tab', { name: '输出' }).click();
   await expect(sheet.getByRole('group', { name: '输出格式' })).toBeVisible();
-  await sheet.getByRole('tab', { name: '胶片' }).click();
+  await sheet.getByRole('tab', { name: '片边' }).click();
+  await sheet.getByRole('button', { name: '高级渲染设置' }).click();
   await expect(sheet.getByLabel('帧号颜色')).toBeVisible();
   await expect(sheet.getByLabel('齿孔颜色')).toBeVisible();
 
@@ -234,10 +245,11 @@ test('mobile settings sheet traps the settings flow and closes with Escape', asy
 
 test('mobile Sheet retains all secondary actions and closes after a privacy notice', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const trigger = page.locator('header').getByRole('button', { name: '打开暗房配方' });
+  await uploadCurationFixtures(page, 1);
+  const trigger = page.locator('header').getByRole('button', { name: '打开调整' });
 
   await trigger.click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  const sheet = page.getByRole('dialog', { name: '调整' });
   const more = sheet.getByRole('button', { name: '更多操作' });
   await more.click();
   await expect(sheet.getByRole('menuitem', { name: '恢复默认设置' })).toBeVisible();
@@ -253,10 +265,11 @@ test('mobile Sheet retains all secondary actions and closes after a privacy noti
 
 test('mobile action-bar settings trigger restores focus after closing the Sheet', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const trigger = page.getByRole('navigation', { name: '移动端主要操作' }).getByRole('button', { name: '打开暗房配方' });
+  await uploadCurationFixtures(page, 1);
+  const trigger = page.getByRole('navigation', { name: '移动端主要操作' }).getByRole('button', { name: '打开调整' });
 
   await trigger.click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  const sheet = page.getByRole('dialog', { name: '调整' });
   await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
@@ -265,13 +278,14 @@ test('mobile action-bar settings trigger restores focus after closing the Sheet'
 
 test('tablet settings drawer traps Tab around visible controls and restores Header focus', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 1024 });
-  const trigger = page.getByRole('button', { name: '配方' });
+  await uploadCurationFixtures(page, 1);
+  const trigger = page.getByRole('button', { name: '调整' });
 
   await trigger.click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  const sheet = page.getByRole('dialog', { name: '调整' });
   await expect(sheet).toBeVisible();
-  const close = sheet.getByRole('button', { name: '关闭暗房配方' });
-  const primaryAction = sheet.getByRole('button', { name: '先添加图片' });
+  const close = sheet.getByRole('button', { name: '关闭调整' });
+  const primaryAction = sheet.getByRole('button', { name: /冲洗待更新照片/ });
   await expect(close).toBeFocused();
   await expect(sheet.getByRole('button', { name: '更多操作' })).toBeHidden();
 
@@ -287,19 +301,31 @@ test('tablet settings drawer traps Tab around visible controls and restores Head
 
 test('upload, develop, preview and film strip remain usable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  const inspector = getRecipeInspector(page);
+  await uploadCurationFixtures(page, 1);
+  await selectRecipeControl(page, '成像方式', 'legacy');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   const sprocketColor = inspector.getByRole('textbox', { name: '齿孔颜色', exact: true });
   await sprocketColor.evaluate((input, value) => {
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     setValue?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, '#3366cc');
-  await page.locator('input[type="file"]').setInputFiles(fixture);
 
   await expect(page.getByTestId('empty-darkroom-film-track')).toHaveCount(0);
-  await expect(page.getByRole('list', { name: /接触印象，共 1 张照片/ })).toBeVisible();
+  await expect(page.getByRole('list', { name: /照片列表，共 1 张照片/ })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary')).toBeVisible();
+  await expect(page.locator('.ff-contact-sheet')).toHaveAttribute('data-layout', 'focus');
+  const focusGeometry = await page.locator('.ff-photo-card__mat').evaluate(element => {
+    const mat = element.getBoundingClientRect();
+    const workspace = document.querySelector('#workspace-panel-single')?.getBoundingClientRect();
+    return { ratio: mat.width / mat.height, widthShare: workspace ? mat.width / workspace.width : 0 };
+  });
+  expect(focusGeometry.ratio).toBeCloseTo(1.5, 3);
+  expect(focusGeometry.widthShare).toBeGreaterThan(0.8);
+  await expect(page.locator('.ff-app-header').getByRole('button', { name: '检查出片进度 (0/1)' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '检查出片进度 (0/1)', exact: true })).toHaveCount(1);
   await expect(page.getByText('待冲洗', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
@@ -307,6 +333,12 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   await expect(developMat).toHaveAttribute('data-develop', 'reveal', { timeout: 30_000 });
   const revealLayers = await developMat.evaluate(element => {
     const surface = element.querySelector<HTMLElement>('.ff-photo-card__reveal-surface');
+    const print = element.querySelector<HTMLElement>('.ff-photo-card__print');
+    const animation = print?.getAnimations()[0];
+    if (animation) {
+      animation.pause();
+      animation.currentTime = 250;
+    }
     const bed = element.querySelector<HTMLElement>('.ff-photo-card__print-bed');
     if (!surface || !bed) throw new Error('Develop reveal layers are missing');
     const matBounds = element.getBoundingClientRect();
@@ -329,6 +361,9 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   expect(revealLayers.bedBackground).not.toBe('rgba(0, 0, 0, 0)');
   expect(revealLayers.widthDelta).toBeLessThan(0.5);
   expect(revealLayers.heightDelta).toBeLessThan(0.5);
+  await developMat.locator('.ff-photo-card__print').evaluate(element => {
+    element.getAnimations().forEach(animation => animation.play());
+  });
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
   const processedImage = page.getByRole('img', { name: path.basename(fixture) });
   const sprocketPixel = await processedImage.evaluate((image: HTMLImageElement) => {
@@ -356,9 +391,9 @@ test('upload, develop, preview and film strip remain usable', async ({ page }) =
   await expect(preview.getByRole('button', { name: '成片', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  await expect(page.getByRole('heading', { name: '长条审片台' })).toBeVisible();
-  const stripStage = page.getByLabel('长条审片台');
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  await expect(page.getByRole('heading', { name: '长条预览' })).toBeVisible();
+  const stripStage = page.getByLabel('长条预览');
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
   const stripImage = stripStage.getByRole('img', { name: '已生成的胶片长条' });
   await expect(stripImage).toBeVisible({ timeout: 30_000 });
@@ -419,9 +454,7 @@ test('single preview keeps the selected source mode across navigation and reopen
 
 test('single preview supports an explicit rotate button and guarded R shortcut', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  const inspector = getRecipeInspector(page);
   await uploadCurationFixtures(page, 1);
 
   const fileName = curationNames[0];
@@ -494,8 +527,8 @@ test('single preview supports an explicit rotate button and guarded R shortcut',
   await expect(previewImage).toHaveAttribute('src', uppercaseSource ?? '');
 
   await preview.getByRole('button', { name: '关闭预览' }).click();
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  const stripStage = page.getByLabel('长条审片台');
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  const stripStage = page.getByLabel('长条预览');
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
   await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
   await stripStage.getByRole('button', { name: '预览' }).click();
@@ -511,11 +544,13 @@ test('single preview supports an explicit rotate button and guarded R shortcut',
 
 test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  const inspector = getRecipeInspector(page);
+  await uploadCurationFixtures(page, 1);
+  await selectRecipeControl(page, '成像方式', 'legacy');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
   await selectFilmStock(inspector,'KODAK PORTRA 160');
 
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   const frameNumberColor = inspector.getByLabel('帧号颜色');
   await frameNumberColor.evaluate((input, value) => {
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -524,6 +559,7 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
   }, '#44cc88');
   await expect(frameNumberColor).toHaveValue('#44cc88');
 
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   const sprocketColor = inspector.getByRole('textbox', { name: '齿孔颜色', exact: true });
   await expect(inspector.getByText('跟随原片', { exact: true })).toBeVisible();
   await sprocketColor.evaluate((input, value) => {
@@ -546,7 +582,9 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, '#cc3344');
 
-  await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(inspector.getByRole('group', { name: '画幅样式' })).toHaveCount(0);
+  await expect(inspector.getByLabel('片边方式')).toBeVisible();
+  await openRecipeAdvancedSettings(page, '高级输出设置');
   await inspector.getByRole('button', { name: '仅保留底片' }).click();
   await expect(inspector.getByRole('button', { name: '仅保留底片' })).toHaveAttribute('aria-pressed', 'true');
   await inspector.getByRole('button', { name: '保留扫描背景' }).click();
@@ -570,8 +608,8 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, '#9fc5d5');
   await expect(scanBackgroundColor).toHaveValue('#9fc5d5');
+  await openRecipeAdvancedSettings(page, '高级输出设置');
   await inspector.getByRole('button', { name: '仅保留底片' }).click();
-  await page.locator('input[type="file"]').setInputFiles(fixture);
   const frameImage = page.getByRole('img', { name: path.basename(fixture) });
   const originalFrameSource = await frameImage.getAttribute('src');
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
@@ -595,8 +633,8 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
   expect(Math.abs(frameSprocketPixel[1] - 51)).toBeLessThan(18);
   expect(Math.abs(frameSprocketPixel[2] - 68)).toBeLessThan(18);
 
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  const stripStage = page.getByLabel('长条审片台');
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  const stripStage = page.getByLabel('长条预览');
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
   const stripImage = stripStage.getByRole('img', { name: '已生成的胶片长条' });
   await expect(stripImage).toBeVisible({ timeout: 30_000 });
@@ -621,6 +659,14 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
   expect(Math.abs(stripSprocketPixel[2] - 68)).toBeLessThan(18);
 });
 
+const nonSpectralStocks = new Set([
+  'KODAK COLORPLUS 200',
+  'KODAK PRO IMAGE 100',
+  'KODAK T-MAX 400',
+  'KODAK T-MAX P3200',
+  'FUJI SUPERIA 400',
+]);
+
 for (const [name, stock] of [
   ['Kodak Portra 400', 'KODAK PORTRA 400'],
   ['Kodak Ektar 100', 'KODAK EKTAR 100'],
@@ -639,21 +685,27 @@ for (const [name, stock] of [
 ] as const) {
   test(`${name} supports real 135 single and template strip rendering`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    const inspector = page.getByRole('complementary', { name: '暗房配方' });
-    await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-    await inspector.getByLabel('成像方式').selectOption('legacy');
+    const inspector = getRecipeInspector(page);
+    await uploadCurationFixtures(page, 1);
+    await selectRecipeControl(page, '成像方式', 'legacy');
+    await selectRecipeControl(page, '片边方式', 'legacy-template');
     await selectFilmStock(inspector,stock);
 
-    await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute('aria-pressed', 'true');
-    await page.locator('input[type="file"]').setInputFiles(fixture);
+    if (nonSpectralStocks.has(stock)) {
+      await expect(inspector.getByRole('button', { name: '135 画幅', exact: true }))
+        .toHaveAttribute('aria-pressed', 'true');
+    } else {
+      await expect(inspector.getByRole('group', { name: '画幅样式' })).toHaveCount(0);
+      await expect(inspector.getByLabel('片边方式')).toBeVisible();
+    }
     const frameImage = page.getByRole('img', { name: path.basename(fixture) });
     const originalFrameSource = await frameImage.getAttribute('src');
     await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
     await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => frameImage.getAttribute('src')).not.toBe(originalFrameSource);
 
-    await page.getByRole('tab', { name: /连底长条/ }).click();
-    const stripStage = page.getByLabel('长条审片台');
+    await page.getByRole('tab', { name: /胶片长条/ }).click();
+    const stripStage = page.getByLabel('长条预览');
     await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
     await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
   });
@@ -661,7 +713,7 @@ for (const [name, stock] of [
 
 test('crop editor returns focus to its trigger after Escape and cancel', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.locator('input[type="file"]').setInputFiles(fixture);
+  await uploadCurationFixtures(page, 1);
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 30_000 });
 
@@ -763,8 +815,9 @@ test('support dialog loads the payment QR image and retains focus trapping', asy
 
 test('support opened from mobile settings replaces the Sheet', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('header').getByRole('button', { name: '打开暗房配方' }).click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  await uploadCurationFixtures(page, 1);
+  await page.locator('header').getByRole('button', { name: '打开调整' }).click();
+  const sheet = page.getByRole('dialog', { name: '调整' });
 
   await sheet.getByRole('button', { name: '更多操作' }).click();
   await sheet.getByRole('menuitem', { name: '支持 FilmFrame' }).click();
@@ -792,22 +845,20 @@ test('desktop More menu supports arrow navigation and notices stay below the Hea
   const notice = page.getByRole('status').filter({
     hasText: '照片只在当前设备处理，不会上传；刷新或关闭页面后不会保留。',
   });
-  const addPhotoElement = await page.getByRole('banner')
-    .getByRole('button', { name: '添加照片' })
-    .elementHandle();
+  const moreMenuElement = await more.elementHandle();
   await expect(notice).toBeVisible();
   await expect(notice).toHaveAttribute('aria-live', 'polite');
-  await expect.poll(() => notice.evaluateAll((elements, addPhoto) => {
-    if (elements.length !== 1 || !addPhoto) return -1;
+  await expect.poll(() => notice.evaluateAll((elements, workspace) => {
+    if (elements.length !== 1 || !workspace) return -1;
     const [toast] = elements;
     const animations = toast.getAnimations({ subtree: true });
     const isStable = getComputedStyle(toast).opacity === '1'
       && animations.every(animation => animation.playState === 'finished');
     if (!isStable) return -1;
     const noticeBox = toast.getBoundingClientRect();
-    const addBox = addPhoto.getBoundingClientRect();
-    return noticeBox.y - addBox.bottom;
-  }, addPhotoElement)).toBeGreaterThanOrEqual(0);
+    const moreBox = workspace.getBoundingClientRect();
+    return noticeBox.y - moreBox.bottom;
+  }, moreMenuElement)).toBeGreaterThanOrEqual(0);
 });
 
 test('credits dialog exposes source licenses and unresolved rights accessibly', async ({ page }) => {
@@ -827,8 +878,9 @@ test('credits dialog exposes source licenses and unresolved rights accessibly', 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button', { name: '更多操作' })).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('header').getByRole('button', { name: '打开暗房配方' }).click();
-  const sheet = page.getByRole('dialog', { name: '暗房配方' });
+  await uploadCurationFixtures(page, 1);
+  await page.locator('header').getByRole('button', { name: '打开调整' }).click();
+  const sheet = page.getByRole('dialog', { name: '调整' });
   await sheet.getByRole('button', { name: '更多操作' }).click();
   await sheet.getByRole('menuitem', { name: '来源与许可' }).click();
   await expect(sheet).toHaveCount(0);
@@ -842,31 +894,31 @@ test('batch curation keeps card, strip, summary, and zero-selection recovery in 
 
   const [firstName, secondName, thirdName] = curationNames;
   const selectionScope = page.getByRole('group', { name: '选片范围' });
-  const summary = page.getByText('入选 3 / 3', { exact: true });
+  const summary = page.getByTestId('workspace-summary').filter({ hasText: /^3\/3 张入选/ });
 
   await expect(summary).toBeVisible();
   await expect(curationCheckbox(page, '取消入选', secondName)).toBeChecked();
 
   await curationCheckbox(page, '取消入选', secondName).uncheck();
-  await expect(page.getByText('入选 2 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^2\/3 张入选/ })).toBeVisible();
   await expect(curationCheckbox(page, '入选', secondName)).not.toBeChecked();
 
-  await page.getByRole('tab', { name: /连底长条 · 2 张入选/ }).click();
+  await page.getByRole('tab', { name: /胶片长条 2 张入选/ }).click();
   const sequence = page.getByLabel('胶片长条照片顺序');
   await expect(sequence.getByRole('checkbox', { name: `入选 ${secondName}` })).not.toBeChecked();
 
   await sequence.getByRole('checkbox', { name: `入选 ${secondName}` }).check();
-  await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^3\/3 张入选/ })).toBeVisible();
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${secondName}` })).toBeChecked();
 
   await selectionScope.getByRole('button', { name: '清空入选' }).click();
-  await expect(page.getByText('入选 0 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^0\/3 张入选/ })).toBeVisible();
   const zeroSelectionMessage = page.getByRole('status').filter({ hasText: '请先选择至少一张照片' });
   await expect(zeroSelectionMessage).toHaveAttribute('role', 'status');
-  await expect(page.getByLabel('长条审片台').getByRole('button', { name: '请先选择至少一张照片' })).toBeDisabled();
+  await expect(page.getByLabel('长条预览').getByRole('button', { name: '请先选择至少一张照片' })).toBeDisabled();
 
   await selectionScope.getByRole('button', { name: '全部入选' }).click();
-  await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^3\/3 张入选/ })).toBeVisible();
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${firstName}` })).toBeChecked();
   await expect(sequence.getByRole('checkbox', { name: `取消入选 ${thirdName}` })).toBeChecked();
 });
@@ -877,7 +929,7 @@ test('incomplete ZIP export requires an explicit partial export or finishes the 
 
   const thirdName = curationNames[2];
   await curationCheckbox(page, '取消入选', thirdName).uncheck();
-  const emptyExportButton = page.getByRole('button', { name: '完成冲洗并导出 ZIP (0/2)' });
+  const emptyExportButton = page.getByRole('button', { name: '检查出片进度 (0/2)' });
   await emptyExportButton.click();
   const dialog = page.getByRole('dialog', { name: '这一卷还没有全部冲洗完成' });
   await expect(dialog).toContainText('当前 0/2 张已有成片，另有 2 张待冲洗。');
@@ -889,7 +941,7 @@ test('incomplete ZIP export requires an explicit partial export or finishes the 
   await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(2, { timeout: 30_000 });
 
   await curationCheckbox(page, '入选', thirdName).check();
-  const exportButton = page.getByRole('button', { name: '完成冲洗并导出 ZIP (2/3)' });
+  const exportButton = page.getByRole('button', { name: '检查出片进度 (2/3)' });
   await exportButton.click();
 
   await expect(dialog).toContainText('当前 2/3 张已有成片，另有 1 张待冲洗。');
@@ -924,12 +976,13 @@ test('delete all photos requires confirmation and resets only the current roll',
     };
   });
 
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector,'KODAK PORTRA 160');
   await uploadCurationFixtures(page, 2);
-  await page.getByRole('tab', { name: /连底长条 · 2 张入选/ }).click();
+  await page.getByRole('tab', { name: /胶片长条 2 张入选/ }).click();
 
   const trigger = page.getByRole('button', { name: '删除全部照片' });
+  await expect(page.getByRole('tab', { name: /胶片长条/ })).toHaveAttribute('aria-selected', 'true');
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: '删除全部照片？' });
   await expect(dialog).toContainText('将从当前工作区移除 2 张照片及其生成结果。');
@@ -938,7 +991,7 @@ test('delete all photos requires confirmation and resets only the current roll',
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
-  await expect(page.getByText('入选 2 / 2', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^2\/2 张入选/ })).toBeVisible();
 
   await trigger.click();
   await dialog.getByRole('button', { name: '取消' }).click();
@@ -951,13 +1004,13 @@ test('delete all photos requires confirmation and resets only the current roll',
   await expect(trigger).toBeHidden();
   await expect(page.locator('#workspace-add-photos')).toBeFocused();
   await expect(inspector.getByRole('button', { name: '胶片型号', exact: true })).toContainText('KODAK PORTRA 160');
-  await expect(page.getByRole('tab', { name: /连底长条/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: /胶片长条/ })).toHaveCount(0);
   expect(await page.evaluate(() => (
     (window as Window & { __revokedObjectUrls?: string[] }).__revokedObjectUrls ?? []
   ))).toHaveLength(2);
 
   await uploadCurationFixtures(page, 2);
-  await expect(page.getByText('入选 2 / 2', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^2\/2 张入选/ })).toBeVisible();
 });
 
 test('delete all rejects a pre-reset upload after delayed decoding and revokes its late URL', async ({ page }) => {
@@ -1033,7 +1086,7 @@ test('delete all rejects a pre-reset upload after delayed decoding and revokes i
     window as UploadLifecycleWindow
   ).__revokedUploadUrls ?? [])).toContain(lateUrl);
   await expect(page.getByRole('img', { name: lateName })).toHaveCount(0);
-  await expect(page.getByRole('list', { name: /接触印象/ })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: /照片列表/ })).toHaveCount(0);
   await expect(page.locator('.ff-notice-toast')).toHaveCount(0);
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   expect(await page.evaluate(() => (
@@ -1055,12 +1108,12 @@ test('batch processing skips excluded cards without renumbering or discarding cu
   const thirdCard = photoCard(page, thirdName);
 
   await curationCheckbox(page, '取消入选', secondName).uncheck();
-  await expect(thirdCard.getByText('FRAME 03 / 03', { exact: true })).toBeVisible();
+  await expect(thirdCard.getByText('第 03 张', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '冲洗待更新照片 (2)' }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(2, { timeout: 30_000 });
   await expect(excludedCard.getByText('待冲洗', { exact: true })).toBeVisible();
-  await expect(thirdCard.getByText('FRAME 03 / 03', { exact: true })).toBeVisible();
+  await expect(thirdCard.getByText('第 03 张', { exact: true })).toBeVisible();
   await expect(curationCheckbox(page, '入选', secondName)).not.toBeChecked();
 
   await curationCheckbox(page, '取消入选', firstName).uncheck();
@@ -1108,7 +1161,7 @@ test('processing locks batch order and rejects dropped files until the snapshot 
   await page.locator('#workspace').dispatchEvent('drop', { dataTransfer });
   await page.waitForTimeout(250);
 
-  await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^3\/3 张入选/ })).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(3);
   await page.getByRole('button', { name: '停止后续' }).click();
   await expect.poll(() => page.evaluate(() => (
@@ -1127,8 +1180,8 @@ test('changing the included subset marks a generated film strip stale', async ({
   await uploadCurationFixtures(page, 2);
 
   const [, secondName] = curationNames;
-  await page.getByRole('tab', { name: /连底长条 · 2 张入选/ }).click();
-  const stripStage = page.getByLabel('长条审片台');
+  await page.getByRole('tab', { name: /胶片长条 2 张入选/ }).click();
+  const stripStage = page.getByLabel('长条预览');
 
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
   await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 30_000 });
@@ -1146,11 +1199,11 @@ test('mobile batch curation remains operable without horizontal overflow', async
 
   const [firstName] = curationNames;
   const firstCheckbox = curationCheckbox(page, '取消入选', firstName);
-  await expect(page.getByText('入选 3 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^3\/3 张入选/ })).toBeVisible();
   await expect(firstCheckbox.locator('xpath=..')).toHaveCSS('min-height', '44px');
 
   await firstCheckbox.uncheck();
-  await expect(page.getByText('入选 2 / 3', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('workspace-summary').filter({ hasText: /^2\/3 张入选/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     await page.evaluate(() => window.innerWidth),
   );

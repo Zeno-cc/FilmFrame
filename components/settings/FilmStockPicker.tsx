@@ -223,7 +223,7 @@ export function FilmStockPicker({ id, value, onChange, disabled = false }: FilmS
         className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel-soft)] px-3 text-left text-sm text-[var(--ff-paper)] transition-colors hover:border-[var(--ff-line-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ff-focus)] disabled:cursor-not-allowed disabled:opacity-45"
       >
         <span className="sr-only" id={`${triggerId}-value`}>{value}</span>
-        <span className="min-w-0 truncate" aria-hidden="true">{value}</span>
+        <span className="min-w-0 leading-4" aria-hidden="true">{value}</span>
         <span className="flex shrink-0 items-center gap-2 text-[var(--ff-paper-dim)]">
           {supported && <SpectralMark compact />}
           <ChevronDownIcon size={15} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
@@ -271,7 +271,7 @@ export function FilmStockPicker({ id, value, onChange, disabled = false }: FilmS
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className={`inline-flex w-3 shrink-0 justify-center text-[var(--ff-amber)] ${selected ? '' : 'invisible'}`} aria-hidden="true"><CheckIcon size={13} /></span>
-                  <span className="truncate">{stock}</span>
+                  <span className="min-w-0 whitespace-normal leading-4">{stock}</span>
                 </span>
                 {stockSupported && <SpectralMark />}
               </button>

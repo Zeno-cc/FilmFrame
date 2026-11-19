@@ -36,8 +36,8 @@ export function MobileActionBar({
       <button
         type="button"
         onClick={event => onOpenSettings(event.currentTarget)}
-        aria-label={settingsOpen ? '收起暗房配方' : '打开暗房配方'}
-        title={settingsOpen ? '收起暗房配方' : '打开暗房配方'}
+        aria-label={settingsOpen ? '收起调整' : '打开调整'}
+        title={settingsOpen ? '收起调整' : '打开调整'}
         aria-expanded={settingsOpen}
         aria-controls="mobile-settings-sheet"
         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[4px] border border-[var(--ff-line)] bg-[var(--ff-panel)] text-[var(--ff-paper-muted)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)]"

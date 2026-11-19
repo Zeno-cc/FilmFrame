@@ -48,10 +48,10 @@ export function FilmSequenceRail({
     <section className={`ff-film-sequence-rail border-y border-[var(--ff-line-soft)] py-4 ${className}`} aria-labelledby="film-sequence-title">
       <div className="mb-3 flex items-center justify-between gap-3 px-4 sm:px-5">
         <div>
-          <h2 id="film-sequence-title" className="text-sm font-medium text-[var(--ff-paper)]">叙事顺序</h2>
+          <h2 id="film-sequence-title" className="text-sm font-medium text-[var(--ff-paper)]">出片顺序</h2>
           <p className="mt-0.5 text-[11px] text-[var(--ff-paper-dim)]">长条会按下列顺序从左到右拼合</p>
         </div>
-        <span className="font-mono text-[10px] text-[var(--ff-paper-dim)]">{items.length} FRAMES</span>
+        <span className="font-mono text-[10px] text-[var(--ff-paper-dim)]">{items.length} 张</span>
       </div>
 
       <ol className="flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:px-5" aria-label="胶片长条照片顺序">
@@ -72,7 +72,7 @@ export function FilmSequenceRail({
             {view.dropTarget ? <span className="absolute -left-2 top-0 h-full w-0.5 bg-[var(--ff-amber)]" aria-hidden="true" /> : null}
             <button
               type="button"
-              className="relative block aspect-[4/3] w-full overflow-hidden rounded-[3px] bg-[var(--ff-bg-deep)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-default"
+              className="relative block aspect-[3/2] w-full overflow-hidden rounded-[3px] bg-[var(--ff-bg-deep)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ff-focus)] disabled:cursor-default"
               onClick={() => onSelect?.(view.item.id)}
               disabled={!onSelect}
               aria-label={`选择第 ${view.sequenceNumber} 张，${view.item.file.name}`}

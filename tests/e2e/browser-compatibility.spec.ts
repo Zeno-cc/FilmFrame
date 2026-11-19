@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, selectRecipeControl } from './recipeControls';
+import { isDocumentedPublicGalleryRequest } from './publicRequests';
 
 const firstFixture = path.resolve(
   process.cwd(),
@@ -28,6 +30,7 @@ test('local photo workflow remains compatible across browser engines', async ({ 
   const unexpectedMutations: string[] = [];
   const applicationRequests: string[] = [];
   page.on('request', request => {
+    if (isDocumentedPublicGalleryRequest(request)) return;
     const url = new URL(request.url());
     applicationRequests.push(`${request.method()} ${url.pathname}`);
     if (['http:', 'https:'].includes(url.protocol) && url.origin !== applicationOrigin) {
@@ -53,16 +56,13 @@ test('local photo workflow remains compatible across browser engines', async ({ 
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('成像方式').selectOption('legacy');
-  await selectFilmStock(inspector,'KODAK PORTRA 160');
-  await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-
   await uploadFixtures(page, [firstFixture]);
+  const inspector = getRecipeInspector(page);
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await selectRecipeControl(page, '成像方式', 'legacy');
+  await selectFilmStock(inspector,'KODAK PORTRA 160');
+  await expect(inspector.getByRole('group', { name: '画幅样式' })).toHaveCount(0);
+  await expect(inspector.getByLabel('片边方式')).toBeVisible();
   await expect(page.getByRole('img', { name: firstName })).toBeVisible();
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(1, {
@@ -107,8 +107,8 @@ test('local photo workflow remains compatible across browser engines', async ({ 
   );
   await preview.getByRole('button', { name: '关闭预览' }).click();
 
-  await page.getByRole('tab', { name: /连底长条 · 2 张入选/ }).click();
-  const stripStage = page.getByLabel('长条审片台');
+  await page.getByRole('tab', { name: /胶片长条 2 张入选/ }).click();
+  const stripStage = page.getByLabel('长条预览');
   await stripStage.getByRole('button', { name: '生成胶片长条' }).click();
   await expect(stripStage.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({
     timeout: 30_000,

@@ -1,5 +1,6 @@
-import { FILM_PRESETS, type FilmSettings, type OutputMode } from '../../types';
+import { type FilmSettings, type OutputMode } from '../../types';
 import { supportsReal135Template } from '../../services/filmOverlay';
+import { EDGE_MODE_LABELS, FRAME_MODE_LABELS } from '../../services/renderModePresentation';
 
 export interface RecipeSummaryCardProps {
   settings: FilmSettings;
@@ -9,11 +10,6 @@ export interface RecipeSummaryCardProps {
   className?: string;
 }
 
-function outputLabel(settings: FilmSettings): string {
-  if (settings.outputFormat === 'image/png') return 'PNG';
-  return `JPG ${Math.round(settings.outputQuality * 100)}`;
-}
-
 export function RecipeSummaryCard({
   settings,
   outputMode = 'single',
@@ -21,50 +17,35 @@ export function RecipeSummaryCard({
   pendingCount,
   className = '',
 }: RecipeSummaryCardProps) {
-  const supportsReal135 = supportsReal135Template(settings.brandText);
-  const real135 = supportsReal135 && (settings.frameRenderMode ?? 'real135') === 'real135';
-  const mode = real135 ? 'REAL 135' : 'CLASSIC REBATE';
-  const aspect = outputMode === 'strip'
-    ? 'STRIP'
-    : real135
-      ? (settings.scanOutputAspect ?? '4:3').toUpperCase()
-      : 'NATIVE';
-  const processing = (settings.processingMode ?? 'preview') === 'high' ? 'HIGH' : 'FAST';
-  const brandColor = FILM_PRESETS[settings.brandText]?.brandColor ?? 'var(--ff-amber)';
+  const real135 = supportsReal135Template(settings.brandText) && (settings.frameRenderMode ?? 'real135') === 'real135';
+  const color = real135 && settings.imagingMode === 'spectral' ? '光谱模拟' : '经典色彩';
+  const edge = real135
+    ? (settings.edgeRenderMode === 'physical135' ? EDGE_MODE_LABELS.physical135 : EDGE_MODE_LABELS['legacy-template'])
+    : FRAME_MODE_LABELS.classic;
+  const output = settings.outputFormat === 'image/png' ? 'PNG' : 'JPG';
 
   return (
-    <div className={`ff-recipe-summary relative overflow-hidden rounded-[6px] border border-[var(--ff-line)] bg-[var(--ff-panel-raised)] p-4 ${className}`}>
-      <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: brandColor }} aria-hidden="true" />
-      <div className="flex items-start justify-between gap-3 pl-1">
+    <section className={`ff-recipe-summary border-b border-[var(--ff-line-soft)] pb-5 ${className}`} aria-label="当前配方">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold text-[var(--ff-paper-dim)]" aria-hidden="true">CURRENT RECIPE</div>
-          <div className="mt-1 truncate text-sm font-semibold text-[var(--ff-paper)]">
+          <h3 className="text-xs font-medium text-[var(--ff-paper-muted)]">当前配方</h3>
+          <p className="mt-1 truncate text-sm font-medium text-[var(--ff-paper)]">
             {recipeName || settings.brandText}
-          </div>
-          {recipeName && (
-            <div className="mt-0.5 truncate text-xs text-[var(--ff-paper-dim)]">{settings.brandText}</div>
-          )}
+          </p>
+          {recipeName && recipeName !== settings.brandText ? (
+            <p className="mt-0.5 truncate font-mono text-xs text-[var(--ff-paper-dim)]">{settings.brandText}</p>
+          ) : null}
         </div>
         {typeof pendingCount === 'number' && pendingCount > 0 && (
-          <span className="shrink-0 rounded-[4px] border border-[var(--ff-warning)] px-2 py-1 text-[11px] text-[var(--ff-warning)]">
-            {pendingCount} 张待冲洗
-          </span>
+          <span className="shrink-0 text-xs text-[var(--ff-warning)]">{pendingCount} 张待冲洗</span>
         )}
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 pl-1 font-mono text-[11px] text-[var(--ff-paper-muted)]">
-        <span>{mode}</span>
-        <span aria-hidden="true">·</span>
-        <span>{aspect}</span>
-        <span aria-hidden="true">·</span>
-        <span>{outputLabel(settings)}</span>
-        {real135 && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span>{processing}</span>
-          </>
-        )}
-      </div>
-    </div>
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
+        <dt className="text-[var(--ff-paper-dim)]">色彩</dt><dd className="text-[var(--ff-paper-muted)]">{color}</dd>
+        <dt className="text-[var(--ff-paper-dim)]">片边</dt><dd className="text-[var(--ff-paper-muted)]">{edge}</dd>
+        <dt className="text-[var(--ff-paper-dim)]">出片</dt><dd className="text-[var(--ff-paper-muted)]">{outputMode === 'strip' ? '胶片长条' : '单张'} / {output}</dd>
+      </dl>
+    </section>
   );
 }
 

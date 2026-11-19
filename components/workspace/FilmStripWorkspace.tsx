@@ -57,17 +57,17 @@ export function FilmStripWorkspace({
   onDragEnd,
   className = '',
 }: FilmStripWorkspaceProps) {
-  const defaultGenerateLabel = stage.kind === 'empty' ? '生成连底长条' : '重新生成';
+  const defaultGenerateLabel = stage.kind === 'empty' ? '生成胶片长条' : '重新生成';
   const busy = stage.kind === 'processing';
   const hasIncludedItems = includedCount > 0;
 
   return (
     <div className={`flex flex-col gap-5 ${className}`}>
-      <section className="overflow-hidden rounded-[6px] border border-[var(--ff-line-soft)] bg-[var(--ff-panel)]" aria-labelledby="film-strip-stage-title">
+      <section aria-labelledby="film-strip-stage-title">
         <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-[var(--ff-line-soft)] px-4 py-2 sm:px-5">
           <div>
-            <h2 id="film-strip-stage-title" className="text-sm font-medium text-[var(--ff-paper)]">长条审片台</h2>
-            <p className="mt-0.5 font-mono text-[10px] text-[var(--ff-paper-dim)]">ORDERED FILM OUTPUT</p>
+            <h2 id="film-strip-stage-title" className="text-sm font-medium text-[var(--ff-paper)]">长条预览</h2>
+            <p className="mt-0.5 text-xs text-[var(--ff-paper-dim)]">按当前出片顺序拼合</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {stage.kind === 'current' && onPreview ? (
@@ -103,7 +103,7 @@ export function FilmStripWorkspace({
                 <ApertureIcon size={30} />
               </span>
               <p className="text-sm">{stage.message ?? '长条盘中拼合...'}</p>
-              <p className="font-mono text-[10px] tracking-[0.14em] text-[var(--ff-paper-dim)]">CONTACT STRIP</p>
+              <p className="text-xs text-[var(--ff-paper-dim)]">正在本机拼合这一卷</p>
             </div>
           ) : stage.kind === 'current' ? (
             <img
@@ -129,7 +129,7 @@ export function FilmStripWorkspace({
             <div className="max-w-sm text-center text-[var(--ff-paper-muted)]">
               <FilmIcon className="mx-auto text-[var(--ff-paper-dim)]" size={38} />
               <p className="mt-4 text-sm">{stage.message ?? `将按当前顺序拼合 ${sequenceItems.length} 张照片`}</p>
-              <p className="mt-1 text-xs text-[var(--ff-paper-dim)]">生成前仍可在下方调整叙事顺序</p>
+              <p className="mt-1 text-xs text-[var(--ff-paper-dim)]">生成前仍可在下方调整出片顺序</p>
             </div>
           )}
         </div>

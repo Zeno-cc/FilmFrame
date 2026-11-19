@@ -139,9 +139,9 @@ export function PhotoCard({
     >
       {dropTarget ? <span className="absolute inset-y-0 left-0 z-10 w-0.5 bg-[var(--ff-amber)]" aria-hidden="true" /> : null}
 
-      <div className="flex min-h-11 items-center justify-between gap-3 border-b border-[var(--ff-line-soft)] bg-[rgba(0,0,0,0.18)] px-3">
+      <div className="ff-photo-card__heading flex min-h-11 items-center justify-between gap-3 border-b border-[var(--ff-line-soft)] bg-[rgba(0,0,0,0.18)] px-3">
         <span className="ff-photo-card__frame-tag">
-          FRAME {padded(frameNumber)} / {padded(total)}
+          第 {padded(frameNumber)} 张
         </span>
         <div className="flex shrink-0 items-center gap-2">
           <label
@@ -171,7 +171,7 @@ export function PhotoCard({
         </div>
       </div>
 
-      <div className="ff-photo-card__mat relative aspect-[4/3] w-full overflow-hidden" data-develop={developPhase}>
+      <div className="ff-photo-card__mat relative aspect-[3/2] w-full overflow-hidden" data-develop={developPhase}>
         <img
           src={item.previewUrl}
           alt=""
@@ -234,7 +234,7 @@ export function PhotoCard({
         onRemove={() => onRemove(item.id)}
       />
 
-      <div className="flex min-h-[68px] items-center justify-between gap-3 px-3 py-2">
+      <div className="ff-photo-card__footer flex min-h-[68px] items-center justify-between gap-3 px-3 py-2">
         <div className="min-w-0">
           <p className="truncate font-mono text-xs text-[var(--ff-paper)]" title={item.file.name}>{item.file.name}</p>
           <p className="mt-1 truncate text-[11px] text-[var(--ff-paper-dim)]">

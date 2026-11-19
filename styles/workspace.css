@@ -1,0 +1,178 @@
+.ff-contact-sheet[data-layout="focus"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ff-contact-sheet[data-layout="focus"] > li {
+  min-width: 0;
+}
+
+.ff-contact-sheet[data-layout="focus"] .ff-photo-card {
+  margin-inline: auto;
+  max-width: min(1080px, calc((100dvh - 350px) * 1.5));
+}
+
+.ff-contact-sheet[data-layout="focus"] .ff-photo-card__heading {
+  min-height: 44px;
+}
+
+.ff-contact-sheet[data-layout="focus"] .ff-photo-card__actions {
+  min-height: 44px;
+}
+
+.ff-contact-sheet[data-layout="focus"] .ff-photo-card__footer {
+  min-height: 52px;
+}
+
+.ff-contact-sheet[data-layout="focus"] .ff-photo-card__mat {
+  min-height: 260px;
+}
+
+.ff-workspace-toolbar__description {
+  max-width: 62ch;
+}
+
+.ff-session-meter__dial {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.ff-session-meter__dial > span {
+  color: var(--ff-paper-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ff-session-meter__dial > span + span::before {
+  color: var(--ff-line-strong);
+  content: "/";
+  margin-right: 16px;
+}
+
+.ff-session-meter__chip--live {
+  color: var(--ff-paper) !important;
+}
+
+.ff-session-meter__compact {
+  display: none;
+}
+
+.ff-app-header__brand-mark {
+  font-family: var(--ff-font-ui);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ff-button--primary,
+.ff-icon-button--primary,
+.ff-header-control--primary {
+  background: var(--ff-amber);
+  border-color: var(--ff-amber);
+  box-shadow: none;
+  color: var(--ff-ink);
+  text-shadow: none;
+}
+
+.ff-button--primary:hover:not(:disabled),
+.ff-icon-button--primary:hover:not(:disabled),
+.ff-header-control--primary:hover:not(:disabled) {
+  background: var(--ff-amber-hover);
+  border-color: var(--ff-amber-hover);
+}
+
+.ff-button--secondary,
+.ff-header-control {
+  background: var(--ff-panel);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.ff-output-tabs {
+  border-bottom: 1px solid var(--ff-line);
+  gap: 24px;
+}
+
+.ff-output-tabs > button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ff-paper-muted);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: -1px;
+  min-height: 46px;
+  padding: 0 4px;
+  transition: border-color var(--ff-motion-fast), color var(--ff-motion-fast);
+}
+
+.ff-output-tabs > button[aria-selected="true"] {
+  border-bottom-color: var(--ff-amber);
+  color: var(--ff-paper);
+}
+
+.ff-output-tabs > button:hover:not(:disabled) {
+  color: var(--ff-paper);
+}
+
+.ff-output-tabs__meta {
+  color: var(--ff-paper-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.ff-output-tabs > button[aria-selected="true"] .ff-output-tabs__meta {
+  color: var(--ff-amber);
+}
+
+.ff-advanced-settings {
+  border-top: 1px solid var(--ff-line-soft);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.ff-advanced-settings .ff-disclosure__trigger {
+  color: var(--ff-paper-muted);
+  font-size: 12px;
+  min-height: 44px;
+  padding-inline: 0;
+}
+
+.ff-advanced-settings[data-open="true"] > .ff-disclosure__trigger {
+  color: var(--ff-amber);
+}
+
+.ff-advanced-settings .ff-disclosure__content {
+  padding-bottom: 4px;
+}
+
+.ff-advanced-settings fieldset {
+  min-width: 0;
+}
+
+@media (min-width: 1180px) {
+  .ff-recipe-inspector {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .ff-contact-sheet[data-layout="focus"] .ff-photo-card__mat {
+    max-height: none;
+    min-height: 0;
+  }
+
+  .ff-output-tabs {
+    gap: 12px;
+  }
+
+  .ff-output-tabs__meta {
+    font-size: 11px;
+  }
+}

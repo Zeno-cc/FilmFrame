@@ -56,14 +56,14 @@ export function Disclosure({
         </span>
         <ChevronDownIcon className="ff-disclosure__chevron" size={18} />
       </button>
-      <div
-        id={contentId}
-        className={joinClassNames('ff-disclosure__content', contentClassName)}
-        hidden={!isOpen}
-        aria-hidden={!isOpen}
-      >
-        {children}
-      </div>
+      {isOpen ? (
+        <div
+          id={contentId}
+          className={joinClassNames('ff-disclosure__content', contentClassName)}
+        >
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -19,6 +19,7 @@ export interface MobileSettingsSheetProps {
 
 const tabs: Array<{ id: MobileSettingsTab; label: string }> = [
   { id: 'film', label: '胶片' },
+  { id: 'edge', label: '片边' },
   { id: 'output', label: '输出' },
   { id: 'recipes', label: '配方' },
 ];
@@ -30,7 +31,7 @@ export function MobileSettingsSheet({
   inspectorProps,
   children,
   moreMenuProps,
-  title = '暗房配方',
+  title = '调整',
   className = '',
 }: MobileSettingsSheetProps) {
   const [activeTab, setActiveTab] = useState<MobileSettingsTab>(initialTab);
@@ -128,7 +129,7 @@ export function MobileSettingsSheet({
               ref={closeRef}
               type="button"
               onClick={onClose}
-              aria-label="关闭暗房配方"
+              aria-label="关闭调整"
               title="关闭"
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[4px] text-[var(--ff-paper-muted)] hover:bg-[var(--ff-panel-soft)] hover:text-[var(--ff-paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--ff-focus)]"
             >
@@ -137,7 +138,7 @@ export function MobileSettingsSheet({
           </div>
         </div>
 
-        <div role="tablist" aria-label="配方设置分类" className="grid shrink-0 grid-cols-3 gap-1 border-b border-[var(--ff-line-soft)] bg-[var(--ff-bg)] p-1.5">
+        <div role="tablist" aria-label="调整设置分类" className="grid shrink-0 grid-cols-4 gap-1 border-b border-[var(--ff-line-soft)] bg-[var(--ff-bg)] p-1.5">
           {tabs.map(tab => {
             const selected = activeTab === tab.id;
             return (

@@ -4,6 +4,7 @@ import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, Outpu
 import {
   cancelFilmRendering,
   disposeFilmWorkerClient,
+  WorkerTimeoutError,
   processImage,
   generateFilmStrip,
 } from './services/filmWorkerClient';
@@ -12,7 +13,12 @@ import {
   evaluateExportReadiness,
   type ExportReadyEntry,
 } from './services/exportReadiness';
-import { loadPreferences, mergeSettings, savePreferences } from './services/settingsStorage';
+import {
+  loadPreferences,
+  mergeSettings,
+  normalizeSpectralRenderMode,
+  savePreferences,
+} from './services/settingsStorage';
 import { buildPreviewDownload } from './services/previewDownload';
 import { prepareUploadedImages } from './services/uploadFiles';
 import {
@@ -213,7 +219,11 @@ const App: React.FC = () => {
   const [showDonate, setShowDonate] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(() => initialPreferences.migratedClassicEdge
+    ? { tone: 'info', message: '经典片边已停用，已切换为模板片边。' }
+    : initialPreferences.migratedUnsupportedEdge
+      ? { tone: 'info', message: '该型号没有物理片边，已切换为模板片边。' }
+      : null);
   const [processingMessage, setProcessingMessage] = useState('');
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
@@ -292,7 +302,7 @@ const App: React.FC = () => {
       if (result.status === 'fallback') {
         setNotice(current => current ?? {
           tone: 'warning',
-          message: '运行配置暂时无法读取，当前按 700 MiB 的 Canvas 安全上限继续使用。刷新页面可重试。',
+          message: '运行配置暂时无法读取，当前按 6144 MiB 的 Canvas 安全上限继续使用。刷新页面可重试。',
         });
       }
 
@@ -744,9 +754,18 @@ const App: React.FC = () => {
     } catch (e) {
       if (!mountedRef.current || generation !== renderGenerationRef.current) return 'cancelled';
       console.error(e);
-      setErrorMsg(e instanceof Error && e.message.includes('single frames only')
-        ? '光谱负片目前仅支持真实 135 单张出片；胶片长条请使用经典色彩。'
-        : '处理过程中发生错误，可能是图片文件损坏或内存不足。');
+      setErrorMsg(e instanceof WorkerTimeoutError
+        ? '本次胶片长条渲染超时，已停止后台任务，未生成新的长条。原照片和已有成片均已保留；可重试，或先选择 WebGL2 GPU 后再生成。'
+        : e instanceof Error && e.message.includes('Spectral template strip')
+          ? '光谱负片用模板片边生成胶片长条需要光谱胶片与 135 模板路径；当前设置不可用，请改用物理片边，或改选经典色彩后重试。'
+          : '处理过程中发生错误，可能是图片文件损坏或内存不足。');
+      if (e instanceof WorkerTimeoutError && batchMode === 'strip') {
+        setStripResult(previous => {
+          if (previous) revokeObjectUrl(previous.url);
+          stripResultRef.current = null;
+          return null;
+        });
+      }
       return 'failed';
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
@@ -1084,13 +1103,21 @@ const App: React.FC = () => {
   const applyRecipe = (recipeId: string) => {
     const recipe = recipes.find(item => item.id === recipeId);
     if (!recipe) return;
+    const migration = normalizeSpectralRenderMode({ ...settings, ...recipe.settings });
     setSelectedRecipeId(recipeId);
-    setSettings(current => mergeSettings(current, {
+    setSettings(current => normalizeSpectralRenderMode(mergeSettings(current, {
       frameNumberColor: undefined,
       real135SprocketColor: undefined,
       ...recipe.settings,
-    }, 0));
-    setNotice({ tone: 'info', message: `已应用配方“${recipe.name}”，现有成片需要重新冲洗。` });
+    }, 0)).settings);
+    setNotice({
+      tone: 'info',
+      message: migration.migratedClassic
+        ? `已应用配方“${recipe.name}”。经典片边已停用，已切换为模板片边，现有成片需要重新冲洗。`
+        : migration.migratedUnsupportedEdge
+          ? `已应用配方“${recipe.name}”。该型号没有物理片边，已切换为模板片边，现有成片需要重新冲洗。`
+          : `已应用配方“${recipe.name}”，现有成片需要重新冲洗。`,
+    });
   };
 
   const removeRecipe = (recipeId: string) => {
@@ -1343,7 +1370,7 @@ const App: React.FC = () => {
       ? '下载长条大图'
       : singleExportReadiness.status === 'complete'
         ? `打包下载 ZIP (${singleExportReadiness.readyCount})`
-        : `完成冲洗并导出 ZIP (${singleExportReadiness.readyCount}/${singleExportReadiness.totalCount})`;
+        : `检查出片进度 (${singleExportReadiness.readyCount}/${singleExportReadiness.totalCount})`;
   const primaryActionState = exporting
     ? 'exporting'
     : processing
@@ -1435,17 +1462,6 @@ const App: React.FC = () => {
     processing,
     exporting,
     selectedRecipeName,
-    physicalFrameSeed: (images.find(item => item.id === selectedImageId) ?? images[0])?.physicalFrameSeed,
-    onPhysicalFrameSeedChange: seed => {
-      const id = selectedImageId ?? images[0]?.id;
-      if (!id) {
-        setSettings(current => ({ ...current, physicalFrameSeed: seed }));
-        return;
-      }
-      const nextImages = imagesRef.current.map(item => item.id === id ? { ...item, physicalFrameSeed: seed } : item);
-      imagesRef.current = nextImages;
-      setImages(nextImages);
-    },
   };
   const mobilePrimaryAction = {
     ...primaryAction,
@@ -1473,8 +1489,8 @@ const App: React.FC = () => {
         ? { kind: 'stale', artifact: stripResult, message: '选片、顺序或配方已变化，请重新生成。' }
         : { kind: 'empty', message: includedCount === 0 ? '请先选择至少一张照片' : `按当前顺序合成 ${includedCount} 张入选照片` };
   const workspaceSummary = images.length === 0
-    ? 'NEW ROLL · LOCAL ONLY'
-    : `入选 ${includedCount} / ${images.length} · ${includedProcessedCount} 已出片 · ${includedPendingCount} 待冲洗`;
+    ? '新的一卷 · 仅本地处理'
+    : `${includedCount}/${images.length} 张入选 · ${includedProcessedCount} 张已出片`;
   const stripStatusLabel = currentStripResult ? '已生成' : stripResult ? '需重生成' : `${includedCount} 张入选`;
   const previewAfterSource = previewImageItem
     ? editorPreviewUrl ?? previewImageArtifact?.url ?? previewImageItem.previewUrl
@@ -1505,13 +1521,11 @@ const App: React.FC = () => {
             imageCount={images.length}
             processedCount={includedProcessedCount}
             outputMode={outputMode}
-            hasDownloadableResult={hasExportAction}
+            hasPhotos={images.length > 0}
             processing={processing}
             exporting={exporting}
             busyLabel={processing ? processingMessage : exporting ? exportMessage : undefined}
             settingsOpen={settingsOpen}
-            onAddPhotos={() => fileInputRef.current?.click()}
-            onExport={() => void downloadAll()}
             onOpenSettings={toggleMobileSettings}
             onReset={resetToDefaults}
             onOpenSupport={() => setShowDonate(true)}
@@ -1522,7 +1536,7 @@ const App: React.FC = () => {
         )}
         workspace={(
           <Workspace
-            toolbar={(
+            toolbar={images.length > 0 ? (
               <WorkspaceToolbar
                 outputMode={outputMode}
                 imageCount={images.length}
@@ -1542,7 +1556,7 @@ const App: React.FC = () => {
                 onClearSelection={() => setAllImageSelections(false)}
                 onDeleteAll={openDeleteAllPhotos}
               />
-            )}
+            ) : null}
             isDragActive={isDraggingUpload}
             onDragEnter={handleUploadDragEnter}
             onDragOver={handleUploadDragOver}
@@ -1551,7 +1565,7 @@ const App: React.FC = () => {
           >
             {images.length === 0 ? (
               <EmptyDarkroom
-                className="-mx-3 sm:-mx-5 lg:-mx-8"
+                className="ff-workspace__empty"
                 uploadDisabled={processing || exporting}
                 onChoosePhotos={() => fileInputRef.current?.click()}
               />
@@ -1619,10 +1633,11 @@ const App: React.FC = () => {
         inspector={(
           <RecipeInspector
             {...inspectorProps}
+            empty={images.length === 0}
             className="hidden min-[1180px]:sticky min-[1180px]:top-16 min-[1180px]:flex min-[1180px]:h-[calc(100dvh-4rem)]"
           />
         )}
-        mobileActionBar={(
+        mobileActionBar={images.length > 0 ? (
           <MobileActionBar
             primaryAction={mobilePrimaryAction}
             onPrimaryAction={runPrimaryAction}
@@ -1632,7 +1647,7 @@ const App: React.FC = () => {
             exporting={exporting}
             hidden={settingsOpen}
           />
-        )}
+        ) : null}
         overlays={(
           <>
             <MobileSettingsSheet
