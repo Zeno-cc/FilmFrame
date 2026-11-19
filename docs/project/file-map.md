@@ -51,7 +51,8 @@
 | `renderResult.ts` / `imageBatch.ts` / `workflowState.ts` | 结果签名、generation gate、批次和 UI 状态推导 |
 | `heicConversion.ts` / `uploadFiles.ts` | CSP-compatible 本地 HEIC/HEIF→JPEG、输入/render File 分工、尺寸解码、大图提示和 EXIF 编排 |
 | `settingsStorage.ts` / `recipeStorage.ts` | 白名单本地偏好和配方 |
-| `runtimeConfig.ts` | Strict same-origin runtime-config decoding, 700 MiB fallback, and MiB-to-budget conversion |
+| `renderModePresentation.ts` | 135 画幅/经典边框与模板/物理片边的用户可见文案 |
+| `runtimeConfig.ts` | Strict same-origin runtime-config decoding, 6144 MiB fallback, and MiB-to-budget conversion |
 | `renderAdmission.ts` / `renderBudget.ts` / `batchAdmission.ts` | App-local estimates and feedback, single-Canvas limits, and independent source/work-set/strip admission |
 | `zip.ts` | ZIP input boundary, independent from the configured Canvas budget |
 | `previewDownload.ts` / `shareArtifact.ts` | 下载和 Web Share 文件边界 |
@@ -77,11 +78,11 @@
 | `src/passkeyStore.ts` | WebAuthn challenge、凭证和恢复会话存储 |
 | `src/routes/adminRoutes.ts` | 管理页、列表、创建和撤销 API |
 | `src/runtimeConfig.ts` | Persisted singleton Canvas budget validation and exact MiB/byte conversion |
-| `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–4,096 MiB Canvas budget |
+| `src/views/adminSettingsView.ts` | Administrator runtime-policy UI for the 128–6,144 MiB Canvas budget |
 | `src/views/html.ts` | 无第三方脚本的服务端邀请页和管理页；一次性明文可清除 |
 | `src/cli.ts` | SSH 应急 create/list/revoke/backup |
 | `migrations/001_initial.sql` | invites、sessions 和索引的初始 schema |
-| `migrations/005_render_budget.sql` | Additive singleton render-budget table seeded to 700 MiB |
+| `migrations/005_render_budget.sql` | Additive singleton render-budget table seeded to 700 MiB (later migrations raise the ceiling and default) |
 | `migrations/006_passkeys.sql` | Passkey credentials and one-time WebAuthn challenges |
 | `tests/all.test.ts` | 单进程聚合测试入口，避免原生 SQLite 多进程退出问题 |
 | `Dockerfile` | Node 22 多阶段构建；build stage 编译 `better-sqlite3`，非 root runtime |

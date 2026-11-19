@@ -21,9 +21,10 @@ Run browser groups serially. Use `npm run test:e2e:preview` for production asset
 - Add focused Vitest coverage for pure services, state transitions, normalization, budgets, and routing policy.
 - Add or update Playwright coverage for user-facing workflows, responsive behavior, dialogs/focus, and browser rendering integration.
 - Verify image/Canvas changes in a real browser. Use structural assertions and screenshots where randomized grain makes exact pixel snapshots unsuitable.
-- Preserve local-only privacy: no image upload, telemetry, or external processing path.
+- Preserve local-only user-photo privacy: no user-photo upload, telemetry, or external processing path. Public demo-gallery downloads are a separate, attribution-preserving resource path with no user/session payload; they must never enter the renderer or exporter.
 - Check resource ownership for every new Object URL, timer, Worker request, or event listener.
-- Check desktop, tablet, and 390px mobile behavior for layout changes.
+- Before reading an image whose accessible name is the filename, wait for the accepted-artifact indicator (`已出片`) or the up-to-date action. The source preview uses that same name and already has a Blob URL; its existence and decoded dimensions do not prove that development has completed.
+- Check 1440px and 1180px desktop, 768px tablet, and 390px mobile behavior for workspace layout changes. Verify the primary action and privacy copy, not only horizontal overflow.
 - Keep `processImage(fileOrSource, settings, dateOverride, previewUrlFallback,
   transform, renderBudgetLimits)` argument roles consistent across App, Worker
   client and direct engine calls. Never pass a preview URL in the transform
@@ -42,6 +43,13 @@ Run browser groups serially. Use `npm run test:e2e:preview` for production asset
   and return hashes/difference statistics instead of serializing every channel
   through Playwright. If navigation is needed between two renders, use a
   test-owned temporary cache and delete it in a test teardown.
+  Performance scripts are not acceptance tests. Every rendered measurement must
+  bind one strip request ID to its successful Worker response, actual backend,
+  zero main-thread fallbacks and an output hash. A WebGL2 measurement also
+  requires float color-buffer support and a successful FLOAT readback in the
+  Worker. Requested settings or a renderer string on the main page are not
+  evidence. Preserve the raw JSON record with its artifact; missing evidence,
+  a fallback, timeout or rejected budget is not a valid CPU/GPU comparison.
 
 ### Scenario: Local Static HEIC/HEIF Import
 
@@ -350,6 +358,7 @@ Apply this contract whenever real-135 template registration, Worker routing, Wor
 function shouldUseWorkerForSettings(settings: FilmSettings): boolean;
 function cancelFilmRendering(): void;
 class WorkerCancelledError extends Error {}
+class WorkerTimeoutError extends Error {}
 ```
 
 #### 3. Contracts
@@ -359,7 +368,8 @@ class WorkerCancelledError extends Error {}
 - Overlay and sprocket-mask `ImageBitmap` promises are cached by URL inside the Worker. Failed loads remove their cache entry so a later request can retry.
 - Classic rendering and unsupported browsers stay on the main thread. Ordinary Worker failures fall back once to the main-thread engine.
 - User cancellation rejects pending work with `WorkerCancelledError`, terminates the Worker, clears the singleton, and never falls back to main-thread rendering.
-- The App increments its generation before cancellation. Completed artifacts remain owned; cancelled or late results cannot update state or create an Object URL. A later request lazily creates a new Worker.
+- A strip timeout rejects with `WorkerTimeoutError`, terminates the Worker, clears the singleton, and never repeats the strip on the main thread. A retry must use a fresh Worker rather than receive the cached timeout error. Single-image timeout routing remains unchanged unless explicitly redesigned.
+- The App increments its generation before cancellation. Completed single-frame artifacts remain owned; cancelled or late results cannot update state or create an Object URL. A terminal strip timeout revokes the invalidated strip URL and removes its download state. A later request lazily creates a new Worker.
 
 #### 4. Validation & Error Matrix
 
@@ -379,7 +389,7 @@ class WorkerCancelledError extends Error {}
 #### 6. Tests Required
 
 - Unit tests enumerate all 16 registry keys through `shouldUseWorkerForSettings` and cover classic/template-disabled rejection.
-- Worker lifecycle tests cover pending rejection, timer cleanup, late-response suppression, message errors, timeout, and cancellation type guards.
+- Worker lifecycle tests cover pending rejection, timer cleanup, late-response suppression, message errors, timeout, cancellation type guards, and successful retry through a newly constructed Worker. Install fake timers before dynamically importing the client: its default dependencies capture the global timer functions at module evaluation.
 - Playwright instruments `Worker.terminate()`, proves stop is quiet, then reruns the same batch successfully.
 - Real-browser coverage renders every registered stock in single and strip modes; representative flattened output also samples aperture/sprocket pixels.
 
@@ -429,6 +439,7 @@ Apply this contract to ambient looping motion that decorates a workflow surface 
 - The animation must unmount with its owning surface and add no global listener or cleanup path.
 - When the decoration represents horizontal 135 film, model the `36x24 mm` exposure as an exact `3:2` window independently from the wider eight-perforation transport pitch and from the full strip height.
 - Model a visual 135 strip as one contiguous acetate body: both perforation rails must directly abut the exposure row, and inter-frame rebates must reveal that same base rather than the surrounding page background.
+- A one-shot entrance may reveal the current frame by clipping a wrapper from zero to its full width. Keep the image and its moving caption at the frame's intrinsic 3:2 geometry; do not scale or stretch them with the clip. This is separate from the ambient transport, which still moves one track by `transform` only. Reduced motion disables both animations and shows the complete frame immediately.
 
 #### 4. Validation & Error Matrix
 
@@ -462,6 +473,31 @@ Apply this contract to ambient looping motion that decorates a workflow surface 
 /* Correct: one phase-aligned compositor track. */
 .film-track { animation: ff-film-loop 36s linear infinite; }
 @keyframes ff-film-loop { to { transform: translate3d(-360px, 0, 0); } }
+```
+
+### Scenario: Public Demo Gallery Refresh
+
+Apply this contract only to the empty-state public photography illustration, never to uploaded user photographs or render inputs.
+
+- Download candidates and metadata from the Wikimedia Commons official HTTPS API with `credentials: 'omit'` and `referrerPolicy: 'no-referrer'`. Do not send filenames, user settings, recipes, transforms, session values or telemetry. Do not scrape or hotlink Magnum/Hasselblad sites.
+- Accept only an explicit allowlist of `CC BY 4.0`, `CC BY-SA 4.0`, `CC0` and public-domain metadata, with a valid author and source page. If the API omits `LicenseUrl` for a public-domain record, map only the accepted license name to the fixed official Commons licensing URL; never accept an arbitrary fallback URL. Production queries the 24 reviewed Lange/Parks/Evans page IDs directly; a category name or a free license alone does not approve an image for this surface. Download only official Wikimedia image hosts with JPEG/PNG content and a bounded file size. A public URL alone is not a reuse licence.
+- Store gallery assets as `ArrayBuffer` bytes plus MIME in the dedicated `filmframe-darkroom-gallery` IndexedDB database, and rebuild Blobs only when displaying. WebKit may reject Blob persistence in IndexedDB. This is not user-photo persistence; do not place gallery data in `FilmSettings`, preferences, recipes, Worker requests or export inputs.
+- A replacement batch is publishable only after every candidate passes licensing, content, decode and persistence checks. Preserve the previous batch on any failure. Namespace asset IDs by batch. After a durable save, bound storage to the current batch in a follow-up transaction; never call `clear()` or delete bundled images/user data. A failed cleanup must surface instead of being silently swallowed. Cache-unavailable states keep the bundled batch instead of downloading images that cannot be persisted.
+- Show twelve real 3:2 documentary frames in one continuous strip, moving left at a constant 24px/s rather than stepping on a timer. Do not replace this with a single-photo fade or duplicate the same photo into adjacent empty frames. The current frame's author/source/license follows the leftmost frame that is at least half visible; duplicate end frames exist only for visual continuity.
+- Rotate only while the empty state is visible. Pause native animation at its current position on hover, focus-within, drag activity and hidden documents; `prefers-reduced-motion` stops the strip and holds the first frame. Unmount cancels requests and animations and revokes owned Object URLs. Unsubscribing one mounted view must not cancel another view's shared request; the last subscriber owns cancellation of the underlying request.
+- Measure one cycle as the distance from the first real frame to its duplicate, then use a linear infinite Web Animation. Never hard-code an 8- or 4-frame width. After the duplicate arrives, the next iteration must show the same visible frame sequence at the same screen positions, with no blank gap and no reverse jump. Keep the attribution index synchronized with the visible frame, not with a timer.
+- Show the 12 bundled public-domain photographs immediately and keep them as the permanent offline fallback. No loading modal, progress indicator or remote-image placeholder may block photo import.
+- Test licensing/host/MIME rejection, body/decode timeout, portable byte storage, current-pool cache validation, expired replacement, failed preservation, request cleanup and keyboard/mobile/reduced-motion behavior. Verify one actual Wikimedia API/image round trip before calling the integration network-ready. Run the gallery spec in WebKit as well as Chromium because Blob/IndexedDB support differs.
+
+```ts
+const previous = await galleryCache.latest();
+try {
+  const next = await downloadCompleteLicensedBatch();
+  await galleryCache.persist(next);
+  await galleryCache.deleteBatch(previous.id);
+} catch {
+  // The previous licensed batch or bundled illustration remains visible.
+}
 ```
 
 ### 场景：审核快照驱动的外部语料
@@ -692,7 +728,7 @@ The same-origin response has exactly these fields:
 
 ### 3. Contracts
 
-- Accept only whole-MiB values from 128 through 4,096. Four RGBA bytes per
+- Accept only whole-MiB values from 128 through 6,144. Four RGBA bytes per
   pixel convert the value to `RenderBudgetLimits`; the compiled default is 700
   MiB.
 - Fetch `/api/runtime-config` with same-origin credentials, `no-store`, and a
@@ -701,10 +737,10 @@ The same-origin response has exactly these fields:
 - Read runtime configuration before sending the startup session refresh. The
   refresh atomically rotates the opaque Cookie, so concurrent requests can
   leave the configuration request carrying the newly invalidated old token
-  and incorrectly activate the 700 MiB fallback.
+  and incorrectly activate the 6144 MiB fallback.
 - While the configuration is loading, block expensive single-image, retry,
   preview, and strip rendering. Failure is recoverable but remains bounded by
-  the 700 MiB fallback and must be visible to the user.
+  the 6144 MiB fallback and must be visible to the user.
 - Treat the loaded value as a page-lifetime snapshot. An administrator change
   applies only to a newly opened or refreshed page.
 - Pass one validated `RenderBudgetLimits` object through App admission,
@@ -720,7 +756,7 @@ The same-origin response has exactly these fields:
 
 - `128..4096` whole MiB with matching bytes/timestamp -> ready and bounded.
 - HTTP failure, timeout, malformed JSON, schema drift, or inconsistent bytes ->
-  fallback to 700 MiB and show recoverable status.
+  fallback to 6144 MiB and show recoverable status.
 - Render command during loading -> no renderer call; show wait guidance.
 - Invalid dimensions, edge overflow, or configured pixel overflow -> reject
   before creating Canvas or Worker work.
@@ -731,13 +767,13 @@ The same-origin response has exactly these fields:
 
 - Good: a 128 MiB configuration blocks a 20-frame high-quality real-135 strip
   before any Canvas allocation or Worker creation.
-- Base: a valid 700 MiB response preserves the established default behavior.
+- Base: a valid 6144 MiB response preserves the established default behavior.
 - Bad: App preflight uses 128 MiB but the Worker or main-thread fallback omits
   the limits and allocates using a larger compiled default.
 
 ### 6. Tests Required
 
-- Unit tests cover 128, 700, and 4,096 MiB; immediately outside each boundary;
+- Unit tests cover 128, 700, and 6,144 MiB; immediately outside each boundary;
   exact byte conversion; strict response fields; timeout; fallback; and every
   Canvas sizing helper without allocating a giant Canvas.
 - Worker-client and fallback tests assert the same limits are forwarded for

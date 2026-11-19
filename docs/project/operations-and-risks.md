@@ -32,7 +32,7 @@ Cloudflare IP、橙云状态或 `Cf-Access-Jwt-Assertion` 请求头的存在都�
 
 ### 图片隐私边界不能被门禁侵蚀
 
-access sidecar 不得新增图片、EXIF、构图、渲染结果或 Object URL 接口。普通图片工作流仍应只产生同源素材请求。生产验收必须用 Network 记录证明照片没有上传，而不是只依据代码说明。
+access sidecar 不得新增图片、EXIF、构图、渲染结果或 Object URL 接口。普通图片工作流仍应只产生同源素材请求；唯一允许的第三方请求是空暗房的 Wikimedia Commons 匿名轮换（固定主机、`credentials: omit`、`no-referrer`、无用户数据）。生产验收必须用 Network 记录证明照片没有上传，且该轮换请求不带 Cookie 或来源页，而不是只依据代码说明。
 
 ### 门禁的安全上限
 
@@ -144,9 +144,9 @@ npm run check:access
 
 门禁与渲染是独立层。先确认应用资源已授权加载，再按原有顺序检查 MIME/尺寸解码、同源胶片素材、Worker 能力、主线程 fallback、Canvas 预算、stale 结果和 Object URL 回收。不要通过上传用户照片到 sidecar 来规避浏览器兼容问题。
 
-The administrator setting controls only the estimated RGBA bytes of one Canvas. It does not change upload bytes, decoded-source thresholds, aggregate processing working-set thresholds, ZIP limits, or the 32,767 px edge ceiling. Values from 128 through 4,096 MiB are accepted, with 700 MiB as the bounded fallback. Raising the value is not proof that a browser can allocate that Canvas.
+The administrator setting controls only the estimated RGBA bytes of one Canvas. It does not change upload bytes, decoded-source thresholds, aggregate processing working-set thresholds, ZIP limits, or the 32,767 px edge ceiling. Values from 128 through 6,144 MiB are accepted, with 6144 MiB as the bounded fallback. Raising the value is not proof that a browser can allocate that Canvas.
 
-If `/api/runtime-config` is unavailable or malformed, confirm the invited session and exact OpenResty route first. The frontend must report a recoverable fallback state and continue with 700 MiB; it must never become unbounded. A saved value applies to newly opened or refreshed tabs only.
+If `/api/runtime-config` is unavailable or malformed, confirm the invited session and exact OpenResty route first. The frontend must report a recoverable fallback state and continue with 6144 MiB; it must never become unbounded. A saved value applies to newly opened or refreshed tabs only.
 
 ## 回滚原则
 
@@ -180,4 +180,4 @@ npm run verify:deployment -- --live
 openresty -t
 ```
 
-再补充外网 HTTPS、直连源站、Cloudflare cache、Google + WebAuthn、管理员撤销、站点数据清理、access 停机 fail-closed、数据库恢复和其他 vhost 回归结果。For v1.3, redacted physical iPhone Safari and Android Chrome records are also mandatory before tag creation; desktop emulation is not a substitute. 缺少这些外部证据时，只能说仓库实现完成，不能说生产门禁完成。
+再补充外网 HTTPS、直连源站、Cloudflare cache、Google + WebAuthn、管理员撤销、站点数据清理、access 停机 fail-closed、数据库恢复和其他 vhost 回归结果。For v1.3, redacted physical iPhone Safari and Android Chrome records are also mandatory before tag creation; desktop emulation is not a substitute. 长条性能与 CPU/WebGL2 光谱预算的证据同样必须来自具备硬件 GPU 的设备：软件渲染器上单帧物理光谱约 12-65 秒，五帧长条会超过 Worker 的 120 秒请求预算，因此 `physical five-frame strips` 用例在没有硬件 WebGL2 时显式跳过，不能当作通过证据。缺少这些外部证据时，只能说仓库实现完成，不能说生产门禁完成。

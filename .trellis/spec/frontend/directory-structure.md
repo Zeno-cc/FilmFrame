@@ -25,6 +25,8 @@ styles/
   tokens.css             # semantic design tokens
   base.css               # document-level rules
   components.css         # application component classes
+  empty-darkroom.css      # empty-state composition, film transport and quote context
+  workspace.css           # task toolbar, settings grouping and session status
 tests/                   # Vitest unit tests
 tests/e2e/               # Playwright browser journeys
 public/film-overlays/    # runtime film template assets

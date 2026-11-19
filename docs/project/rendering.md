@@ -6,7 +6,7 @@
 
 当前默认使用 Gold 200 光谱成像与物理 135。`services/spectral/stockRegistry.ts` 选择型号及其资源，`services/physical135/capability.ts` 决定物理光谱能力，`services/physical135/` 负责几何、材质和连续长条。光谱模块与资源按需加载，支持 CPU 与 WebGL2；`auto` 可以选择 CPU，显式 WebGL2 的失败必须报错。
 
-物理片门与贴图片窗尺寸不同，不能复用贴图几何作为物理裁切标准。物理长条连续展开，不使用下文贴图路径的四帧换行。光谱配合贴图片边时只支持单张；CineStill、反转片和黑白片不具备已验收的物理光谱齿孔路径。
+物理片门与贴图片窗尺寸不同，不能复用贴图几何作为物理裁切标准。物理长条连续展开，不使用下文贴图路径的四帧换行。贴图长条同样支持光谱：每帧在片窗区域显影后再叠加颗粒与片边；模板长条在一次任务内共享一个长条级光谱会话，只加载一次 stock pipeline 并只创建一个后端，`finally` 释放。仅在胶片无光谱资源、非 135 渲染模式或 `useFilmOverlayTemplate === false` 时才报错，不静默退回经典色彩。CineStill、反转片和黑白片不具备已验收的物理光谱齿孔路径。
 
 旧偏好与旧配方保留原渲染选择。精确的资源身份、色彩空间、行跨度、连续材质、资源释放和 Worker/主线程验证契约见 [光谱渲染规范](../../.trellis/spec/frontend/spectral-rendering.md)。下文的 Gold 字节色彩变换、随机片基和模板尺寸适用于经典色彩及历史贴图路径，不能用于解释光谱成像。
 
@@ -24,7 +24,7 @@ strip
   real135 -> Gold continuous strip or complete flattened-template frames
 ```
 
-classic 当前固定主线程，避免其两套实现的已知差异影响用户。16 款已注册真实 135 在能力满足时都进入 Worker：Gold 200 使用分层专用路径，其余 15 款使用共享模板几何的扁平 overlay 路径；Worker 不可用或执行失败时由 client 回退完整主线程引擎。
+classic 当前固定主线程，避免其两套实现的已知差异影响用户。16 款已注册 135 画幅模板在能力满足时都进入 Worker：Gold 200 使用分层专用路径，其余 15 款使用共享模板几何的扁平 overlay 路径；Worker 不可用或执行失败时由 client 回退完整主线程引擎。
 
 ## 135 物理模型
 
@@ -44,7 +44,7 @@ classic 当前固定主线程，避免其两套实现的已知差异影响用户
 
 ## 模板几何契约
 
-已注册的 16 款真实 135 模板都必须维持 1307 x 1203。片窗坐标：
+已注册的 16 款 135 画幅模板都必须维持 1307 x 1203。片窗坐标：
 
 ```text
 x = 92
@@ -79,9 +79,9 @@ h = 800
 | `cinestill-800t.png` | 1307x1203 RGB | CineStill 800T 单图与长条扁平模板 |
 | `ilford-hp5-plus.png` | 1307x1203 RGB | Ilford HP5 Plus 单图与长条扁平模板 |
 
-`aperture-mask.png`、`aperture-shadow.png`、`*-clean`、`*-cutout` 看起来是素材处理过程文件，当前源码未引用。删除前仍需确认资产来源和人工工作流。
+`aperture-mask.png`、`aperture-shadow.png`、`aperture-shadow-clean.png`、`aperture-shadow-cutout.png` 是未被生产渲染引用的素材处理过程文件，现归档于 `docs/asset-sources/`，不随网页发布。保留来源摘要及原有权利审核，不把归档视为清权或删除历史证据。`aperture-shadow-derived.png` 与活跃分层素材仍保留在原路径。
 
-## 真实 135 单张主线程路径
+## 135 画幅单张主线程路径
 
 `processImage()` 在 `frameRenderMode=real135` 时先查询 `REAL135_TEMPLATE_URLS`。Gold 200 进入分层模板路径：
 
@@ -90,7 +90,7 @@ h = 800
 3. 根据 processing mode 选择片窗宽度。
 4. 创建模板比例画布和独立 emulsion canvas。
 5. 将照片 center-cover 到片窗；竖图先旋转。
-6. 对 Gold 200 应用 `applyGold200Look()`。
+6. 光谱模式在片窗区域执行光谱显影；经典色彩对 Gold 200 应用 `applyGold200Look()`。
 7. 在照片区域叠加颗粒。
 8. 把 grayscale mask 的 RGB 亮度转换为 alpha。
 9. 用 `destination-in` 把 emulsion 裁进片窗。
@@ -113,7 +113,7 @@ Worker 若缺资产或任一步报错，不在 Worker 内执行 legacy 模板 fa
 
 普通 cover 由共享 `RenderTransform` 控制。每张图片默认 `{focusX:0.5, focusY:0.5, zoom:1, quarterTurns:0}`，因此与旧居中 cover 等价。`focusX/focusY` 是 `[0,1]` 连续位置，`zoom` 是 `[1,3]` 的 cover 基准倍率，旋转只接受四分之一圈；旧 transform 缺少 zoom 时自动补 1。
 
-`createCoverPlacement()` 先应用用户旋转，再依据旋转后尺寸判断是否需要真实 135 自动旋入；随后把连续位置映射到自动旋入后的坐标，计算 `minimum cover scale * zoom`、overflow 和有界偏移。主线程与 Worker 使用同一 placement，拖动和缩放不会暴露空白。
+`createCoverPlacement()` 先应用用户旋转，再依据旋转后尺寸判断是否需要 135 画幅自动旋入；随后把连续位置映射到自动旋入后的坐标，计算 `minimum cover scale * zoom`、overflow 和有界偏移。主线程与 Worker 使用同一 placement，拖动和缩放不会暴露空白。
 
 竖图进入横向片窗的条件：
 
@@ -133,6 +133,8 @@ sourceHeight > sourceWidth && frameWidth > frameHeight
 
 ## 分辨率策略
 
+单帧物理光谱渲染在 CPU 后端上实测约 12-65 秒（preview 级片窗），因此多帧物理光谱长条只在具备硬件 WebGL2 后端的设备上可用：五帧长条会超过 Worker 的 120 秒请求预算（`services/filmWorkerClient.ts` 的 `DEFAULT_WORKER_TIMEOUT_MS`），超时后不发布半条，只报告失败。`auto` 后端在软件渲染器上回退 CPU，此时长条应改用模板片边或减少帧数。
+
 | 模式 | 片窗宽度 |
 | --- | --- |
 | 真实单张 preview | 1200 |
@@ -140,7 +142,7 @@ sourceHeight > sourceWidth && frameWidth > frameHeight
 | 真实长条 preview | 每帧 900 |
 | 真实长条 high | 每帧 1400 |
 
-高质量模式会把小于 1800 宽的源图放大。所有单张和长条画布创建前统一检查 32767 最大边长和管理员配置的单 Canvas RGBA 预算；预算范围为 `128–4096 MiB`，默认 `700 MiB`（183,500,800 像素）。超限时必须在分配画布前失败。
+高质量模式会把小于 1800 宽的源图放大。所有单张和长条画布创建前统一检查 32767 最大边长和管理员配置的单 Canvas RGBA 预算；预算范围为 `128–6144 MiB`，默认 `6144 MiB`。超限时必须在分配画布前失败。
 
 The Canvas budget is one admission guardrail, not an upload limit or a browser capability guarantee. The following measurements remain independent:
 
@@ -149,10 +151,10 @@ The Canvas budget is one admission guardrail, not an upload limit or a browser c
 | Upload bytes | Warning at 25 MiB; unchanged by the administrator setting |
 | Decoded source | `width * height * 4` estimated RGBA bytes |
 | Batch working set | Decoded source estimate times the processing multiplier, plus strip output |
-| Single Canvas | 32,767 px edge and configured 128–4,096 MiB RGBA ceiling |
+| Single Canvas | 32,767 px edge and configured 128–6,144 MiB RGBA ceiling |
 | ZIP input | Warning at 192 MiB and block above 256 MiB |
 
-At startup, `runtimeConfig.ts` reads the same-origin, invitation-session-protected `/api/runtime-config` response and converts whole MiB to exact `RenderBudgetLimits`. Invalid or unavailable configuration is recoverable and remains bounded by the compiled 700 MiB default. A saved administrator change applies only after the application is opened again or refreshed.
+At startup, `runtimeConfig.ts` reads the same-origin, invitation-session-protected `/api/runtime-config` response and converts whole MiB to exact `RenderBudgetLimits`. Invalid or unavailable configuration is recoverable and remains bounded by the compiled 6144 MiB default. A saved administrator change applies only after the application is opened again or refreshed.
 
 `canvasRuntime.ts` owns main-thread DOM Canvas mechanics: image loading, Canvas-to-Blob/Object URL export, output rotation/orientation restoration, and the coupled luminance-to-alpha mask conversion. `filmEngine.ts` retains film policy, drawing order, templates, texture, markings, and the stable public rendering facade. The Worker keeps its separate `OffscreenCanvas` implementation.
 
@@ -191,7 +193,7 @@ At startup, `runtimeConfig.ts` reads the same-origin, invitation-session-protect
 
 Worker 文件仍保留对应实现，但 client 不再把 classic 路由给 Worker；重新启用前必须先完成标记、尺寸和旋转契约对齐。
 
-## 真实 135 长条
+## 135 画幅长条
 
 Gold 200 使用 `createKodakGoldStripLayout(target, count, 4)`：
 

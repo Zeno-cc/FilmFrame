@@ -109,7 +109,7 @@ FileList / DataTransfer.files
   -> 单图、胶片长条或 ZIP 下载
 ```
 
-UI 通过 `filmWorkerClient` 门面选择 Worker 或主线程。classic 当前固定主线程；已注册的真实 135 模板可进入 Worker。Worker 请求使用递增 ID 与 pending Map 配对，支持 120 秒超时、错误回退、取消和晚到结果丢弃。
+UI 通过 `filmWorkerClient` 门面选择 Worker 或主线程。classic 当前固定主线程；已注册的 135 画幅模板可进入 Worker。Worker 请求使用递增 ID 与 pending Map 配对，支持 120 秒超时、错误回退、取消和晚到结果丢弃。
 
 单张处理使用图片、设置与 generation 快照，结果按图片 ID 合并。设置、构图或顺序变化后，旧结果变为 stale，不能再下载。长条签名还包含入选顺序与每张照片的 transform。
 
@@ -127,7 +127,7 @@ UI 通过 `filmWorkerClient` 门面选择 Worker 或主线程。classic 当前�
 
 设置偏好使用 `filmFrame.preferences.v1`，本地配方使用 `filmFrame.recipes.v1`。两者只保存白名单设置，不保存图片、EXIF、Blob、Object URL、邀请码、会话 token 或构图中的临时草稿。
 
-应用没有图片上传、云同步或遥测接口。access sidecar 也没有接收图片的路由，只处理邀请码、会话和管理员断言。HEIC/HEIF 转换模块在首次候选导入时从同源静态包延迟加载，照片 Blob、EXIF、JPEG 中间结果与成片始终留在当前页面会话。正常运行时的网络请求限于同源 HTML、JS/转换代码、Worker、胶片模板、齿孔蒙版与本地发布的摄影名言快照；只有用户主动点击出处链接时才访问 Wikiquote。
+应用没有图片上传、云同步或遥测接口。access sidecar 也没有接收图片的路由，只处理邀请码、会话和管理员断言。HEIC/HEIF 转换模块在首次候选导入时从同源静态包延迟加载，照片 Blob、EXIF、JPEG 中间结果与成片始终留在当前页面会话。正常运行时的网络请求只有两类：同源 HTML、JS/转换代码、Worker、胶片模板、齿孔蒙版与本地发布的摄影名言快照；以及空暗房可见时对 `commons.wikimedia.org` 公共接口与被选中缩略图的匿名请求（`credentials: omit`、`no-referrer`、无 Cookie，失败回退本地照片）。用户照片不参与第二类请求。只有用户主动点击出处链接时才访问 Wikiquote。
 
 ## 缓存与部署边界
 

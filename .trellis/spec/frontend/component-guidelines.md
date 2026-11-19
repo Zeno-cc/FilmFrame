@@ -41,10 +41,33 @@ export function RecipeSummaryCard({ settings, outputMode, imageCount, pendingCou
 
 ### Darkroom atmosphere and materials
 
-- Global grain / vignette / safelight wash live on body pseudo-elements and atmosphere tokens; prefer tuning tokens over page-local overlays.
-- Prefer shared surface utilities (.ff-surface*) or existing panel/button classes; avoid one-off floating SaaS card shadows.
-- Atmosphere is decorative: pointer-events none, keep photo content readable, weaker/static grain under prefers-reduced-motion.
-- Empty-darkroom film geometry and data-testid hooks are E2E contracts; do not break dimensions without updating tests.
+- Use the semantic surface tokens from `styles/tokens.css`; do not add global grain, vignette, or safelight pseudo-elements over the workspace. Photo content and controls stay unobscured.
+- Prefer shared surface utilities (.ff-surface*) or existing panel/button classes; avoid one-off floating SaaS card shadows or nested decorative cards.
+- Empty-darkroom film geometry and data-testid hooks are E2E contracts; do not break dimensions without updating tests. `styles/empty-darkroom.css` owns the current empty-state composition; verify computed geometry because legacy selectors in `components.css` load earlier.
+- With no photos, expose one `#workspace-add-photos` control in the empty darkroom. Do not repeat the same primary action in the header, mobile action bar, or output toolbar. Settings show only the lightweight film-stock summary until photos exist.
+- The task-facing surface is “照片工作台” with “单张” / “胶片长条” output choices. Keep “调整” for controls and “我的配方” for saved presets; do not expose internal renderer modes as top-level navigation.
+- Group settings as film, edge, output, and recipes. Advanced groups use `Disclosure`: a closed group does not mount its children, so hidden controls cannot intercept label queries or keyboard navigation. The settings themselves remain owned by `App.tsx`; folding a group must not reset `FilmSettings`.
+
+### Render-mode settings
+
+- Import user-facing mode names from `services/renderModePresentation.ts`. Do not hardcode “真实 135”, “经典片边”, “贴图”, or “物理底片” in settings components, summaries, errors, or tests.
+- Use `supportsSpectralStock(brandText)` to scope the classic option, not the current `imagingMode`. Spectral-capable stocks show only `片边方式`; non-spectral stocks also show `画幅样式` (`135 画幅` / `经典边框`).
+- Keep `片边方式` at the normal edge level and expose physical parameters through `高级渲染设置`. It is a two-option native select, not another segmented control.
+- The helper appears once: `模板整幅套用，物理按片门与齿孔生成`. Do not add cards, comparison tables, or explanatory sections.
+- “模板片边” covers both real overlay PNGs and procedural compatibility edges. Do not rename it to “AI 贴图” or imply an official/measured scan.
+
+```tsx
+<label>
+  <span>片边方式</span>
+  <select aria-label="片边方式" value={settings.edgeRenderMode} onChange={onEdgeModeChange}>
+    <option value="legacy-template">模板片边</option>
+    <option value="physical135">物理片边</option>
+  </select>
+</label>
+<Disclosure title="高级渲染设置">{physicalControls}</Disclosure>
+```
+
+Browser tests open the named disclosure before operating an advanced field. Do not force all groups open or bypass the disclosure with direct DOM mutation.
 - PhotoCard develop phases use `data-develop` (`idle` | `bath` | `reveal` | `print`): wet-tray atmosphere while processing/queued; reveal only when the real print URL arrives (result-driven, not a fake spinner timer).
 - Keep develop overlays decorative (`pointer-events: none`); dual-layer images stay inside `.ff-photo-card__mat` and must not alter export/render pipelines.
 

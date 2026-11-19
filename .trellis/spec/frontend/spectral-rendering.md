@@ -178,14 +178,47 @@ plain `node` does not resolve the source modules' extensionless imports.
   source alpha and never quantize intermediate densities into Canvas bytes.
   Temporary spatial textures and frame-owned exposure textures must release on
   success, allocation failure and disposal; never read and write the same texture
-  in a fragment pass. Main-thread overlay rasterization must be redrawn after
-  resizing its intermediate canvas, exactly once, to match Worker overlay pixels.
+  in a fragment pass. Both main-thread and Worker flattened-template paths
+  first draw the source overlay into a same-size 2D Canvas before scaling it
+  into the output. Do not scale an `ImageBitmap` directly in only one route:
+  that can introduce small rasterization differences. Main-thread overlay
+  rasterization must be redrawn after resizing its intermediate canvas,
+  exactly once, to match Worker overlay pixels.
 - `auto` may select the equivalent CPU spectral pipeline on unsupported or
   known-inaccurate software renderers. Explicit `webgl2` failure, context loss
   and disposal must be visible, not silently converted to legacy output.
 - Imaging mode and backend participate in settings/result identity. Release
   textures, framebuffers, programs, VAOs, listeners and owned GL contexts at
   their owning boundary; Blob URL ownership remains unchanged.
+- A physical strip may share one task-scoped spectral resource pipeline,
+  perforation CMY and backend. Initialize it once per strip and dispose it in
+  `finally`; each frame still owns independent pixels and GPU frame resources.
+  A single frame without a supplied session owns its backend through its whole
+  preparation/render `try/finally`, including a Canvas-context failure before
+  `backend.render()`. Never share rendered frames across tasks or retain an
+  undisposed backend.
+- A template-edge strip develops spectral per frame after cover/rotation and
+  before grain/rebate/perforations/numbers, using the same aperture rectangle as
+  a single frame. The template strip shares one task-scoped aperture session
+  (`createSpectralApertureSession`): it loads the stock pipeline and creates the
+  backend once, reuses one `Float32Array`, and fixes the frame size for its
+  lifetime. `process()` must reject a mismatched frame size instead of reusing
+  the backend. `dispose()` runs in `finally` on success, failure, cancellation
+  and Worker fallback. `applySpectralToAperture` remains the single-frame wrapper
+  and owns (and disposes) its own one-shot session. A template strip fails only
+  when the stock has no spectral resource, the render mode is not 135, or
+  `useFilmOverlayTemplate === false`; it never silently degrades to legacy color.
+- A Kodak Gold 200 template strip in spectral mode uses the aperture session and
+  must not additionally call `applyGold200Look`; that Gold look stays exclusive
+  to legacy color. The Gold strip layout, row spacing, frame numbers and output
+  size are unchanged.
+- A strip Worker timeout is terminal: terminate the Worker, clear its client
+  singleton so a retry constructs a fresh Worker, and do not repeat the same
+  heavy strip on the main thread. Preserve valid prior single-frame artifacts;
+  revoke and remove the previous strip when this terminal attempt invalidates
+  the strip workflow. Never accept a partial strip or create an Object URL for
+  a late response. Ordinary quick business errors retain the existing
+  identical-settings retry.
 
 ### 4. Validation & Error Matrix
 
@@ -198,6 +231,19 @@ plain `node` does not resolve the source modules' extensionless imports.
   release owned resources and do not schedule a cancelled replacement.
 - Ordinary Worker failure -> one identical-settings main-thread retry;
   cancellation remains terminal and has no fallback.
+- Strip Worker timeout -> no main-thread retry, no late-result Object URL, and
+  a new Worker on the next request. Previous single-frame artifacts remain
+  valid; the invalidated strip is revoked rather than left downloadable.
+- Owned single-frame spectral session fails before rendering -> dispose its
+  backend exactly once, with no `render()` call.
+- Spectral template strip with a stock that has no spectral resource, a non-135
+  render mode, or `useFilmOverlayTemplate === false` -> reject with the specific
+  reason and a usable alternative; a standard template strip renders and never
+  reports a single-frame-only boundary.
+- A stock with no registered physical edge layout -> disable the physical-edge
+  option, normalize persisted or recipe-backed `physical135` to
+  `legacy-template`, and never render physical geometry without a stock imprint.
+  Do not treat a missing edge definition as a valid geometry-only output.
 
 ### 5. Good / Base / Bad Cases
 
@@ -218,6 +264,11 @@ plain `node` does not resolve the source modules' extensionless imports.
 - Exercise actual FilmFrame aperture rendering, not only the isolated harness;
   cover Worker/forced-main, CPU/auto, persistence/recipes, stale results,
   JPEG/PNG export and local-only requests.
+- Exercise a spectral template strip through the actual UI for Kodak Gold 200 and
+  a non-Gold spectral stock, in Worker and forced-main routes. Assert success
+  with no error dialog, unchanged strip geometry, one created spectral backend
+  per strip, and that the strip's first-frame aperture matches the single-frame
+  spectral aperture more closely than its legacy-look counterpart.
 - Assert setup/frame resource byte accounting returns to setup-only after frame
   release and zero after disposal. Report draw, readback and CPU times separately.
 - Record profile/source digests and modification notices. Technical tests do

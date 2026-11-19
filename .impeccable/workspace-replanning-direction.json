@@ -1,0 +1,103 @@
+{
+  "title": "FilmFrame 工作区重规划",
+  "question": "两种方向都采用「选片 → 调整 → 出片」，保留真实胶片能力和本地隐私。请选择首屏的视觉组织方式。",
+  "options": [
+    {
+      "id": "assigned",
+      "kind": "assigned",
+      "label": "胶片索引",
+      "kicker": "THE ROLL",
+      "lineage": "可触阅的胶片索引与摄影图谱",
+      "thesis": "以一枚精确画幅展开当前一卷，让照片与胶片型号先于渲染术语。",
+      "palette": ["#171d20", "#e8e7df", "#ed9b52", "#92afb4", "#f4f0e7"],
+      "materials": ["石墨蓝工作面", "石灰白胶片索引", "冷青状态标记", "氧化橙主操作"],
+      "viewport": "顶部仅保留品牌和必要工具；主区左侧为导入与三步路径，右侧是带照片与真实胶片边的大画幅；无照片时设置栏只展示胶片与配方入口。",
+      "case": "更强的索引秩序与照片主导，适合胶片型号、排序和长条扩展；不再是满屏空胶片框。",
+      "risk": "网格如果过重会重复当前的边框噪声，实施时必须减少内层容器。",
+      "raised": [
+        {"from": "crouwel-grid-specimen", "raise": "照片、胶片型号与画幅共享真实 3:2 比例网格，而不是另加装饰网格。"},
+        {"from": "rw-timetable-slide-rack", "raise": "颜色区分工作面、内容面与状态，不再全屏同一种灰棕。"},
+        {"from": "digital-design-canon-monochrome-product-marketing", "raise": "用真实胶片画幅与当前状态证明能力，不用虚构功能卡。"}
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html",
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "kind": "pick",
+      "label": "接触印样",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "摄影编辑的接触印样与选片台",
+      "thesis": "把首屏变成一张等待照片的接触印样，用更熟悉的编辑台承接选片和显影。",
+      "palette": ["#242522", "#f0eee5", "#d76447", "#a9b8a1", "#161714"],
+      "materials": ["温和炭黑", "暖白印样纸", "朱砂选片标记", "低饱和绿状态"],
+      "viewport": "顶部保留轻量品牌与当前一卷；左侧大标题和唯一导入按钮，右侧一张倾斜照片与胶片印样相接，流程收在底部细线中；设置栏保持轻量摘要。",
+      "case": "摄影爱好者最熟悉，最不容易学习失败；但仍是图片工具常见的编辑台路线。",
+      "risk": "熟悉度较高，若照片与排版不够大胆会退化为普通暗色工具首页。",
+      "html": ".impeccable/mocks/decision/model-pick.html",
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-crouwel-grid",
+      "kind": "challenger",
+      "catalogId": "crouwel-grid-specimen",
+      "label": "构成网格",
+      "kicker": "ALTERNATE",
+      "verdict": "competitive",
+      "lineage": "荷兰构成主义网格与字体样张",
+      "thesis": "用严格可见的比例网格连接照片、胶片与出片状态。",
+      "palette": ["#edece5", "#151e29", "#e0ae36", "#3f7194"],
+      "materials": ["石灰白网格", "深靛底片", "黄色选片", "青蓝状态"],
+      "viewport": "更明亮的工作区，主标题、导入、胶片型号和真实画幅由同一网格切分，设置面板更紧凑。",
+      "case": "在胶片画幅和排序上具有产品辨识度，但整体工具熟悉感略弱于接触印样。",
+      "risk": "可见构造线可能压过照片，必须让网格只出现在结构边界。",
+      "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/crouwel-grid-specimen.webp",
+      "html": ".impeccable/mocks/decision/challenger-crouwel-grid.html",
+      "comp": ".impeccable/mocks/decision/challenger-crouwel-grid.webp"
+    },
+    {
+      "id": "challenger-timetable",
+      "kind": "challenger",
+      "catalogId": "rw-timetable-slide-rack",
+      "label": "倾斜片格",
+      "kicker": "NOT RECOMMENDED",
+      "verdict": "declined",
+      "lineage": "玻璃片格与时刻表",
+      "palette": ["#d9aa42", "#46505a", "#f1e7cc", "#c65139"],
+      "materials": ["倾斜片格", "单色大字", "透光玻璃"],
+      "case": "倾斜结构与统一字号会伤害中文参数阅读，也不提高主流程清晰度。",
+      "kept": "颜色承担区域和状态分工。",
+      "risk": "视觉形式先于操作，容易成为胶片主题装饰。",
+      "hero": "https://impeccable.style/worlds/cards/rw-timetable-slide-rack-hero.webp"
+    },
+    {
+      "id": "challenger-split-flap",
+      "kind": "challenger",
+      "catalogId": "signals-instruments-split-flap-concourse",
+      "label": "机械翻牌",
+      "kicker": "NOT RECOMMENDED",
+      "verdict": "declined",
+      "lineage": "车站翻牌信息板",
+      "palette": ["#171717", "#e7e4d7", "#d8a84b"],
+      "materials": ["黑色翻牌", "机械字符", "琥珀状态灯"],
+      "case": "旅行符号与字符动画对摄影任务陌生，会降低而非增强识别。",
+      "kept": "冲洗状态在原位置就地更新。",
+      "risk": "把工作区做成不相关的仪器，增加无意义动态。",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse-hero.webp"
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code", "toggle": false},
+  "canon": true,
+  "canonCard": {
+    "kind": "canon",
+    "label": "标准图片工具",
+    "thesis": "采用熟悉的编辑器布局，以完整工艺实现，不添加新的摄影形式。",
+    "palette": ["#1b1d20", "#e7e8ea", "#d7a34c"],
+    "materials": ["紧凑工具栏", "中央画布", "右侧属性"],
+    "viewport": "品牌与步骤在顶部，左侧主操作和空画布，右侧参数摘要；所有操作符合常见图片工具预期。",
+    "risk": "清晰但与常见图片工具难以区分。"
+  },
+  "steer": true
+}

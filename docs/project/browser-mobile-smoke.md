@@ -42,7 +42,7 @@ Do not commit raw HAR files or screenshots. Summarize the observed request class
 
 ## Bounded Memory Stress Protocol
 
-Use non-sensitive fixtures that may be deleted after the run. Do not create a 700 MiB Canvas merely to prove the configured constant.
+Use non-sensitive fixtures that may be deleted after the run. Do not allocate a multi-gigabyte Canvas merely to prove the configured constant; the 6144 MiB default exists to remove the budget gate, and the 32,767 px edge limit is what actually binds normal work.
 
 | Case | Representative input | Expected result |
 | --- | --- | --- |

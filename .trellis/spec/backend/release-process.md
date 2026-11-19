@@ -43,6 +43,26 @@ only by a pushed `vMAJOR.MINOR.PATCH` tag.
   tags. The updater then discovers it through GitHub's `releases/latest` API.
 - Do not report a branch-only push as a published update; state clearly when a
   release is still waiting on the tag/workflow.
+- Before an upgrade and automatic rollback, verify the stored Canvas budget's
+  semantic compatibility with the actual target release, not only its schema
+  version. `FIRST_6_GIB_VERSION` in the updater is the fixed capability
+  boundary: the published `v1.4.12` tag still caps at 2048 MiB, so the next
+  minor candidate is `1.5.0`, which accepts up to 6144 MiB. Never derive this
+  boundary from the manifest currently being installed or rolled back;
+  changing it requires evidence from the tagged release source and its
+  configuration contract.
+- A legacy target with a 2048 MiB ceiling must reject a >2048 MiB configuration
+  before switching. Never clamp the administrator's setting or report a blocked
+  rollback as successful; preserve the current release and surface the
+  documented recovery path.
+- `recover_previous` is a root-only maintenance action, checked through the
+  peer UID at the Unix-server boundary rather than exposed through Access.
+  Before clearing a `recovery_required` job, require the actual current
+  symlink, previous version/revision, service health, loopback/origin/public
+  checks and stored budget to match the previous release. Only then transition
+  it to `rolled_back`; do not switch releases, alter configuration, or report
+  the failed target as successful. Any rejection retains the recovery lock and
+  original error code.
 
 ### 4. Validation & Error Matrix
 

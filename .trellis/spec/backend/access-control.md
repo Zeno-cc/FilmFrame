@@ -770,13 +770,13 @@ GET /api/runtime-config
 
 ### 3. Contracts
 
-- Migration `005` adds one singleton row seeded to 700 MiB and timestamp `0`; migration `007` expands its persisted upper bound to 4,096 MiB.
+- Migration `005` adds one singleton row seeded to 700 MiB and timestamp `0`; migration `007` expands its persisted upper bound to 4,096 MiB; migration `008` raises the ceiling and the untouched seed to 6,144 MiB while preserving any administrator-saved value.
   It is additive and remains backward-compatible with v1.2, which ignores the
   table.
 - Administrator reads and writes require the exact admin host and verified
   Cloudflare Access identity. Writes also require exact Origin, JSON, CSRF,
   existing rate limits, strict request fields, and a redacted audit event.
-- Accept only integer `maxCanvasMiB` values from 128 through 4,096 and derive
+- Accept only integer `maxCanvasMiB` values from 128 through 6,144 and derive
   `maxCanvasBytes` server-side. Never accept bytes, pixels, identity, or generic
   settings JSON from the request.
 - Public `GET /api/runtime-config` requires an active invited-device session,
@@ -804,7 +804,7 @@ GET /api/runtime-config
 
 - Good: an authenticated administrator saves 1,024 MiB, a refreshed invited
   application receives 1,073,741,824 bytes, and no identity data is exposed.
-- Base: migration seeds 700 MiB and an unchanged deployment keeps its prior
+- Base: migration seeds 6,144 MiB and an unchanged deployment keeps its prior
   rendering behavior.
 - Bad: a prefix `/api/` proxy exposes administrator routes or lets an anonymous
   browser read runtime policy without an invited session.

@@ -1,0 +1,404 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17",
+  "title": "Design System: FilmFrame",
+  "extensions": {
+    "colorMeta": {
+      "oxidized-orange": {
+        "role": "primary",
+        "displayName": "Oxidized Orange",
+        "canonical": "#ed9b52",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "oxidized-orange-hover": {
+        "role": "primary",
+        "displayName": "Oxidized Orange Hover",
+        "canonical": "#f4af6d",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "#f4af6d", "oklch(95% 0.0185 60.30)"]
+      },
+      "action-ink": {
+        "role": "neutral",
+        "displayName": "Action Ink",
+        "canonical": "#1c2426",
+        "tonalRamp": ["oklch(15% 0.0034 214.58)", "#1c2426", "oklch(35% 0.0094 214.58)", "oklch(45% 0.0111 214.58)", "oklch(55% 0.0120 214.58)", "oklch(65% 0.0113 214.58)", "oklch(75% 0.0093 214.58)", "oklch(85% 0.0060 214.58)", "oklch(95% 0.0017 214.58)"]
+      },
+      "oxidized-orange-soft": {
+        "role": "primary",
+        "displayName": "Oxidized Orange Soft",
+        "canonical": "rgba(237, 155, 82, 0.14)",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "oxidized-orange-line": {
+        "role": "primary",
+        "displayName": "Oxidized Orange Line",
+        "canonical": "rgba(237, 155, 82, 0.65)",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "focus-orange": {
+        "role": "primary",
+        "displayName": "Focus Orange",
+        "canonical": "#f5b778",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "#f4af6d", "#f5b778"]
+      },
+      "cool-cyan": {
+        "role": "secondary",
+        "displayName": "Cool Cyan",
+        "canonical": "#92afb4",
+        "tonalRamp": ["oklch(15% 0.0091 209.17)", "oklch(25% 0.0179 209.17)", "oklch(35% 0.0254 209.17)", "oklch(45% 0.0300 209.17)", "oklch(55% 0.0326 209.17)", "oklch(65% 0.0307 209.17)", "#92afb4", "oklch(85% 0.0163 209.17)", "oklch(95% 0.0046 209.17)"]
+      },
+      "cool-cyan-soft": {
+        "role": "secondary",
+        "displayName": "Cool Cyan Soft",
+        "canonical": "rgba(146, 175, 180, 0.12)",
+        "tonalRamp": ["oklch(15% 0.0091 209.17)", "oklch(25% 0.0179 209.17)", "oklch(35% 0.0254 209.17)", "oklch(45% 0.0300 209.17)", "oklch(55% 0.0326 209.17)", "oklch(65% 0.0307 209.17)", "#92afb4", "oklch(85% 0.0163 209.17)", "oklch(95% 0.0046 209.17)"]
+      },
+      "cool-cyan-line": {
+        "role": "secondary",
+        "displayName": "Cool Cyan Line",
+        "canonical": "rgba(146, 175, 180, 0.6)",
+        "tonalRamp": ["oklch(15% 0.0091 209.17)", "oklch(25% 0.0179 209.17)", "oklch(35% 0.0254 209.17)", "oklch(45% 0.0300 209.17)", "oklch(55% 0.0326 209.17)", "oklch(65% 0.0307 209.17)", "#92afb4", "oklch(85% 0.0163 209.17)", "oklch(95% 0.0046 209.17)"]
+      },
+      "processing-safelight": {
+        "role": "tertiary",
+        "displayName": "Processing Safelight",
+        "canonical": "#a55247",
+        "tonalRamp": ["oklch(15% 0.0313 29.06)", "oklch(25% 0.0615 29.06)", "oklch(35% 0.0872 29.06)", "oklch(45% 0.1028 29.06)", "#a55247", "oklch(65% 0.1051 29.06)", "oklch(75% 0.0861 29.06)", "oklch(85% 0.0559 29.06)", "oklch(95% 0.0156 29.06)"]
+      },
+      "processing-safelight-soft": {
+        "role": "tertiary",
+        "displayName": "Processing Safelight Soft",
+        "canonical": "rgba(165, 82, 71, 0.16)",
+        "tonalRamp": ["oklch(15% 0.0313 29.06)", "oklch(25% 0.0615 29.06)", "oklch(35% 0.0872 29.06)", "oklch(45% 0.1028 29.06)", "#a55247", "oklch(65% 0.1051 29.06)", "oklch(75% 0.0861 29.06)", "oklch(85% 0.0559 29.06)", "oklch(95% 0.0156 29.06)"]
+      },
+      "processing-safelight-line": {
+        "role": "tertiary",
+        "displayName": "Processing Safelight Line",
+        "canonical": "rgba(197, 111, 97, 0.75)",
+        "tonalRamp": ["oklch(15% 0.0313 29.06)", "oklch(25% 0.0615 29.06)", "oklch(35% 0.0872 29.06)", "oklch(45% 0.1028 29.06)", "#a55247", "oklch(65% 0.1051 29.06)", "oklch(75% 0.0861 29.06)", "oklch(85% 0.0559 29.06)", "oklch(95% 0.0156 29.06)"]
+      },
+      "processing-safelight-text": {
+        "role": "tertiary",
+        "displayName": "Processing Safelight Text",
+        "canonical": "#e6a296",
+        "tonalRamp": ["oklch(15% 0.0313 29.06)", "oklch(25% 0.0615 29.06)", "oklch(35% 0.0872 29.06)", "oklch(45% 0.1028 29.06)", "#a55247", "oklch(65% 0.1051 29.06)", "oklch(75% 0.0861 29.06)", "#e6a296", "oklch(95% 0.0156 29.06)"]
+      },
+      "ready-green": {
+        "role": "tertiary",
+        "displayName": "Ready Green",
+        "canonical": "#8da795",
+        "tonalRamp": ["oklch(15% 0.0109 155.07)", "oklch(25% 0.0214 155.07)", "oklch(35% 0.0303 155.07)", "oklch(45% 0.0358 155.07)", "oklch(55% 0.0389 155.07)", "oklch(65% 0.0366 155.07)", "#8da795", "oklch(85% 0.0194 155.07)", "oklch(95% 0.0054 155.07)"]
+      },
+      "ready-green-text": {
+        "role": "tertiary",
+        "displayName": "Ready Green Text",
+        "canonical": "#c0d6bd",
+        "tonalRamp": ["oklch(15% 0.0109 155.07)", "oklch(25% 0.0214 155.07)", "oklch(35% 0.0303 155.07)", "oklch(45% 0.0358 155.07)", "oklch(55% 0.0389 155.07)", "oklch(65% 0.0366 155.07)", "#8da795", "#c0d6bd", "oklch(95% 0.0054 155.07)"]
+      },
+      "ready-green-soft": {
+        "role": "tertiary",
+        "displayName": "Ready Green Soft",
+        "canonical": "rgba(141, 167, 149, 0.14)",
+        "tonalRamp": ["oklch(15% 0.0109 155.07)", "oklch(25% 0.0214 155.07)", "oklch(35% 0.0303 155.07)", "oklch(45% 0.0358 155.07)", "oklch(55% 0.0389 155.07)", "oklch(65% 0.0366 155.07)", "#8da795", "oklch(85% 0.0194 155.07)", "oklch(95% 0.0054 155.07)"]
+      },
+      "ready-green-line": {
+        "role": "tertiary",
+        "displayName": "Ready Green Line",
+        "canonical": "rgba(141, 167, 149, 0.65)",
+        "tonalRamp": ["oklch(15% 0.0109 155.07)", "oklch(25% 0.0214 155.07)", "oklch(35% 0.0303 155.07)", "oklch(45% 0.0358 155.07)", "oklch(55% 0.0389 155.07)", "oklch(65% 0.0366 155.07)", "#8da795", "oklch(85% 0.0194 155.07)", "oklch(95% 0.0054 155.07)"]
+      },
+      "attention-amber": {
+        "role": "tertiary",
+        "displayName": "Attention Amber",
+        "canonical": "#e0ac64",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#e0ac64", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "attention-amber-soft": {
+        "role": "tertiary",
+        "displayName": "Attention Amber Soft",
+        "canonical": "rgba(224, 172, 100, 0.12)",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#e0ac64", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "attention-amber-line": {
+        "role": "tertiary",
+        "displayName": "Attention Amber Line",
+        "canonical": "rgba(224, 172, 100, 0.75)",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#e0ac64", "oklch(85% 0.0661 60.30)", "oklch(95% 0.0185 60.30)"]
+      },
+      "danger-coral": {
+        "role": "tertiary",
+        "displayName": "Danger Coral",
+        "canonical": "#e08b7d",
+        "tonalRamp": ["oklch(15% 0.0299 30.00)", "oklch(25% 0.0587 30.00)", "oklch(35% 0.0832 30.00)", "oklch(45% 0.0982 30.00)", "oklch(55% 0.1067 30.00)", "oklch(65% 0.1003 30.00)", "#e08b7d", "oklch(85% 0.0534 30.00)", "oklch(95% 0.0149 30.00)"]
+      },
+      "danger-coral-soft": {
+        "role": "tertiary",
+        "displayName": "Danger Coral Soft",
+        "canonical": "rgba(224, 139, 125, 0.12)",
+        "tonalRamp": ["oklch(15% 0.0299 30.00)", "oklch(25% 0.0587 30.00)", "oklch(35% 0.0832 30.00)", "oklch(45% 0.0982 30.00)", "oklch(55% 0.1067 30.00)", "oklch(65% 0.1003 30.00)", "#e08b7d", "oklch(85% 0.0534 30.00)", "oklch(95% 0.0149 30.00)"]
+      },
+      "danger-coral-line": {
+        "role": "tertiary",
+        "displayName": "Danger Coral Line",
+        "canonical": "rgba(224, 139, 125, 0.7)",
+        "tonalRamp": ["oklch(15% 0.0299 30.00)", "oklch(25% 0.0587 30.00)", "oklch(35% 0.0832 30.00)", "oklch(45% 0.0982 30.00)", "oklch(55% 0.1067 30.00)", "oklch(65% 0.1003 30.00)", "#e08b7d", "oklch(85% 0.0534 30.00)", "oklch(95% 0.0149 30.00)"]
+      },
+      "graphite-deep": {
+        "role": "neutral",
+        "displayName": "Graphite Deep",
+        "canonical": "#101719",
+        "tonalRamp": ["oklch(15% 0.0032 217.07)", "#101719", "oklch(35% 0.0088 217.07)", "oklch(45% 0.0104 217.07)", "oklch(55% 0.0113 217.07)", "oklch(65% 0.0106 217.07)", "oklch(75% 0.0087 217.07)", "oklch(85% 0.0056 217.07)", "oklch(95% 0.0016 217.07)"]
+      },
+      "graphite-workspace": {
+        "role": "neutral",
+        "displayName": "Graphite Workspace",
+        "canonical": "#171d20",
+        "tonalRamp": ["oklch(15% 0.0030 229.47)", "#171d20", "oklch(35% 0.0083 229.47)", "oklch(45% 0.0098 229.47)", "oklch(55% 0.0106 229.47)", "oklch(65% 0.0100 229.47)", "oklch(75% 0.0082 229.47)", "oklch(85% 0.0053 229.47)", "oklch(95% 0.0015 229.47)"]
+      },
+      "graphite-panel": {
+        "role": "neutral",
+        "displayName": "Graphite Panel",
+        "canonical": "#20292d",
+        "tonalRamp": ["oklch(15% 0.0041 226.63)", "#20292d", "oklch(35% 0.0114 226.63)", "oklch(45% 0.0135 226.63)", "oklch(55% 0.0146 226.63)", "oklch(65% 0.0137 226.63)", "oklch(75% 0.0113 226.63)", "oklch(85% 0.0073 226.63)", "oklch(95% 0.0020 226.63)"]
+      },
+      "graphite-raised": {
+        "role": "neutral",
+        "displayName": "Graphite Raised",
+        "canonical": "#273237",
+        "tonalRamp": ["oklch(15% 0.0049 227.24)", "#273237", "oklch(35% 0.0136 227.24)", "oklch(45% 0.0160 227.24)", "oklch(55% 0.0174 227.24)", "oklch(65% 0.0164 227.24)", "oklch(75% 0.0134 227.24)", "oklch(85% 0.0087 227.24)", "oklch(95% 0.0024 227.24)"]
+      },
+      "graphite-soft": {
+        "role": "neutral",
+        "displayName": "Graphite Soft",
+        "canonical": "#303d42",
+        "tonalRamp": ["oklch(15% 0.0054 223.23)", "#303d42", "oklch(35% 0.0149 223.23)", "oklch(45% 0.0176 223.23)", "oklch(55% 0.0192 223.23)", "oklch(65% 0.0180 223.23)", "oklch(75% 0.0147 223.23)", "oklch(85% 0.0096 223.23)", "oklch(95% 0.0027 223.23)"]
+      },
+      "structure-soft": {
+        "role": "neutral",
+        "displayName": "Structure Soft",
+        "canonical": "#35464c",
+        "tonalRamp": ["oklch(15% 0.0067 221.46)", "oklch(25% 0.0131 221.46)", "#35464c", "oklch(45% 0.0220 221.46)", "oklch(55% 0.0239 221.46)", "oklch(65% 0.0225 221.46)", "oklch(75% 0.0184 221.46)", "oklch(85% 0.0119 221.46)", "oklch(95% 0.0033 221.46)"]
+      },
+      "structure-line": {
+        "role": "neutral",
+        "displayName": "Structure Line",
+        "canonical": "#53676e",
+        "tonalRamp": ["oklch(15% 0.0074 221.11)", "oklch(25% 0.0146 221.11)", "oklch(35% 0.0207 221.11)", "oklch(45% 0.0244 221.11)", "#53676e", "oklch(65% 0.0249 221.11)", "oklch(75% 0.0204 221.11)", "oklch(85% 0.0132 221.11)", "oklch(95% 0.0037 221.11)"]
+      },
+      "structure-strong": {
+        "role": "neutral",
+        "displayName": "Structure Strong",
+        "canonical": "#8ba3a9",
+        "tonalRamp": ["oklch(15% 0.0079 214.51)", "oklch(25% 0.0155 214.51)", "oklch(35% 0.0220 214.51)", "oklch(45% 0.0260 214.51)", "oklch(55% 0.0282 214.51)", "oklch(65% 0.0265 214.51)", "#8ba3a9", "oklch(85% 0.0141 214.51)", "oklch(95% 0.0040 214.51)"]
+      },
+      "lime-white": {
+        "role": "neutral",
+        "displayName": "Lime White",
+        "canonical": "#e8e7df",
+        "tonalRamp": ["oklch(15% 0.0030 100.83)", "oklch(25% 0.0059 100.83)", "oklch(35% 0.0084 100.83)", "oklch(45% 0.0099 100.83)", "oklch(55% 0.0107 100.83)", "oklch(65% 0.0101 100.83)", "oklch(75% 0.0083 100.83)", "oklch(85% 0.0054 100.83)", "#e8e7df"]
+      },
+      "content-muted": {
+        "role": "neutral",
+        "displayName": "Content Muted",
+        "canonical": "#b1bdbd",
+        "tonalRamp": ["oklch(15% 0.0037 196.89)", "oklch(25% 0.0073 196.89)", "oklch(35% 0.0104 196.89)", "oklch(45% 0.0122 196.89)", "oklch(55% 0.0133 196.89)", "oklch(65% 0.0125 196.89)", "#b1bdbd", "oklch(85% 0.0066 196.89)", "oklch(95% 0.0019 196.89)"]
+      },
+      "content-dim": {
+        "role": "neutral",
+        "displayName": "Content Dim",
+        "canonical": "#97a9ac",
+        "tonalRamp": ["oklch(15% 0.0058 208.75)", "oklch(25% 0.0114 208.75)", "oklch(35% 0.0161 208.75)", "oklch(45% 0.0190 208.75)", "oklch(55% 0.0207 208.75)", "oklch(65% 0.0194 208.75)", "#97a9ac", "oklch(85% 0.0103 208.75)", "oklch(95% 0.0029 208.75)"]
+      },
+      "film-rail": {
+        "role": "neutral",
+        "displayName": "Film Rail",
+        "canonical": "#182226",
+        "tonalRamp": ["#080f12", "#101719", "#182226", "#243237", "#35464c", "#53676e", "#8ba3a9", "#b1bdbd", "#e8e7df"]
+      },
+      "film-perforation": {
+        "role": "neutral",
+        "displayName": "Film Perforation",
+        "canonical": "#080f12",
+        "tonalRamp": ["#080f12", "#101719", "#182226", "#243237", "#35464c", "#53676e", "#8ba3a9", "#b1bdbd", "#e8e7df"]
+      },
+      "film-empty-frame": {
+        "role": "neutral",
+        "displayName": "Film Empty Frame",
+        "canonical": "#243237",
+        "tonalRamp": ["#080f12", "#101719", "#182226", "#243237", "#35464c", "#53676e", "#8ba3a9", "#b1bdbd", "#e8e7df"]
+      },
+      "film-caption": {
+        "role": "tertiary",
+        "displayName": "Film Caption",
+        "canonical": "#edb66a",
+        "tonalRamp": ["oklch(15% 0.0370 60.30)", "oklch(25% 0.0727 60.30)", "oklch(35% 0.1031 60.30)", "oklch(45% 0.1216 60.30)", "oklch(55% 0.1322 60.30)", "oklch(65% 0.1243 60.30)", "#ed9b52", "#edb66a", "oklch(95% 0.0185 60.30)"]
+      },
+      "dialog-overlay": {
+        "role": "neutral",
+        "displayName": "Dialog Overlay",
+        "canonical": "rgba(7, 13, 15, 0.86)",
+        "tonalRamp": ["rgba(7,13,15,.98)", "rgba(7,13,15,.94)", "rgba(7,13,15,.90)", "rgba(7,13,15,.86)", "rgba(7,13,15,.72)", "rgba(7,13,15,.58)", "rgba(7,13,15,.44)", "rgba(7,13,15,.28)", "rgba(7,13,15,.12)"]
+      },
+      "atmosphere-cyan": {
+        "role": "secondary",
+        "displayName": "Atmosphere Cyan",
+        "canonical": "rgba(146, 175, 180, 0.035)",
+        "tonalRamp": ["oklch(15% 0.0091 209.17)", "oklch(25% 0.0179 209.17)", "oklch(35% 0.0254 209.17)", "oklch(45% 0.0300 209.17)", "oklch(55% 0.0326 209.17)", "oklch(65% 0.0307 209.17)", "#92afb4", "oklch(85% 0.0163 209.17)", "oklch(95% 0.0046 209.17)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Empty Darkroom Display", "purpose": "The existing Chinese empty-workspace heading, with balanced wrapping." },
+      "display-mobile": { "displayName": "Empty Darkroom Display Mobile", "purpose": "The compact empty-workspace heading at 640px and below." },
+      "workspace-title": { "displayName": "Workspace Title", "purpose": "The populated photo workbench heading." },
+      "brand": { "displayName": "Brand", "purpose": "The FilmFrame wordmark in the sticky header." },
+      "panel-title": { "displayName": "Panel Title", "purpose": "System-sans settings and dialog headings." },
+      "body": { "displayName": "Body", "purpose": "General interface and explanatory reading." },
+      "intro": { "displayName": "Introduction", "purpose": "The generous-leading empty-darkroom explanation." },
+      "control": { "displayName": "Control", "purpose": "Shared button labels and forward actions." },
+      "label": { "displayName": "Label", "purpose": "Field names and compact summary text." },
+      "metadata": { "displayName": "Metadata", "purpose": "Measured values, frame numbers, filenames, and counts." },
+      "status-code": { "displayName": "Status Code", "purpose": "The existing English code within bilingual status stamps, not invented eyebrow copy." }
+    },
+    "shadows": [
+      { "name": "contact", "value": "0 8px 22px rgba(4, 12, 16, 0.26)", "purpose": "Restrained lift for an explicitly raised shared surface." },
+      { "name": "paper", "value": "0 6px 18px rgba(4, 12, 16, 0.24)", "purpose": "Soft offset beneath photograph cards." },
+      { "name": "lift", "value": "0 18px 44px rgba(4, 12, 16, 0.38)", "purpose": "Modal and floating-listbox elevation." },
+      { "name": "short", "value": "0 10px 28px rgba(4, 12, 16, 0.3)", "purpose": "Transient toast elevation." },
+      { "name": "photo", "value": "0 14px 34px rgba(4, 12, 16, 0.36)", "purpose": "Existing stronger photographic shadow token, not a default panel treatment." },
+      { "name": "press", "value": "inset 0 1px 2px rgba(4, 12, 16, 0.3)", "purpose": "Brief inward active-button response." },
+      { "name": "settings-sheet-mobile", "value": "0 -16px 40px rgba(0,0,0,.42)", "purpose": "Directional separation of the bottom settings sheet." },
+      { "name": "settings-sheet-tablet", "value": "-16px 0 40px rgba(0,0,0,.42)", "purpose": "Directional separation of the right settings drawer." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "120ms", "purpose": "Control color, border, and press transitions." },
+      { "name": "base", "value": "180ms", "purpose": "Disclosure and overlay transitions." },
+      { "name": "slow", "value": "260ms", "purpose": "Existing slower interface transition token." },
+      { "name": "ease", "value": "cubic-bezier(.22, 1, .36, 1)", "purpose": "Shared interface and empty-strip reveal easing." },
+      { "name": "empty-film-transport", "value": "12s between frames; 900ms transform ease-out", "purpose": "Leftward movement of several human-documentary frames, with duplicated end frames and transitionend reset." },
+      { "name": "contact-print-reveal", "value": "2.1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards", "purpose": "Result-driven contact-print reveal, not a substitute for the empty-strip animation." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Shows several static 3:2 human-documentary frames, stops film transport and control transitions, and shows print results without animation." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "640px", "purpose": "Full-width empty-state action, two-column contact index, and compact film geometry." },
+      { "name": "tablet", "value": "768px", "purpose": "64px header and right-drawer settings behavior; mobile action bar is hidden." },
+      { "name": "empty-stack", "value": "1000px", "purpose": "Intro and film become a two-column composition at and above this width." },
+      { "name": "workspace", "value": "1024px", "purpose": "32px workspace gutters and three-column contact index." },
+      { "name": "inspector", "value": "1180px", "purpose": "Sticky inline 344px inspector replaces the overlay settings trigger." },
+      { "name": "wide", "value": "1536px", "purpose": "368px inspector and four-column contact index." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The shared filled forward action used for choosing and developing photographs.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 15V3\"/><path d=\"m7 8 5-5 5 5\"/><path d=\"M4 14v5h16v-5\"/></svg><span>选择照片</span></button>",
+      "css": ".ds-btn-primary{align-items:center;background:#ed9b52;border:1px solid #ed9b52;border-radius:4px;color:#1c2426;display:inline-flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;font-size:14px;font-weight:650;gap:8px;justify-content:center;line-height:20px;min-height:44px;padding:10px 16px;transition:background-color 120ms cubic-bezier(.22,1,.36,1),border-color 120ms cubic-bezier(.22,1,.36,1),box-shadow 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1);white-space:nowrap}.ds-btn-primary:hover:not(:disabled){background:#f4af6d;border-color:#f4af6d}.ds-btn-primary:active:not(:disabled){box-shadow:inset 0 1px 2px rgba(4,12,16,.3);transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-btn-primary:disabled{cursor:not-allowed;opacity:.52}@media(prefers-reduced-motion:reduce){.ds-btn-primary{transition:none}.ds-btn-primary:active:not(:disabled){transform:none}}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The flat graphite working action used for adding photos and exporting results.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg><span>添加照片</span></button>",
+      "css": ".ds-btn-secondary{align-items:center;background:#20292d;border:1px solid #53676e;border-radius:4px;color:#e8e7df;display:inline-flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;font-size:14px;font-weight:650;gap:8px;justify-content:center;line-height:20px;min-height:44px;padding:10px 16px;transition:background-color 120ms cubic-bezier(.22,1,.36,1),border-color 120ms cubic-bezier(.22,1,.36,1),box-shadow 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1)}.ds-btn-secondary:hover:not(:disabled){background:#303d42;border-color:#8ba3a9}.ds-btn-secondary:active:not(:disabled){box-shadow:inset 0 1px 2px rgba(4,12,16,.3);transform:translateY(1px)}.ds-btn-secondary:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-btn-secondary:disabled{cursor:not-allowed;opacity:.52}@media(prefers-reduced-motion:reduce){.ds-btn-secondary{transition:none}.ds-btn-secondary:active:not(:disabled){transform:none}}"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "The accessible 44px square used for photograph actions and compact utilities.",
+      "html": "<button class=\"ds-icon-button\" type=\"button\" aria-label=\"查看照片\" title=\"查看\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.8 12s3.3-5 9.2-5 9.2 5 9.2 5-3.3 5-9.2 5-9.2-5-9.2-5Z\"/><circle cx=\"12\" cy=\"12\" r=\"2.3\"/></svg></button>",
+      "css": ".ds-icon-button{align-items:center;background:transparent;border:1px solid #35464c;border-radius:4px;color:#b1bdbd;display:inline-flex;height:44px;justify-content:center;min-height:44px;min-width:44px;padding:0;transition:background-color 120ms cubic-bezier(.22,1,.36,1),border-color 120ms cubic-bezier(.22,1,.36,1),color 120ms cubic-bezier(.22,1,.36,1);width:44px}.ds-icon-button:hover:not(:disabled){background:#303d42;border-color:#8ba3a9;color:#e8e7df}.ds-icon-button:active:not(:disabled){box-shadow:inset 0 1px 2px rgba(4,12,16,.3)}.ds-icon-button:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-icon-button:disabled{cursor:not-allowed;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-icon-button{transition:none}}"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "input",
+      "refersTo": "segmented-control",
+      "description": "The shared radio-group primitive with roving keyboard focus and a restrained selected treatment.",
+      "html": "<div class=\"ds-segmented\" role=\"radiogroup\" aria-label=\"画幅样式\"><button class=\"ds-segmented-option\" type=\"button\" role=\"radio\" aria-checked=\"true\">135 画幅</button><button class=\"ds-segmented-option\" type=\"button\" role=\"radio\" aria-checked=\"false\" tabindex=\"-1\">经典边框</button></div>",
+      "css": ".ds-segmented{align-items:stretch;background:#171d20;border:1px solid #53676e;border-radius:4px;box-shadow:inset 0 1px 2px rgba(0,0,0,.35);display:inline-flex;gap:2px;max-width:100%;padding:2px}.ds-segmented-option{align-items:center;background:transparent;border:1px solid transparent;border-radius:2px;color:#b1bdbd;display:inline-flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;font-size:13px;gap:6px;justify-content:center;line-height:20px;min-height:40px;min-width:44px;padding:8px 12px;transition:background-color 120ms cubic-bezier(.22,1,.36,1),color 120ms cubic-bezier(.22,1,.36,1),border-color 120ms cubic-bezier(.22,1,.36,1);white-space:nowrap}.ds-segmented-option:hover:not(:disabled):not([aria-checked='true']){background:#303d42;color:#e8e7df}.ds-segmented-option[aria-checked='true']{background:rgba(237,155,82,.14);border-color:rgba(237,155,82,.65);color:#e8e7df}.ds-segmented-option:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-segmented-option:disabled{cursor:not-allowed;opacity:.45}@media(prefers-reduced-motion:reduce){.ds-segmented-option{transition:none}}"
+    },
+    {
+      "name": "Settings Field",
+      "kind": "input",
+      "refersTo": "settings-field",
+      "description": "The compact graphite-soft settings input with a structural border and visible focus.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">起始帧号</span><input class=\"ds-field-input\" type=\"number\" value=\"1\" min=\"1\" max=\"36\"></label>",
+      "css": ".ds-field{display:block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif}.ds-field-label{color:#b1bdbd;display:block;font-size:12px;font-weight:500;line-height:18px;margin-bottom:6px}.ds-field-input{background:#303d42;border:1px solid #53676e;border-radius:4px;color:#e8e7df;font-family:inherit;font-size:14px;line-height:20px;min-height:44px;padding:10px 12px;transition:border-color 120ms cubic-bezier(.22,1,.36,1);width:100%}.ds-field-input:hover:not(:disabled){border-color:#8ba3a9}.ds-field-input:focus-visible{border-color:#8ba3a9;outline:2px solid #f5b778;outline-offset:1px}.ds-field-input:disabled{cursor:not-allowed;opacity:.45}@media(prefers-reduced-motion:reduce){.ds-field-input{transition:none}}"
+    },
+    {
+      "name": "Output Tabs",
+      "kind": "nav",
+      "refersTo": "output-tab",
+      "description": "The text-led single/strip output choice with count metadata and an orange selection rule.",
+      "html": "<div class=\"ds-output-tabs\" role=\"tablist\" aria-label=\"出片方式\"><button class=\"ds-output-tab\" type=\"button\" role=\"tab\" aria-selected=\"true\">单张 <span class=\"ds-output-tab-meta\">1/3</span></button><button class=\"ds-output-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">胶片长条 <span class=\"ds-output-tab-meta\">3 张入选</span></button></div>",
+      "css": ".ds-output-tabs{border-bottom:1px solid #53676e;display:inline-flex;gap:24px}.ds-output-tab{align-items:center;background:transparent;border:0;border-bottom:2px solid transparent;color:#b1bdbd;display:inline-flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;font-size:14px;font-weight:500;gap:10px;justify-content:center;margin-bottom:-1px;min-height:46px;padding:0 4px;transition:border-color 120ms,color 120ms}.ds-output-tab[aria-selected='true']{border-bottom-color:#ed9b52;color:#e8e7df}.ds-output-tab:hover:not(:disabled){color:#e8e7df}.ds-output-tab:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-output-tab-meta{color:#97a9ac;font-size:12px;font-weight:400}.ds-output-tab[aria-selected='true'] .ds-output-tab-meta{color:#ed9b52}@media(prefers-reduced-motion:reduce){.ds-output-tab{transition:none}}"
+    },
+    {
+      "name": "Status Stamp",
+      "kind": "chip",
+      "refersTo": "status-stamp-info",
+      "description": "The bilingual status treatment shown here in its cool-cyan queued state.",
+      "html": "<div class=\"ds-status-stamp\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-dasharray=\"3 3\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/></svg><span class=\"ds-status-copy\"><span class=\"ds-status-code\">QUEUED</span><span class=\"ds-status-label\">排队中</span></span></div>",
+      "css": ".ds-status-stamp{align-items:flex-start;background:rgba(146,175,180,.12);border:1px solid rgba(146,175,180,.6);border-radius:4px;color:#92afb4;display:inline-flex;gap:8px;max-width:100%;padding:6px 9px}.ds-status-stamp>svg{flex:0 0 auto;margin-top:1px}.ds-status-copy{display:flex;flex-direction:column;gap:1px;min-width:0}.ds-status-code{font-family:SFMono-Regular,Consolas,'Liberation Mono',ui-monospace,monospace;font-size:10px;font-weight:600;letter-spacing:.1em;line-height:1.4;text-transform:uppercase}.ds-status-label{color:#e8e7df;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;font-size:12px;font-weight:650;line-height:18px}"
+    },
+    {
+      "name": "Recipe Summary",
+      "kind": "card",
+      "refersTo": "recipe-summary",
+      "description": "The borderless, rule-separated current recipe summary with a compact definition list.",
+      "html": "<section class=\"ds-recipe-summary\" aria-label=\"当前配方\"><h3 class=\"ds-recipe-heading\">当前配方</h3><p class=\"ds-recipe-name\">KODAK GOLD 200</p><dl class=\"ds-recipe-list\"><dt>色彩</dt><dd>经典色彩</dd><dt>片边</dt><dd>模板片边</dd><dt>出片</dt><dd>单张 / JPG</dd></dl></section>",
+      "css": ".ds-recipe-summary{border-bottom:1px solid #35464c;color:#b1bdbd;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;padding:0 0 20px}.ds-recipe-heading{color:#b1bdbd;font-size:12px;font-weight:500;line-height:18px;margin:0}.ds-recipe-name{color:#e8e7df;font-size:14px;font-weight:500;line-height:20px;margin:4px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-recipe-list{display:grid;font-size:12px;gap:8px 16px;grid-template-columns:auto 1fr;line-height:18px;margin:16px 0 0}.ds-recipe-list dt{color:#97a9ac}.ds-recipe-list dd{color:#b1bdbd;margin:0}"
+    },
+    {
+      "name": "Photo Card",
+      "kind": "card",
+      "refersTo": "photo-card",
+      "description": "The signature contact-print tray with a 3:2 contained image, status, and icon actions.",
+      "html": "<article class=\"ds-photo-card\"><div class=\"ds-photo-heading\"><span class=\"ds-photo-frame\">第 01 张</span><label class=\"ds-photo-included\"><input type=\"checkbox\" checked> 入选</label></div><div class=\"ds-photo-mat\"><img src=\"/images/darkroom-demo-landscape.jpg\" alt=\"雪山与高山湖泊摄影示意，非胶片渲染结果\" width=\"1200\" height=\"800\"></div><div class=\"ds-photo-actions\"><button class=\"ds-photo-action\" type=\"button\" aria-label=\"查看\" title=\"查看\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.8 12s3.3-5 9.2-5 9.2 5 9.2 5-3.3 5-9.2 5-9.2-5-9.2-5Z\"/><circle cx=\"12\" cy=\"12\" r=\"2.3\"/></svg></button></div><div class=\"ds-photo-footer\"><span class=\"ds-photo-file\">darkroom-demo-landscape.jpg</span><span class=\"ds-photo-note\">照片示意 · 非胶片渲染结果</span></div></article>",
+      "css": ".ds-photo-card{background:#20292d;border:1px solid #53676e;border-radius:3px;box-shadow:0 6px 18px rgba(4,12,16,.24);color:#e8e7df;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;max-width:420px;overflow:hidden}.ds-photo-heading{align-items:center;background:rgba(0,0,0,.18);border-bottom:1px solid #35464c;display:flex;justify-content:space-between;min-height:44px;padding:0 12px}.ds-photo-frame{color:#b1bdbd;font-family:SFMono-Regular,Consolas,'Liberation Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.04em}.ds-photo-included{align-items:center;color:#b1bdbd;display:flex;font-size:11px;gap:6px;min-height:44px}.ds-photo-included input{accent-color:#ed9b52;height:16px;width:16px}.ds-photo-mat{aspect-ratio:3/2;background:#101719;overflow:hidden;position:relative;width:100%}.ds-photo-mat img{height:100%;object-fit:contain;width:100%}.ds-photo-actions{align-items:center;border-bottom:1px solid #35464c;border-top:1px solid #35464c;display:flex;min-height:48px;padding:4px 12px}.ds-photo-action{align-items:center;background:transparent;border:1px solid #35464c;border-radius:4px;color:#b1bdbd;display:inline-flex;height:44px;justify-content:center;padding:0;transition:background-color 120ms,border-color 120ms,color 120ms;width:44px}.ds-photo-action:hover{background:#303d42;border-color:#8ba3a9;color:#e8e7df}.ds-photo-action:focus-visible,.ds-photo-included input:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-photo-footer{display:flex;flex-direction:column;gap:4px;min-height:68px;justify-content:center;padding:8px 12px}.ds-photo-file{font-family:SFMono-Regular,Consolas,'Liberation Mono',ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-photo-note{color:#97a9ac;font-size:11px}@media(prefers-reduced-motion:reduce){.ds-photo-action{transition:none}}"
+    },
+    {
+      "name": "Mobile Settings Sheet",
+      "kind": "custom",
+      "refersTo": "settings-field",
+      "description": "The existing bottom settings sheet; the React primitive additionally traps/restores focus, handles Escape, and locks background scroll.",
+      "html": "<div class=\"ds-sheet-backdrop\"><section class=\"ds-settings-sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"ds-settings-title\"><header class=\"ds-sheet-header\"><h2 class=\"ds-sheet-title\" id=\"ds-settings-title\">调整</h2><button class=\"ds-sheet-close\" type=\"button\" aria-label=\"关闭调整\" title=\"关闭\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"m6 6 12 12M18 6 6 18\"/></svg></button></header><div class=\"ds-sheet-tabs\" role=\"tablist\" aria-label=\"调整设置分类\"><button class=\"ds-sheet-tab\" type=\"button\" role=\"tab\" aria-selected=\"true\">胶片</button><button class=\"ds-sheet-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">片边</button><button class=\"ds-sheet-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">输出</button><button class=\"ds-sheet-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">配方</button></div><div class=\"ds-sheet-body\"><label class=\"ds-sheet-label\" for=\"ds-stock\">胶片型号</label><select class=\"ds-sheet-select\" id=\"ds-stock\"><option>KODAK GOLD 200</option></select></div><footer class=\"ds-sheet-footer\"><button class=\"ds-sheet-primary\" type=\"button\">冲洗待更新照片 (1)</button></footer></section></div>",
+      "css": ".ds-sheet-backdrop{align-items:flex-end;background:rgba(7,13,15,.86);display:flex;justify-content:center;min-height:420px;padding-top:32px}.ds-settings-sheet{background:#20292d;border:1px solid #53676e;border-bottom:0;border-radius:8px 8px 0 0;box-shadow:0 -16px 40px rgba(0,0,0,.42);color:#e8e7df;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;max-height:92dvh;max-width:390px;overflow:hidden;width:100%}.ds-sheet-header{align-items:center;border-bottom:1px solid #35464c;display:flex;justify-content:space-between;padding:12px 16px}.ds-sheet-title{font-size:16px;font-weight:600;line-height:24px;margin:0}.ds-sheet-close{align-items:center;background:transparent;border:0;border-radius:4px;color:#b1bdbd;display:inline-flex;justify-content:center;min-height:44px;min-width:44px}.ds-sheet-close:hover{background:#303d42;color:#e8e7df}.ds-sheet-close:focus-visible,.ds-sheet-tab:focus-visible,.ds-sheet-select:focus-visible,.ds-sheet-primary:focus-visible{outline:2px solid #f5b778;outline-offset:2px}.ds-sheet-tabs{background:#171d20;border-bottom:1px solid #35464c;display:grid;gap:4px;grid-template-columns:repeat(4,1fr);padding:6px}.ds-sheet-tab{background:transparent;border:0;border-radius:4px;color:#b1bdbd;font-family:inherit;font-size:14px;font-weight:500;min-height:44px}.ds-sheet-tab[aria-selected='true']{background:#ed9b52;color:#1c2426}.ds-sheet-tab:hover:not([aria-selected='true']){background:#303d42;color:#e8e7df}.ds-sheet-body{min-height:120px;overflow-y:auto;padding:16px}.ds-sheet-label{color:#b1bdbd;display:block;font-size:12px;font-weight:500;margin-bottom:6px}.ds-sheet-select{background:#303d42;border:1px solid #53676e;border-radius:4px;color:#e8e7df;color-scheme:dark;font-family:inherit;font-size:14px;min-height:44px;padding:10px 12px;width:100%}.ds-sheet-footer{background:#273237;border-top:1px solid #53676e;padding:12px 16px max(12px,env(safe-area-inset-bottom))}.ds-sheet-primary{background:#ed9b52;border:0;border-radius:4px;color:#1c2426;font-family:inherit;font-size:14px;font-weight:600;min-height:44px;padding:0 16px;width:100%}.ds-sheet-primary:hover:not(:disabled){background:#f4af6d}.ds-sheet-primary:disabled{cursor:not-allowed;opacity:.4}@media(min-width:768px){.ds-sheet-backdrop{align-items:stretch;justify-content:flex-end;padding-top:0}.ds-settings-sheet{border-bottom:1px solid #53676e;border-radius:8px 0 0 8px;box-shadow:-16px 0 40px rgba(0,0,0,.42);height:100%;max-height:none;width:min(380px,92vw)}}@media(prefers-reduced-motion:reduce){.ds-settings-sheet{animation:none}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "可触阅的胶片索引",
+    "overview": "FilmFrame is a calm, precise, restrained Operate tool for photography enthusiasts. The working path is select, adjust, finish. Photography leads: the current photograph or the contact sheet carries the visual weight, while film stock, edge treatment, and output controls remain legible but subordinate. Engineering controls are disclosed on demand rather than presented as equally important dashboard modules.\n\nThe empty workspace presents several human-documentary photographs inside a continuous 135 strip, sliding from right to left so adjacent 3:2 frames are visible together. With one imported photo, the same frame grammar expands into a focus view; with several, it becomes an ordered index. The dark graphite-blue environment, lime-white reading text, oxidized-orange action, and cool-cyan structure are a working system, not a simulation of a brown analog desk. There is no global grain or vignette overlay. The local display font is used only for headings; interface text remains in the system sans.",
+    "keyCharacteristics": [
+      "Photography first, with a shared 3:2 frame across the empty strip, contact cards, and sequence rail.",
+      "Flat graphite-blue tonal hierarchy, thin cool borders, and restrained soft depth.",
+      "Oxidized orange for primary action and selection; cyan, safelight red, green, and coral communicate state.",
+      "A 12s frame-by-frame leftward transport with duplicated end frames for continuity, plus a static reduced-motion alternative.",
+      "At least 44px primary interaction targets, visible focus, and keyboard-operable tabs, segments, and dialogs."
+    ],
+    "rules": [
+      { "name": "The Action Has One Color Rule", "body": "Use oxidized orange for the principal forward action, selected controls, and direct manipulation feedback. Do not distribute it across decorative badges, section labels, or every icon.", "section": "colors" },
+      { "name": "The State Is Not the Surface Rule", "body": "Cool cyan, safelight red, ready green, and danger coral describe state in stamps, borders, and small fills. They do not replace the graphite working surfaces.", "section": "colors" },
+      { "name": "The Display Has a Boundary Rule", "body": "FilmFrame Display belongs to the brand and workspace headings. Controls and normal reading text use system sans; measurements use monospace. The bundled subset contains only current workspace headings and printable ASCII, so extend it from the official Source Han Sans source before adding new Chinese display copy.", "section": "typography" },
+      { "name": "The Print, Not the Panel Rule", "body": "Soft shadows belong to photographs and genuinely floating layers. Ordinary settings groups use spacing and separators, not elevated cards inside elevated panels.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the photograph and its 3:2 frame as the primary compositional unit from empty state through selection and output.",
+      "Do use oxidized orange for the main forward action and selected state, with dark ink on the filled orange.",
+      "Do build hierarchy from graphite tonal steps, 1px cool rules, spacing, and the existing type ramp before adding containers.",
+      "Do preserve 44px primary touch targets, visible focus, keyboard-operable selection controls, dialog focus restoration, and reduced-motion results.",
+      "Do keep film stock names and measured values accurate, and disclose engineering controls through the existing advanced-settings disclosures.",
+      "Do use the local display subset only for supported headings and retain the bundled font/photo provenance."
+    ],
+    "donts": [
+      "Don't revive warm-brown workspace surfaces, metallic/beveled action buttons, global grain, or a global vignette as the current system.",
+      "Don't flatten all rendering capabilities into equally weighted dashboard controls or turn every settings group into a nested card.",
+      "Don't crop every photograph into a generic thumbnail; preserve the shared frame ratio and object-contained film output.",
+      "Don't apply monospace to general body copy or the display family to controls and newly unsupported Chinese text.",
+      "Don't invent eyebrow labels, decorative glyph substitutes, or new accent colors to fill quiet areas; existing bilingual status codes and technical fieldset legends are scoped content, not a new heading system.",
+      "Don't imply that the empty-state photograph is a rendered sample, or that this visual specification guarantees physical-rendering correctness, full cross-browser rendering parity, or release readiness."
+    ]
+  }
+}
