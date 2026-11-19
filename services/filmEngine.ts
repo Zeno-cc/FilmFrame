@@ -1,6 +1,6 @@
 
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
-import { applySpectralToAperture, supportsSpectral } from './spectral/canvasAdapter';
+import { applySpectralToAperture, createSpectralApertureSession, supportsSpectral, type SpectralApertureSession } from './spectral/canvasAdapter';
 import { applyGold200Look } from './filmColor';
 import {
   getReal135SprocketColor,
@@ -748,6 +748,8 @@ async function drawKodakGoldTemplateFrame(
   transform?: RenderTransform,
   sprocketOverlay?: CanvasImageSource | null,
   renderBudgetLimits: RenderBudgetLimits = {},
+  session?: SpectralApertureSession | null,
+  origin?: { x: number; y: number },
 ): Promise<void> {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -771,7 +773,17 @@ async function drawKodakGoldTemplateFrame(
   sourceContext.drawImage(img, 0, 0);
   drawImageCoverAutoRotate(ctx, source, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
-  if (supportsSpectral(settings)) {
+  if (session) {
+    // The frame may be drawn under a translate (strip layout). getImageData and
+    // putImageData ignore the current transform, so pass device-space coordinates.
+    await session.process(
+      ctx,
+      (origin?.x ?? 0) + layout.imageX,
+      (origin?.y ?? 0) + layout.imageY,
+      layout.imageW,
+      layout.imageH,
+    );
+  } else if (supportsSpectral(settings)) {
     await applySpectralToAperture(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
   } else if (settings.brandText === FilmType.KODAK_GOLD_200) {
     applyGold200Look(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH);
@@ -968,7 +980,13 @@ const generateReal135FilmStrip = async (
   settings: FilmSettings,
   renderBudgetLimits: RenderBudgetLimits = {},
 ): Promise<CanvasObjectUrlResult | null> => {
-  if (settings.useFilmOverlayTemplate === false || !supportsReal135Template(settings.brandText)) return null;
+  if (settings.useFilmOverlayTemplate === false) return null;
+  if (!supportsReal135Template(settings.brandText)) {
+    if (supportsSpectral(settings)) {
+      throw new Error(`Spectral template strip needs a registered 135 template overlay for ${settings.brandText}.`);
+    }
+    return null;
+  }
   if (settings.brandText !== FilmType.KODAK_GOLD_200) {
     const overlayUrl = getReal135OverlayUrl(settings.brandText);
     if (!overlayUrl) return null;
@@ -977,6 +995,9 @@ const generateReal135FilmStrip = async (
     try {
       overlay = overlayUrl === COMPATIBILITY_135_OVERLAY ? null : await loadCanvasImage(overlayUrl);
     } catch (error) {
+      if (supportsSpectral(settings)) {
+        throw new Error(`Spectral template strip could not load the 135 template overlay for ${settings.brandText}.`);
+      }
       console.warn('Film strip overlay template not available, falling back to classic strip.', error);
       return null;
     }
@@ -994,35 +1015,42 @@ const generateReal135FilmStrip = async (
     ctx.fillStyle = '#161514';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    for (let index = 0; index < images.length; index++) {
-      const row = Math.floor(index / layout.maxPerRow);
-      const col = index % layout.maxPerRow;
-      const x = layout.padding + col * layout.frameStride;
-      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-      const img = await loadCanvasImage(images[index].previewUrl);
-      const frameSettings = {
-        ...settings,
-        frameNumber: getFrameNumberForImage(
-          settings.frameNumber,
-          images[index],
-          index,
-          settings.maxRollFrames ?? 36,
-        ),
-      };
+    const session = await createSpectralApertureSession(settings, layout.frame.imageW, layout.frame.imageH);
+    try {
+      for (let index = 0; index < images.length; index++) {
+        const row = Math.floor(index / layout.maxPerRow);
+        const col = index % layout.maxPerRow;
+        const x = layout.padding + col * layout.frameStride;
+        const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+        const img = await loadCanvasImage(images[index].previewUrl);
+        const frameSettings = {
+          ...settings,
+          frameNumber: getFrameNumberForImage(
+            settings.frameNumber,
+            images[index],
+            index,
+            settings.maxRollFrames ?? 36,
+          ),
+        };
 
-      ctx.save();
-      ctx.translate(x, y);
-      await drawKodakGoldTemplateFrame(
-        ctx,
-        img,
-        overlay,
-        layout.frame,
-        frameSettings,
-        images[index].transform,
-        sprocketOverlay,
-        renderBudgetLimits,
-      );
-      ctx.restore();
+        ctx.save();
+        ctx.translate(x, y);
+        await drawKodakGoldTemplateFrame(
+          ctx,
+          img,
+          overlay,
+          layout.frame,
+          frameSettings,
+          images[index].transform,
+          sprocketOverlay,
+          renderBudgetLimits,
+          session,
+          { x, y },
+        );
+        ctx.restore();
+      }
+    } finally {
+      session?.dispose();
     }
 
     return exportCanvasToObjectUrl(
@@ -1052,35 +1080,42 @@ const generateReal135FilmStrip = async (
     drawContinuousFilmRowBase(ctx, layout, y, rowCount, settings);
   }
 
-  for (let index = 0; index < images.length; index++) {
-    const row = Math.floor(index / layout.maxPerRow);
-    const col = index % layout.maxPerRow;
-    const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-    const img = await loadCanvasImage(images[index].previewUrl);
-    const frameSettings = {
-      ...settings,
-      frameNumber: getFrameNumberForImage(
-        settings.frameNumber,
-        images[index],
-        index,
-        settings.maxRollFrames ?? 36,
-      ),
-    };
+  const session = await createSpectralApertureSession(settings, layout.frame.imageW, layout.frame.imageH);
+  try {
+    for (let index = 0; index < images.length; index++) {
+      const row = Math.floor(index / layout.maxPerRow);
+      const col = index % layout.maxPerRow;
+      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+      const img = await loadCanvasImage(images[index].previewUrl);
+      const frameSettings = {
+        ...settings,
+        frameNumber: getFrameNumberForImage(
+          settings.frameNumber,
+          images[index],
+          index,
+          settings.maxRollFrames ?? 36,
+        ),
+      };
 
-    const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
+      const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
 
-    ctx.save();
-    drawImageCoverAutoRotate(ctx, img, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
-    if (settings.brandText === FilmType.KODAK_GOLD_200) {
-      applyGold200Look(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+      ctx.save();
+      drawImageCoverAutoRotate(ctx, img, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
+      if (session) {
+        await session.process(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+      } else if (settings.brandText === FilmType.KODAK_GOLD_200) {
+        applyGold200Look(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+      }
+      drawRealGrain(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
+      ctx.strokeStyle = 'rgba(0,0,0,0.72)';
+      ctx.lineWidth = Math.max(2, Math.round(layout.frame.filmH * 0.003));
+      ctx.strokeRect(imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
+      ctx.restore();
+
+      drawContinuousStripMarkings(ctx, layout, y, index, frameSettings);
     }
-    drawRealGrain(ctx, imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
-    ctx.strokeStyle = 'rgba(0,0,0,0.72)';
-    ctx.lineWidth = Math.max(2, Math.round(layout.frame.filmH * 0.003));
-    ctx.strokeRect(imageX, y + layout.frame.imageY, layout.frame.imageW, layout.frame.imageH);
-    ctx.restore();
-
-    drawContinuousStripMarkings(ctx, layout, y, index, frameSettings);
+  } finally {
+    session?.dispose();
   }
 
   return exportCanvasToObjectUrl(canvas, settings.outputFormat, settings.outputQuality, 'Failed to export film strip blob');

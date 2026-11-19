@@ -1,5 +1,5 @@
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmSettings, FILM_PRESETS, FilmType, ImageItem, RenderTransform } from '../types';
-import { applySpectralToAperture, supportsSpectral } from './spectral/canvasAdapter';
+import { applySpectralToAperture, createSpectralApertureSession, supportsSpectral, type SpectralApertureSession } from './spectral/canvasAdapter';
 import { assertSpectralStripSupported } from './spectral/scope';
 import { physicalPlanForSettings } from './physical135/frame';
 import { assertPhysicalCombination } from './physical135/plan';
@@ -174,11 +174,18 @@ function loadKodakGoldLayeredAssets(): Promise<KodakGoldLayeredAssets> {
   return kodakGoldLayeredAssetsPromise;
 }
 
-function loadReal135Overlay(brand: FilmType): Promise<ImageBitmap | null> {
+async function loadReal135Overlay(brand: FilmType): Promise<WorkerCanvas | null> {
   const overlayUrl = getReal135OverlayUrl(brand);
-  if (overlayUrl === COMPATIBILITY_135_OVERLAY) return Promise.resolve(null);
-  if (!overlayUrl) return Promise.reject(new Error(`Real 135 overlay is not registered: ${brand}`));
-  return loadCachedBitmap(real135OverlayPromises, overlayUrl);
+  if (overlayUrl === COMPATIBILITY_135_OVERLAY) return null;
+  if (!overlayUrl) throw new Error(`Real 135 overlay is not registered: ${brand}`);
+  const bitmap = await loadCachedBitmap(real135OverlayPromises, overlayUrl);
+  // Match the main thread's source-size Canvas rasterization before scaled
+  // composition, rather than relying on ImageBitmap resampling differences.
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Real 135 overlay context unavailable');
+  context.drawImage(bitmap, 0, 0);
+  return canvas;
 }
 
 function loadReal135SprocketMask(brand: FilmType): Promise<ImageBitmap> {
@@ -432,11 +439,13 @@ async function renderClassicFrame(
 async function drawFlattenedReal135Frame(
   ctx: WorkerContext,
   img: WorkerImage,
-  overlay: WorkerImage | null,
+  overlay: WorkerCanvas | null,
   layout: ReturnType<typeof createKodakGoldOverlayLayout>,
   settings: FilmSettings,
   transform?: RenderTransform,
   sprocketOverlay?: WorkerCanvas | null,
+  session?: SpectralApertureSession | null,
+  origin?: { x: number; y: number },
 ): Promise<void> {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -454,7 +463,17 @@ async function drawFlattenedReal135Frame(
     layout.imageH,
     transform,
   );
-  if (supportsSpectral(settings)) {
+  if (session) {
+    // The frame may be drawn under a translate (strip layout). getImageData and
+    // putImageData ignore the current transform, so pass device-space coordinates.
+    await session.process(
+      ctx,
+      (origin?.x ?? 0) + layout.imageX,
+      (origin?.y ?? 0) + layout.imageY,
+      layout.imageW,
+      layout.imageH,
+    );
+  } else if (supportsSpectral(settings)) {
     await applySpectralToAperture(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings);
   }
   drawGrain(ctx, layout.imageX, layout.imageY, layout.imageW, layout.imageH, settings.grainIntensity);
@@ -847,38 +866,45 @@ async function renderFlattenedReal135Strip(
   ctx.fillStyle = '#161514';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (let index = 0; index < images.length; index++) {
-    const img = await createImageBitmap(images[index].file);
-    try {
-      const row = Math.floor(index / layout.maxPerRow);
-      const col = index % layout.maxPerRow;
-      const x = layout.padding + col * layout.frameStride;
-      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-      const frameSettings = {
-        ...settings,
-        frameNumber: getFrameNumberForImage(
-          settings.frameNumber,
-          images[index],
-          index,
-          settings.maxRollFrames ?? 36,
-        ),
-      };
+  const session = await createSpectralApertureSession(settings, layout.frame.imageW, layout.frame.imageH);
+  try {
+    for (let index = 0; index < images.length; index++) {
+      const img = await createImageBitmap(images[index].file);
+      try {
+        const row = Math.floor(index / layout.maxPerRow);
+        const col = index % layout.maxPerRow;
+        const x = layout.padding + col * layout.frameStride;
+        const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+        const frameSettings = {
+          ...settings,
+          frameNumber: getFrameNumberForImage(
+            settings.frameNumber,
+            images[index],
+            index,
+            settings.maxRollFrames ?? 36,
+          ),
+        };
 
-      ctx.save();
-      ctx.translate(x, y);
-      await drawFlattenedReal135Frame(
-        ctx,
-        img,
-        overlay,
-        layout.frame,
-        frameSettings,
-        images[index].transform,
-        sprocketOverlay,
-      );
-      ctx.restore();
-    } finally {
-      img.close();
+        ctx.save();
+        ctx.translate(x, y);
+        await drawFlattenedReal135Frame(
+          ctx,
+          img,
+          overlay,
+          layout.frame,
+          frameSettings,
+          images[index].transform,
+          sprocketOverlay,
+          session,
+          { x, y },
+        );
+        ctx.restore();
+      } finally {
+        img.close();
+      }
     }
+  } finally {
+    session?.dispose();
   }
 
   return canvasToBlob(canvas, settings);
@@ -921,34 +947,43 @@ async function renderReal135Strip(
     drawContinuousFilmRowBase(ctx, layout, y, rowCount, settings);
   }
 
-  for (let index = 0; index < images.length; index++) {
-    const img = await createImageBitmap(images[index].file);
-    try {
-      const row = Math.floor(index / layout.maxPerRow);
-      const col = index % layout.maxPerRow;
-      const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
-      const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
-      const imageY = y + layout.frame.imageY;
+  const session = await createSpectralApertureSession(settings, layout.frame.imageW, layout.frame.imageH);
+  try {
+    for (let index = 0; index < images.length; index++) {
+      const img = await createImageBitmap(images[index].file);
+      try {
+        const row = Math.floor(index / layout.maxPerRow);
+        const col = index % layout.maxPerRow;
+        const y = layout.padding + row * (layout.frame.filmH + layout.rowGap);
+        const imageX = layout.padding + layout.frame.imageX + col * layout.frameStride;
+        const imageY = y + layout.frame.imageY;
 
-      ctx.save();
-      drawImageCoverAutoRotate(ctx, img, imageX, imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
-      applyGold200Look(ctx as unknown as CanvasRenderingContext2D, imageX, imageY, layout.frame.imageW, layout.frame.imageH);
-      drawGrain(ctx, imageX, imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
-      ctx.strokeStyle = 'rgba(0,0,0,0.72)';
-      ctx.lineWidth = Math.max(2, Math.round(layout.frame.filmH * 0.003));
-      ctx.strokeRect(imageX, imageY, layout.frame.imageW, layout.frame.imageH);
-      ctx.restore();
+        ctx.save();
+        drawImageCoverAutoRotate(ctx, img, imageX, imageY, layout.frame.imageW, layout.frame.imageH, images[index].transform);
+        if (session) {
+          await session.process(ctx, imageX, imageY, layout.frame.imageW, layout.frame.imageH);
+        } else {
+          applyGold200Look(ctx as unknown as CanvasRenderingContext2D, imageX, imageY, layout.frame.imageW, layout.frame.imageH);
+        }
+        drawGrain(ctx, imageX, imageY, layout.frame.imageW, layout.frame.imageH, settings.grainIntensity);
+        ctx.strokeStyle = 'rgba(0,0,0,0.72)';
+        ctx.lineWidth = Math.max(2, Math.round(layout.frame.filmH * 0.003));
+        ctx.strokeRect(imageX, imageY, layout.frame.imageW, layout.frame.imageH);
+        ctx.restore();
 
-      const frameNumber = getFrameNumberForImage(
-        settings.frameNumber,
-        images[index],
-        index,
-        settings.maxRollFrames ?? 36,
-      );
-      drawContinuousStripMarkings(ctx, layout, y, index, { ...settings, frameNumber });
-    } finally {
-      img.close();
+        const frameNumber = getFrameNumberForImage(
+          settings.frameNumber,
+          images[index],
+          index,
+          settings.maxRollFrames ?? 36,
+        );
+        drawContinuousStripMarkings(ctx, layout, y, index, { ...settings, frameNumber });
+      } finally {
+        img.close();
+      }
     }
+  } finally {
+    session?.dispose();
   }
 
   return canvasToBlob(canvas, settings);

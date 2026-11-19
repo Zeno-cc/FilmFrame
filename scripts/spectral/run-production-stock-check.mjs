@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { writeFile } from 'node:fs/promises';
+import { getRecipeInspector, selectRecipeControl } from '../../tests/e2e/recipeControls.ts';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:4174';
 const executablePath = process.env.CHROME_PATH || undefined;
@@ -15,14 +16,15 @@ async function capture({ forceMain = false, backend = 'cpu', stock = 'KODAK GOLD
   });
   if (forceMain) await page.addInitScript(() => Object.defineProperty(window, 'Worker', { value: undefined }));
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('胶片型号').selectOption(stock);
-  await inspector.getByLabel('成像方式').selectOption('spectral');
-  await inspector.getByLabel('光谱计算').selectOption(backend);
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
+  await inspector.getByRole('button', { name: '胶片型号', exact: true }).click();
+  await inspector.getByRole('listbox', { name: '胶片型号' }).getByRole('option', { name: new RegExp(`^${stock}(?: · 光谱)?$`) }).click();
+  await selectRecipeControl(page, '成像方式', 'spectral');
+  await selectRecipeControl(page, '光谱计算', backend);
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
   const name = fixture.split('/').pop();
-  await page.locator('input[type=file]').setInputFiles(fixture);
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await page.getByRole('img', { name: '已出片' }).waitFor({ timeout: 60000 });
   const result = await page.getByRole('img', { name }).evaluate(element => {

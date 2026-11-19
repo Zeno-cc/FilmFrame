@@ -1,6 +1,6 @@
 import { FilmType } from '../../types';
 import { createPortraSetupFromResource, decodeSpectralResource, verifySpectralResourceDigests, type PortraSetup } from './setup';
-import { multiply3, type Vec3 } from './math';
+import { type Vec3 } from './math';
 import { preparePortraPrint, type PortraPrintSetup } from './print';
 import type { PortraSetupResource } from './types';
 
@@ -40,10 +40,6 @@ export function decodeMonochromeSetupResource(value: unknown): PortraSetupResour
     throw new Error('Missing exact Multigrade filter pack');
   }
   return resource;
-}
-
-export function monochromeLinearSrgbToInput(pipeline: MonochromePipeline, rgb: Vec3): Vec3 {
-  return multiply3(pipeline.setup.arrays.srgbToProPhoto, rgb);
 }
 
 export function developMonochromeFilm(pipeline: MonochromePipeline, filmRaw: Float32Array): Float32Array {

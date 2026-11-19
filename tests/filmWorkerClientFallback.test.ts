@@ -56,6 +56,9 @@ class FailingWorker {
   onerror: ((event: ErrorEvent) => void) | null = null;
   onmessageerror: ((event: MessageEvent) => void) | null = null;
   messages: WorkerMessage[] = [];
+  terminated = false;
+  autoFail = true;
+  autoSucceed = false;
 
   constructor() {
     FailingWorker.instances.push(this);
@@ -63,6 +66,15 @@ class FailingWorker {
 
   postMessage(message: WorkerMessage) {
     this.messages.push(message);
+    if (this.autoSucceed) {
+      queueMicrotask(() => {
+        this.onmessage?.({
+          data: { id: message.id, ok: true, blob: new Blob(['complete strip']) },
+        } as MessageEvent);
+      });
+      return;
+    }
+    if (!this.autoFail) return;
     queueMicrotask(() => {
       this.onmessage?.({
         data: { id: message.id, ok: false, error: 'forced worker render failure' },
@@ -70,7 +82,23 @@ class FailingWorker {
     });
   }
 
-  terminate() {}
+  terminate() {
+    this.terminated = true;
+  }
+}
+
+function useFailingWorker() {
+  FailingWorker.instances = [];
+  vi.stubGlobal('Worker', FailingWorker);
+}
+
+function suspendNextWorkerResponse() {
+  const worker = new FailingWorker();
+  worker.autoFail = false;
+  vi.stubGlobal('Worker', function PendingWorker() {
+    return worker;
+  });
+  return worker;
 }
 
 const eligibleSettings: FilmSettings = {
@@ -80,8 +108,7 @@ const eligibleSettings: FilmSettings = {
 };
 
 function enableWorkerCapabilities() {
-  FailingWorker.instances = [];
-  vi.stubGlobal('Worker', FailingWorker);
+  useFailingWorker();
   vi.stubGlobal('OffscreenCanvas', class {
     convertToBlob() {
       return Promise.resolve(new Blob());
@@ -92,6 +119,8 @@ function enableWorkerCapabilities() {
 
 afterEach(() => {
   disposeFilmWorkerClient();
+  vi.resetModules();
+  vi.useRealTimers();
   engine.processImage.mockReset();
   engine.generateFilmStrip.mockReset();
   vi.restoreAllMocks();
@@ -171,6 +200,7 @@ describe('started Worker failure fallback', () => {
       transform,
       renderBudgetLimits,
     });
+    expect(engine.processImage).toHaveBeenCalledTimes(1);
     expect(engine.processImage).toHaveBeenCalledWith(
       'blob:source-preview',
       eligibleSettings,
@@ -210,6 +240,7 @@ describe('started Worker failure fallback', () => {
       settings: eligibleSettings,
       renderBudgetLimits,
     });
+    expect(engine.generateFilmStrip).toHaveBeenCalledTimes(1);
     expect(engine.generateFilmStrip).toHaveBeenCalledWith(
       images,
       eligibleSettings,
@@ -217,14 +248,121 @@ describe('started Worker failure fallback', () => {
     );
   });
 
-  it('rejects unsupported spectral strips before creating a Worker or allocating a result', async () => {
+  it('accepts spectral template strips and reaches the Worker before falling back', async () => {
+    enableWorkerCapabilities();
+    const output = { url: 'blob:spectral-strip', byteSize: 2048 };
+    engine.generateFilmStrip.mockResolvedValue(output);
+    const spectralSettings: FilmSettings = {
+      ...eligibleSettings,
+      brandText: FilmType.KODAK_PORTRA_400,
+      imagingMode: 'spectral',
+    };
+
+    await expect(generateFilmStrip([image], spectralSettings)).resolves.toBe(output);
+
+    expect(FailingWorker.instances).toHaveLength(1);
+    expect(FailingWorker.instances[0].messages[0]).toMatchObject({
+      type: 'generateFilmStrip',
+      settings: spectralSettings,
+    });
+    expect(engine.generateFilmStrip).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects spectral template strips when the 135 template path is disabled', async () => {
     enableWorkerCapabilities();
     await expect(generateFilmStrip([image], {
       ...eligibleSettings,
       brandText: FilmType.KODAK_PORTRA_400,
       imagingMode: 'spectral',
-    })).rejects.toThrow('single frames only');
+      useFilmOverlayTemplate: false,
+    })).rejects.toThrow('Spectral template strips need the 135 overlay template');
     expect(FailingWorker.instances).toHaveLength(0);
     expect(engine.generateFilmStrip).not.toHaveBeenCalled();
+  });
+
+  it('rejects spectral template strips for a stock without a spectral resource', async () => {
+    enableWorkerCapabilities();
+    await expect(generateFilmStrip([image], {
+      ...eligibleSettings,
+      brandText: FilmType.FUJI_SUPERIA,
+      imagingMode: 'spectral',
+    })).rejects.toThrow('has none');
+    expect(FailingWorker.instances).toHaveLength(0);
+    expect(engine.generateFilmStrip).not.toHaveBeenCalled();
+  });
+
+  it('rejects a strip timeout without a main-thread retry and suppresses late output', async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    const { WorkerTimeoutError, generateFilmStrip } = await import('../services/filmWorkerClient');
+    enableWorkerCapabilities();
+    const worker = suspendNextWorkerResponse();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:late-strip');
+
+    const pending = generateFilmStrip([image], eligibleSettings);
+    const outcome = pending.catch(error => error);
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    const timeout = await outcome;
+    expect(timeout).toBeInstanceOf(WorkerTimeoutError);
+    expect(timeout.message).toBe('Worker request timed out after 120000ms');
+    expect(worker.terminated).toBe(true);
+    expect(worker.messages).toHaveLength(1);
+    expect(engine.generateFilmStrip).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+
+    worker.onmessage?.({
+      data: { id: worker.messages[0].id, ok: true, blob: new Blob(['partial strip']) },
+    } as MessageEvent);
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.stubGlobal('Worker', class SuccessfulWorker extends FailingWorker {
+      autoSucceed = true;
+    });
+    const retry = await generateFilmStrip([image], eligibleSettings);
+    expect(retry.url).toBe('blob:late-strip');
+    expect(FailingWorker.instances).toHaveLength(2);
+    expect(FailingWorker.instances[0].terminated).toBe(true);
+    expect(engine.generateFilmStrip).not.toHaveBeenCalled();
+  });
+
+  it('keeps the single-image main-thread retry after a Worker timeout', async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    const { WorkerTimeoutError, processImage } = await import('../services/filmWorkerClient');
+    enableWorkerCapabilities();
+    const worker = suspendNextWorkerResponse();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:late-image');
+    const output = { url: 'blob:single-timeout-fallback', byteSize: 712 };
+    engine.processImage.mockResolvedValue(output);
+    const file = new File(['source'], 'source.jpg', { type: 'image/jpeg' });
+
+    const pending = processImage(file, eligibleSettings, undefined, 'blob:source-preview');
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    await expect(pending).resolves.toBe(output);
+    expect(worker.terminated).toBe(true);
+    expect(worker.messages).toHaveLength(1);
+    expect(engine.processImage).toHaveBeenCalledTimes(1);
+    expect(engine.processImage).toHaveBeenCalledWith(
+      'blob:source-preview',
+      eligibleSettings,
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      'Worker image processing failed; falling back to main thread.',
+      expect.any(WorkerTimeoutError),
+    );
+
+    worker.onmessage?.({
+      data: { id: worker.messages[0].id, ok: true, blob: new Blob(['late image']) },
+    } as MessageEvent);
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

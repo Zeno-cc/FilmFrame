@@ -93,6 +93,13 @@ export class WorkerCancelledError extends Error {
   }
 }
 
+export class WorkerTimeoutError extends Error {
+  constructor(message = 'Worker request timed out') {
+    super(message);
+    this.name = 'WorkerTimeoutError';
+  }
+}
+
 export function isWorkerCancelledError(error: unknown): error is WorkerCancelledError {
   return error instanceof WorkerCancelledError;
 }
@@ -183,7 +190,7 @@ export function createWorkerRenderer(
     return new Promise((resolve, reject) => {
       const timeout = deps.setTimeout(() => {
         if (!pending.has(id)) return;
-        makeUnavailable(new Error(`Worker request timed out after ${deps.timeoutMs}ms`));
+        makeUnavailable(new WorkerTimeoutError(`Worker request timed out after ${deps.timeoutMs}ms`));
       }, deps.timeoutMs);
 
       pending.set(id, { resolve, reject, timeout });
@@ -304,6 +311,10 @@ export const generateFilmStrip = async (
         return await renderer.generateFilmStrip(images, settings, renderBudgetLimits);
       } catch (error) {
         if (isWorkerCancelledError(error)) throw error;
+        if (error instanceof WorkerTimeoutError) {
+          disposeFilmWorkerClient();
+          throw error;
+        }
         console.warn('Worker film strip generation failed; falling back to main thread.', error);
       }
     }

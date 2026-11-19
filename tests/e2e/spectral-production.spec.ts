@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, selectRecipeControl } from './recipeControls';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
 const fixtureName = path.basename(fixture);
@@ -9,14 +10,14 @@ async function selectGoldSpectral(page: Page, backend = 'cpu') {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type="file"]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector,'KODAK GOLD 200');
-  await inspector.getByLabel('成像方式').selectOption('spectral');
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('光谱计算').selectOption(backend);
+  await selectRecipeControl(page, '成像方式', 'spectral');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await selectRecipeControl(page, '光谱计算', backend);
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles(fixture);
   return inspector;
 }
 
@@ -47,7 +48,7 @@ test('Gold layered frame executes spectral resources and changes the aperture', 
   await develop(page);
   const spectralPixels = await readAperturePixels(page);
   expect(resources.some(url => url.includes('kodak_gold_200-setup'))).toBe(true);
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  await selectRecipeControl(page, '成像方式', 'legacy');
   await develop(page);
   expect(await readAperturePixels(page)).not.toEqual(spectralPixels);
 });
@@ -92,8 +93,8 @@ test('Gold layered asset failure preserves spectral failure and legacy fallback 
   await expect(main.getByRole('dialog', { name: '需要处理' })).toBeVisible({ timeout: 30_000 });
   await expect(main.getByRole('img', { name: '已出片' })).toHaveCount(0);
 
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await inspector.getByLabel('成像方式').selectOption('legacy');
+  const inspector = getRecipeInspector(page);
+  await selectRecipeControl(page, '成像方式', 'legacy');
   await develop(page);
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible();
 });
@@ -111,15 +112,14 @@ test('Gold forced GPU failure cannot silently produce legacy output', async ({ p
       return Reflect.apply(getOffscreenContext, this, [type, ...args]);
     } as typeof getOffscreenContext;
   });
-  await page.route('**/assets/filmWorker-*.js', async route => {
+  await page.route(/\/(?:services\/filmWorker\.ts|assets\/filmWorker-[^/]+\.js)(?:\?.*)?$/, async route => {
     const response = await route.fetch();
     const source = `
       const getContext = OffscreenCanvas.prototype.getContext;
       OffscreenCanvas.prototype.getContext = function(type, ...args) {
         return type === 'webgl2' ? null : getContext.call(this, type, ...args);
       };
-      ${await response.text()}
-    `;
+    ` + await response.text();
     await route.fulfill({ response, body: source });
   });
   await selectGoldSpectral(page, 'webgl2');
@@ -129,12 +129,11 @@ test('Gold forced GPU failure cannot silently produce legacy output', async ({ p
   await expect(page.getByText('处理失败，请重试').first()).toBeVisible();
 });
 
-test('spectral strips report their explicit single-frame boundary', async ({ page }) => {
-  const inspector = await selectGoldSpectral(page);
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await develop(page);
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  await page.getByLabel('长条审片台').getByRole('button', { name: '生成胶片长条' }).click();
-  await expect(page.getByText('光谱负片目前仅支持真实 135 单张出片；胶片长条请使用经典色彩。')).toBeVisible();
-  await expect(page.getByRole('img', { name: '已生成的胶片长条' })).toHaveCount(0);
+test('Gold spectral template strips render without a single-frame boundary error', async ({ page }) => {
+  await selectGoldSpectral(page);
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  await page.getByLabel('长条预览').getByRole('button', { name: '生成胶片长条' }).click();
+  await expect(page.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByRole('dialog', { name: '需要处理' })).toHaveCount(0);
 });

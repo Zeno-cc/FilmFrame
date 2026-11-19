@@ -3,6 +3,7 @@ import { FilmType } from '../types';
 import type { FilmSettings } from '../types';
 import {
   WorkerCancelledError,
+  WorkerTimeoutError,
   createWorkerRenderer,
   isWorkerCancelledError,
   shouldUseWorkerForSettings,
@@ -131,11 +132,16 @@ describe('createWorkerRenderer', () => {
     const id = worker.messages[0].id;
 
     await vi.advanceTimersByTimeAsync(25);
-    await expect(pending).rejects.toThrow('timed out');
+    const timeout = await pending.catch(error => error);
+    expect(timeout).toBeInstanceOf(WorkerTimeoutError);
+    expect(timeout).not.toBeInstanceOf(WorkerCancelledError);
+    expect(timeout.message).toBe('Worker request timed out after 25ms');
+    expect(isWorkerCancelledError(timeout)).toBe(false);
     expect(worker.terminated).toBe(true);
 
     worker.respond({ id, ok: true, blob: new Blob(['late']) });
     expect(createObjectURL).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
     renderer.dispose();
   });
 

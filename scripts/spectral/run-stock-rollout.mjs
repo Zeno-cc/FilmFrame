@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { writeFile } from 'node:fs/promises';
 import { selectFilmStock } from '../../tests/e2e/stockPicker.ts';
+import { getRecipeInspector, selectRecipeControl } from '../../tests/e2e/recipeControls.ts';
 
 const stocks = [
   ['KODAK PORTRA 160', 'kodak_portra_160'],
@@ -27,12 +28,12 @@ try {
     await page.goto('http://127.0.0.1:4174', { waitUntil: 'networkidle' });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle' });
-    const inspector = page.getByRole('complementary', { name: '暗房配方' });
-    await selectFilmStock(inspector,filmType);
-    await inspector.getByLabel('成像方式').selectOption('spectral');
-    await inspector.getByLabel('光谱计算').selectOption('cpu');
-    await inspector.getByLabel('颗粒强度').fill('0');
     await page.locator('input[type="file"]').setInputFiles('public/film-overlays/aperture-mask-derived.png');
+    const inspector = getRecipeInspector(page);
+    await selectFilmStock(inspector,filmType);
+    await selectRecipeControl(page, '成像方式', 'spectral');
+    await selectRecipeControl(page, '光谱计算', 'cpu');
+    await inspector.getByLabel('颗粒强度').fill('0');
     await page.getByRole('button', { name: /冲洗待更新照片|重新冲洗全部/ }).click();
     await page.getByRole('img', { name: '已出片' }).waitFor({ timeout: 60000 });
     const processed = page.getByRole('img', { name: 'aperture-mask-derived.png' });
