@@ -28,7 +28,7 @@ Prove that a pinned, openly licensed Portra 400 -> Portra Endura negative-to-pri
 - [x] Automated tests demonstrate negative-density and print-RGB agreement with upstream gray-ramp and green-patch references within documented tolerances; any remaining mismatch has a measured explanation.
 - [x] Fixed test images show distinct, reviewable legacy-versus-spectral output with no film-border pixels involved in the comparison.
 - [x] The prototype records timings and working-set estimates, including the two 81-wavelength integrals, and defines an evidence-based maximum initial preview resolution.
-- [ ] A documented go/no-go review confirms numerical correctness, useful visible improvement and feasible browser performance before UI integration.
+- [x] A documented go/no-go review confirms numerical correctness, useful visible improvement and feasible browser performance before UI integration. 收尾认定（2026-11-19）：没有单独的评审文档，但决策真实发生并被后续任务覆盖——`11-06-spectral-negative-stock-rollout` 与 `11-06-webgl2-spectral-migration` 验收全部勾选，24 款光谱胶片已上线，用户在本轮开发中直接验收了光谱效果。详见 `closure.md`。
 - [x] Source notices, profile license, modifications changelog, spectral-data provenance and input/output approximation disclosures accompany the prototype.
 - [x] No production default, current film template, existing export artifact or user photo is changed by the isolated experiment.
 

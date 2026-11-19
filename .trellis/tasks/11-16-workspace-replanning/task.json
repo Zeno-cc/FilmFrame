@@ -1,0 +1,28 @@
+{
+  "id": "workspace-replanning",
+  "name": "workspace-replanning",
+  "title": "重规划数字暗房工作区",
+  "description": "面向摄影爱好者统一选片、调整、出片的信息架构与中文命名，重构空暗房首屏及视觉系统，保留本地渲染、配方、预览和导出功能；先评审后实现。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-11-16",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-17-darkroom-gallery-refresh"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

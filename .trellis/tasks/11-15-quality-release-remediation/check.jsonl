@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Review runtime configuration and access behavior"}
+{"file":".trellis/spec/backend/release-process.md","reason":"Review updater/rollback safety"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review Worker, browser and regression evidence"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Review rendering and cleanup behavior"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Review valid-result preservation and recovery"}
+{"file":".trellis/tasks/11-14-quality-release-planning/research/recommendation.md","reason":"Check implementation against the reviewed plan"}
+{"file":".trellis/tasks/11-14-quality-release-planning/research/planning-addendum.md","reason":"Check user recovery and partial-artifact boundaries"}

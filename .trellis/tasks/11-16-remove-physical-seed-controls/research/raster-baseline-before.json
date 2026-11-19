@@ -1,0 +1,68 @@
+{
+  "strip-s0-i0": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "327e2a68bc556513",
+    "backing": "a21b06213d03b39e",
+    "filmBase": "455d239ba2c94054",
+    "wall": "857744ecfeac156d"
+  },
+  "strip-s0-i1": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "3909575f75907855",
+    "backing": "bdd4f8f6cf35cd77",
+    "filmBase": "85db53845ff1abd1",
+    "wall": "9f73397fcd0b71ce"
+  },
+  "strip-s0-i2": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "15c25462d464d7bc",
+    "backing": "1d4090907a8c47da",
+    "filmBase": "04a653a57d4f1318",
+    "wall": "31a57b6eab55f7f1"
+  },
+  "strip-s1.5-i0": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "7448000d6253c5a9",
+    "backing": "ddec4dbfae0d891b",
+    "filmBase": "bf172d150cafac32",
+    "wall": "71d64a8a6e0b5ff7"
+  },
+  "strip-s1.5-i1": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "345d49427e248942",
+    "backing": "396428d15bba2a94",
+    "filmBase": "2ecc8510f97e5367",
+    "wall": "609aac9248c1c2ab"
+  },
+  "strip-s1.5-i2": {
+    "frameSeed": 1,
+    "size": [
+      950,
+      875
+    ],
+    "presence": "c120e452c630e1f0",
+    "backing": "a93bae097d31896f",
+    "filmBase": "9639bb0329a95c23",
+    "wall": "8b8e628cd79eefa3"
+  }
+}

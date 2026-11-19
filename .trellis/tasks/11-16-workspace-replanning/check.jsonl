@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"按项目要求检查功能回归、动画、资源、响应式、键盘与浏览器验证。"}
+{"file":".trellis/tasks/11-16-workspace-replanning/research/information-architecture.md","reason":"核对命名、功能去重、渐进披露及现有测试选择器兼容。"}
+{"file":".trellis/tasks/11-16-workspace-replanning/research/visual-direction-review.md","reason":"独立桌面和390px审查证据，检查空态到工作态连续性、遮挡和真实视觉风险。"}
+{"file":"PRODUCT.md","reason":"检查任务路径、真实能力、隐私与受众是否与已确认产品事实一致。"}
+{"file":".impeccable/surfaces/app-tsx.md","reason":"按已批准方向审查空状态、视觉系统和完成证据。"}

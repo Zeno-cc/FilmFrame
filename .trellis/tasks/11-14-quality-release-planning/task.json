@@ -1,0 +1,28 @@
+{
+  "id": "quality-release-planning",
+  "name": "quality-release-planning",
+  "title": "六项质量与发布风险处置规划",
+  "description": "Evaluate rollback compatibility, development dependency advisories, historical assets and licensing, long-strip performance and obsolete-code cleanup from multiple independent perspectives. Produce staged owner decisions and verification gates; no implementation in this planning task.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-11-14",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-15-quality-release-remediation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

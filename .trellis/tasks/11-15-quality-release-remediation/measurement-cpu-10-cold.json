@@ -1,0 +1,33 @@
+{
+  "backend": "cpu",
+  "measuredBackend": "cpu",
+  "count": 10,
+  "cache": "cold",
+  "elapsedMs": 50501,
+  "outcome": "rendered",
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "worker": {
+    "requestedIds": [
+      1
+    ],
+    "requestBackends": [
+      "cpu"
+    ],
+    "successfulIds": [
+      1
+    ],
+    "failedIds": [],
+    "responseBackends": [
+      "cpu"
+    ],
+    "fallbacks": 0,
+    "webgl2Contexts": 0,
+    "floatColorBuffers": 0,
+    "floatReadbacks": 0,
+    "glErrors": []
+  },
+  "heapBefore": 9945605,
+  "heapAfter": 41741215,
+  "bytes": 566600,
+  "hash": "2d19662c382bac0461a6832facd598d606a98a86519adcc41b40bd11f6d71d57"
+}

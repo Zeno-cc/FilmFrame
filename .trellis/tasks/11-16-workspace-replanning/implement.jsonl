@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"保留前端功能、资源所有权、动画、摄影名言、响应式、可访问性及验证契约。"}
+{"file":".trellis/tasks/11-16-workspace-replanning/research/selected-direction.md","reason":"用户已选择的胶片索引视觉方向与不可退让的空状态、设置层级要求。"}
+{"file":".trellis/tasks/11-16-workspace-replanning/research/information-architecture.md","reason":"独立信息架构审查中的命名、渐进披露与测试兼容映射。"}
+{"file":".trellis/tasks/11-16-workspace-replanning/research/visual-direction-review.md","reason":"桌面和390px实测暴露的重复入口、遮挡、空态到工作态连续性要求。"}
+{"file":"PRODUCT.md","reason":"已确认的用户、产品价值、隐私边界和可访问性约束。"}
+{"file":".impeccable/surfaces/app-tsx.md","reason":"已确认的视觉方向合同、首屏构图与完成审查要求。"}

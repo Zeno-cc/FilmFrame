@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Preserve access and runtime configuration contracts"}
+{"file":".trellis/spec/backend/release-process.md","reason":"Preserve release and rollback trust boundaries"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Define real browser and regression validation"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Preserve imaging and rendering lifecycle"}
+{"file":".trellis/tasks/archive/2026-11/11-14-project-quality-audit/research/verified-findings.md","reason":"Start from verified findings rather than speculative risks"}
+{"file":"ops/provenance/README.md","reason":"Separate rights and corresponding-source approval from engineering"}

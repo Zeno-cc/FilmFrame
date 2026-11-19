@@ -86,6 +86,8 @@ This is a **real-135 replacement**, not another optional border decoration. Full
 
 ## Acceptance Criteria
 
+> 2026-11-19 收尾：本任务已实现并被后续任务取代，以下的「取代前门禁」清单不作为归档门禁逐项回填。逐项证据与取代关系见 `closure.md`。
+
 ### Geometry and deterministic behavior
 
 - [ ] Full-frame 135 gate/advance/perforation geometry, orientation transposition, crop registration and output dimensions have unit tests with explicit provenance.

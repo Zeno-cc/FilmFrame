@@ -1,0 +1,22 @@
+{
+  "backend": "webgl2",
+  "count": 36,
+  "cache": "cold",
+  "elapsedMs": 168,
+  "outcome": "rejected",
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "worker": {
+    "requestedIds": [],
+    "requestBackends": [],
+    "successfulIds": [],
+    "failedIds": [],
+    "responseBackends": [],
+    "fallbacks": 0,
+    "webgl2Contexts": 0,
+    "floatColorBuffers": 0,
+    "floatReadbacks": 0,
+    "glErrors": []
+  },
+  "heapBefore": 11122101,
+  "message": "al-portrait.png\n\n入选\n22\n\nphysical-natural-portrait.png\n\n入选\n23\n\nphysical-natural-portrait.png\n\n入选\n24\n\nphysical-natural-portrait.png\n\n入选\n25\n\nphysical-natural-portrait.png\n\n入选\n26\n\nphysical-natural-portrait.png\n\n入选\n27\n\nphysical-natural-portrait.png\n\n入选\n28\n\nphysical-natural-portrait.png\n\n入选\n29\n\nphysical-natural-portrait.png\n\n入选\n30\n\nphysical-natural-portrait.png\n\n入选\n31\n\nphysical-natural-portrait.png\n\n入选\n32\n\nphysical-natural-portrait.png\n\n入选\n33\n\nphysical-natural-portrait.png\n\n入选\n34\n\nphysical-natural-portrait.png\n\n入选\n35\n\nphysical-natural-portrait.png\n\n入选\n36\n\nphysical-natural-portrait.png\n\n入选\n暗房配方\nDARKROOM RECIPE\n重置\nCURRENT RECIPE\nKODAK GOLD 200\n36 张待冲洗\nREAL 135\n·\nSTRIP\n·\nPNG\n·\nFAST\n胶片与片边\n胶片型号\nλ\nKODAK GOLD 200\nKODAK GOLD 200\nλ\n成像方式\n经典色彩\n光谱负片（实验）\n光谱计算\n自动（优先 GPU）\nWebGL2 GPU\nCPU 光谱\nPHYSICAL 135 · 本地渲染\n底片渲染\n真实 135 贴图\n物理底片\n片门与齿孔进入光谱显影；灰雾和漏光为片边曝光近似，非完整感光测量。\n齿孔背光\n开放白光\n黑色背底\n镜头光圈\n换一台 · 1\n换一格 · 1\n拉直\n0°\n边缘灰雾\n1\n片轴漏光\n0\n片边模式\n真实 135\n经典片边\n起始帧号\n帧号颜色\n#eab308\n齿孔颜色\n跟随原片\n颗粒强度\n0\n输出\n处理模式\n快速预览\n高清出片\n输出格式\nJPG\nPNG\n当前配方色标：#eab308\n我的暗房配方\n\n还没有本地配方。保存后只会写入浏览器偏好，不会保存照片。\n\n保存\n\n最多 12 条，名称最多 40 个字符；同名保存会覆盖旧配方。\n\n36 张 · PNG · 长条输出\n生成胶片长条\n完成\n\n已添加 36 张照片，照片仅在本机处理。\n\n需要处理\n\n生成胶片长条前预检：长条画布约 114.2 MiB，超过浏览器安全上限。 建议：取消部分入选、切换预览质量。\n\n我知道了"
+}

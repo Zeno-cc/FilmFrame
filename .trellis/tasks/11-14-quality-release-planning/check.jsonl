@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/release-process.md","reason":"Review release and rollback planning constraints"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review proposed validation gates"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Review rendering lifecycle and performance choices"}
+{"file":".trellis/tasks/archive/2026-11/11-14-project-quality-audit/research/verified-findings.md","reason":"Check proposed disposition of audit findings"}
+{"file":"ops/provenance/README.md","reason":"Keep owner/legal decisions distinct from technical acceptance"}

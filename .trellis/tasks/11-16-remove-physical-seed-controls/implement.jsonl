@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/spectral-rendering.md", "reason": "Physical 135 frame/body seed semantics and local-vs-roll coordinate rules"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Worker/main-thread comparison must share frame seed; artifact freshness rules"}

@@ -24,6 +24,8 @@ Offer the validated Portra spectral result as an explicit, reversible FilmFrame 
 
 ## Acceptance Criteria
 
+> 2026-11-19 收尾：本任务被 `11-07-spectral-stock-picker` 与 `11-18-render-mode-simplification` 取代，验收不再逐项勾选；许可相关条目转交 `11-06-spectral-license-provenance`。详见 `closure.md`。
+
 - [ ] Existing users/recipes retain legacy output by default; opting into spectral mode changes only the intended aperture pixels and visibly distinguishes Portra's film/paper response from the old no-color template path.
 - [ ] Portra spectral single-frame render works through Worker and forced-main CPU routes, with matching documented numerical tolerances and no processing of template pixels.
 - [ ] Changing imaging mode invalidates old single/strip artifacts as specified; preferences and old/new recipes round-trip safely and unknown/invalid values normalize predictably.

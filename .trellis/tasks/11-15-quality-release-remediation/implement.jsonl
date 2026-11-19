@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/access-control.md","reason":"Preserve runtime configuration and access contracts"}
+{"file":".trellis/spec/backend/release-process.md","reason":"Preserve updater and rollback trust boundaries"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply real Worker, browser and artifact validation"}
+{"file":".trellis/spec/frontend/spectral-rendering.md","reason":"Preserve CPU/WebGL2 and strip resource lifecycle"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve user work and artifact ownership"}
+{"file":".trellis/tasks/11-14-quality-release-planning/research/recommendation.md","reason":"Implement the reviewed staged recommendations"}
+{"file":".trellis/tasks/11-14-quality-release-planning/research/planning-addendum.md","reason":"Preserve recovery workflows and reject partial output"}
+{"file":"ops/provenance/README.md","reason":"Do not convert engineering remediation into rights clearance"}

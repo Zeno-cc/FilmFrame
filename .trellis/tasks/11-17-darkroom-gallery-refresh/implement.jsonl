@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"公共摄影资源与本地用户照片隔离，资源所有权、计时器、响应式、减弱动态和真实浏览器验证契约。"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"区分用户照片的会话状态与独立公共示意缓存，禁止把 Blob URL 或远程图片混入现有渲染设置。"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"复用空暗房构图、标准控件与现有动画/无障碍约定，不增加竞争主操作。"}
+{"file":"PRODUCT.md","reason":"本地用户照片隐私、摄影内容主导与可访问性约束。"}

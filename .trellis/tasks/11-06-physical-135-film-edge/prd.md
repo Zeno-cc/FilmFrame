@@ -22,6 +22,8 @@ Improve FilmFrame's continuous 135 film material and edge appearance through a s
 
 ## Acceptance Criteria
 
+> 2026-11-19 收尾：本规划任务被已落地的物理 135 管线取代，验收不再逐项勾选；来源与许可条目转交 `11-06-spectral-license-provenance`。详见 `closure.md`。
+
 - [ ] A reviewed design and owned/approved reference set define the physical geometry and permitted code/data provenance before implementation.
 - [ ] Deterministic geometry/texture tests cover pitch, gate registration, hole softness, text placement, seed stability, preview/high consistency, and single/continuous-strip correspondence.
 - [ ] Human review at fit/100%/200% finds a coherent continuous strip without repeated-card appearance, hard identical holes, opaque aperture seams, excessive dark rims, or unreadable/colliding markings.

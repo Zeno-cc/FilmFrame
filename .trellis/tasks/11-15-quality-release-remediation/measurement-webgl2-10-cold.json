@@ -1,0 +1,33 @@
+{
+  "backend": "webgl2",
+  "measuredBackend": "webgl2",
+  "count": 10,
+  "cache": "cold",
+  "elapsedMs": 9586,
+  "outcome": "rendered",
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+  "worker": {
+    "requestedIds": [
+      1
+    ],
+    "requestBackends": [
+      "webgl2"
+    ],
+    "successfulIds": [
+      1
+    ],
+    "failedIds": [],
+    "responseBackends": [
+      "webgl2"
+    ],
+    "fallbacks": 0,
+    "webgl2Contexts": 1,
+    "floatColorBuffers": 1,
+    "floatReadbacks": 12,
+    "glErrors": []
+  },
+  "heapBefore": 11756757,
+  "heapAfter": 40272835,
+  "bytes": 566445,
+  "hash": "af3986f9ea49a0a4dd7dbeb8a2819dfbd6ee46baa68177a5473be5d5f312433f"
+}

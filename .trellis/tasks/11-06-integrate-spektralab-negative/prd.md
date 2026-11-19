@@ -49,6 +49,8 @@ The parent owns cross-child scope and final integration review, not a parallel r
 
 ## Acceptance Criteria
 
+> 2026-11-19 收尾：工程目标由已交付的子任务完成，验收不逐项勾选；未完成的「分发权利/notice」转交 `11-06-spectral-license-provenance` 与 `11-11-spektralab-full-stock-migration`，仍为发布阻塞。归档只代表工程收尾，不代表获得公开分发许可。详见 `closure.md`。
+
 ### Parent / Integration
 
 - [ ] Three source-evidenced research reports and the child PRDs define the approved pipeline, integration boundaries, exclusions and licensing gates.

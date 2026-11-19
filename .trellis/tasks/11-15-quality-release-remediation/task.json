@@ -1,0 +1,28 @@
+{
+  "id": "quality-release-remediation",
+  "name": "quality-release-remediation",
+  "title": "质量与发布风险分阶段修复",
+  "description": "Implement reviewed rollback configuration checks, heavy-strip timeout protection, bounded dependency upgrades, evidence-based cleanup and local long-strip measurements. Preserve user work and distribution/legal boundaries; no Docker or deployment.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "xuzicheng",
+  "assignee": "xuzicheng",
+  "createdAt": "2026-11-15",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-16-remove-physical-seed-controls"
+  ],
+  "parent": "11-14-quality-release-planning",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

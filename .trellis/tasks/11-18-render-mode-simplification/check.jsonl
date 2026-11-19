@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"前端质量检查入口与验证要求"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"核对设置控件、文案层级和可访问性"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"核对旧设置与配方迁移不破坏用户状态"}
+{"file":".trellis/tasks/11-18-render-mode-simplification/research/implementation-context.md","reason":"核对经典片边范围、命名和兼容边界"}
