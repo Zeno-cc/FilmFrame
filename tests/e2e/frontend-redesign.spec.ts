@@ -548,7 +548,7 @@ test('single preview supports an explicit rotate button and guarded R shortcut',
   await expect(stripImage).toHaveAttribute('src', stripSource ?? '');
 });
 
-test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }) => {
+test('Kodak Portra 160 supports real 135 single and template strip rendering', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const inspector = getRecipeInspector(page);
   await uploadCurationFixtures(page, 1);
@@ -628,16 +628,31 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas context unavailable');
     context.drawImage(image, 0, 0);
-    return Array.from(context.getImageData(
-      Math.round(image.naturalWidth * 121 / 1307),
-      Math.round(image.naturalHeight * 136 / 1203),
-      1,
-      1,
-    ).data);
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      source: image.currentSrc.slice(0, 64),
+      pixel: Array.from(context.getImageData(
+        Math.round(image.naturalWidth * 121 / 1307),
+        Math.round(image.naturalHeight * 136 / 1203),
+        1,
+        1,
+      ).data),
+    };
   });
-  expect(Math.abs(frameSprocketPixel[0] - 204)).toBeLessThan(18);
-  expect(Math.abs(frameSprocketPixel[1] - 51)).toBeLessThan(18);
-  expect(Math.abs(frameSprocketPixel[2] - 68)).toBeLessThan(18);
+  // Sampling ratios assume the 1307x1203 template layout; keep the size in the
+  // failure output so a geometry regression is not reported as a colour miss.
+  testInfo.attach('portra-160-sprocket-sample.json', {
+    body: JSON.stringify({
+      ...frameSprocketPixel,
+      settings: await page.evaluate(() => localStorage.getItem('filmFrame.preferences.v1')),
+    }, null, 2),
+    contentType: 'application/json',
+  });
+  const frameSprocketRgb = frameSprocketPixel.pixel;
+  expect(Math.abs(frameSprocketRgb[0] - 204)).toBeLessThan(18);
+  expect(Math.abs(frameSprocketRgb[1] - 51)).toBeLessThan(18);
+  expect(Math.abs(frameSprocketRgb[2] - 68)).toBeLessThan(18);
 
   await page.getByRole('tab', { name: /胶片长条/ }).click();
   const stripStage = page.getByLabel('长条预览');
@@ -653,16 +668,25 @@ test('Kodak Portra 160 supports real 135 single and template strip rendering', a
     context.drawImage(image, 0, 0);
     const xRatio = (0.035 + 121 / 1307) / 1.07;
     const yRatio = (0.035 + 136 / 1307) / (1203 / 1307 + 0.07);
-    return Array.from(context.getImageData(
-      Math.round(image.naturalWidth * xRatio),
-      Math.round(image.naturalHeight * yRatio),
-      1,
-      1,
-    ).data);
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      pixel: Array.from(context.getImageData(
+        Math.round(image.naturalWidth * xRatio),
+        Math.round(image.naturalHeight * yRatio),
+        1,
+        1,
+      ).data),
+    };
   });
-  expect(Math.abs(stripSprocketPixel[0] - 204)).toBeLessThan(18);
-  expect(Math.abs(stripSprocketPixel[1] - 51)).toBeLessThan(18);
-  expect(Math.abs(stripSprocketPixel[2] - 68)).toBeLessThan(18);
+  testInfo.attach('portra-160-strip-sprocket-sample.json', {
+    body: JSON.stringify(stripSprocketPixel, null, 2),
+    contentType: 'application/json',
+  });
+  const stripSprocketRgb = stripSprocketPixel.pixel;
+  expect(Math.abs(stripSprocketRgb[0] - 204)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketRgb[1] - 51)).toBeLessThan(18);
+  expect(Math.abs(stripSprocketRgb[2] - 68)).toBeLessThan(18);
 });
 
 const nonSpectralStocks = new Set([
