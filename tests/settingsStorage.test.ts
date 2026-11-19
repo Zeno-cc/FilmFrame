@@ -1,12 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FILM_PRESETS, FilmType } from '../types';
 import { defaultEdgeForStock, supportsPhysicalSpectralStock } from '../services/physical135/capability';
+import { hasPhysicalEdgeLayout } from '../services/physical135/edgeRegistry';
 import type { FilmSettings } from '../types';
 import {
   loadPreferences,
   mergeSettings,
   normalizeOutputMode,
   normalizeSettingsPatch,
+  normalizeSpectralRenderMode,
   savePreferences,
   settingsForFilmStock,
 } from '../services/settingsStorage';
@@ -195,6 +197,136 @@ describe('settings normalization', () => {
   });
 });
 
+describe('spectral render mode normalization', () => {
+  it('migrates classic framing on spectral stocks to template 135 output', () => {
+    const migrated = normalizeSpectralRenderMode({
+      ...defaults,
+      brandText: FilmType.KODAK_PORTRA_400,
+      frameRenderMode: 'classic',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'spectral',
+    });
+
+    expect(migrated.migratedClassic).toBe(true);
+    expect(migrated.settings).toMatchObject({
+      brandText: FilmType.KODAK_PORTRA_400,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'legacy',
+    });
+  });
+
+  it('reports physical edge availability for every stock without an edge layout', () => {
+    for (const stock of [
+      FilmType.FUJI_PROVIA_100F,
+      FilmType.FUJI_VELVIA_100,
+      FilmType.KODAK_KODACHROME_64,
+      FilmType.FUJI_ACROS_II,
+    ]) {
+      expect(hasPhysicalEdgeLayout(stock)).toBe(false);
+      expect(normalizeSpectralRenderMode({
+        ...defaults,
+        brandText: stock,
+        frameRenderMode: 'real135',
+        edgeRenderMode: 'physical135',
+        imagingMode: 'legacy',
+      }).settings.edgeRenderMode).toBe('legacy-template');
+    }
+    expect(hasPhysicalEdgeLayout(FilmType.KODAK_PORTRA_400)).toBe(true);
+  });
+
+  it('keeps real 135 framing on spectral stocks', () => {
+    const settings = {
+      ...defaults,
+      brandText: FilmType.KODAK_PORTRA_400,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'physical135',
+      imagingMode: 'spectral',
+    } as const;
+    expect(normalizeSpectralRenderMode(settings)).toEqual({
+      settings,
+      migratedClassic: false,
+      migratedUnsupportedEdge: false,
+    });
+  });
+
+  it('keeps classic framing on non-spectral stocks', () => {
+    const settings = {
+      ...defaults,
+      brandText: FilmType.KODAK_COLORPLUS_200,
+      frameRenderMode: 'classic',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'legacy',
+    } as const;
+    expect(normalizeSpectralRenderMode(settings)).toEqual({
+      settings,
+      migratedClassic: false,
+      migratedUnsupportedEdge: false,
+    });
+  });
+
+  it('keeps real 135 framing on non-spectral stocks', () => {
+    const settings = {
+      ...defaults,
+      brandText: FilmType.KODAK_COLORPLUS_200,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'legacy',
+    } as const;
+    expect(normalizeSpectralRenderMode(settings)).toEqual({
+      settings,
+      migratedClassic: false,
+      migratedUnsupportedEdge: false,
+    });
+  });
+
+  it('clears physical edge settings that classic framing cannot express', () => {
+    const normalized = normalizeSpectralRenderMode({
+      ...defaults,
+      brandText: FilmType.KODAK_COLORPLUS_200,
+      frameRenderMode: 'classic',
+      edgeRenderMode: 'physical135',
+      imagingMode: 'legacy',
+    });
+    expect(normalized.migratedClassic).toBe(false);
+    expect(normalized.settings.frameRenderMode).toBe('classic');
+    expect(normalized.settings.edgeRenderMode).toBe('legacy-template');
+  });
+
+  it('clears classic framing when switching from a non-spectral stock to a spectral stock', () => {
+    const selected = settingsForFilmStock({
+      ...defaults,
+      brandText: FilmType.KODAK_COLORPLUS_200,
+      frameRenderMode: 'classic',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'legacy',
+    }, FilmType.KODAK_PORTRA_400);
+
+    expect(selected).toMatchObject({
+      brandText: FilmType.KODAK_PORTRA_400,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'legacy-template',
+      imagingMode: 'legacy',
+    });
+  });
+
+  it('preserves real 135 framing when switching from spectral to non-spectral', () => {
+    const selected = settingsForFilmStock({
+      ...defaults,
+      brandText: FilmType.KODAK_GOLD_200,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'physical135',
+      imagingMode: 'spectral',
+    }, FilmType.KODAK_COLORPLUS_200);
+
+    expect(selected).toMatchObject({
+      brandText: FilmType.KODAK_COLORPLUS_200,
+      frameRenderMode: 'real135',
+      edgeRenderMode: 'legacy-template',
+    });
+  });
+});
+
 describe('settings storage', () => {
   const savedValues = new Map<string, string>();
 
@@ -257,6 +389,104 @@ describe('settings storage', () => {
     }
   });
 
+  it('migrates a legacy spectral classic preference once', () => {
+    const original = savedValues.get('filmFrame.preferences.v1');
+    try {
+      savedValues.set('filmFrame.preferences.v1', JSON.stringify({
+        settings: {
+          brandText: FilmType.KODAK_PORTRA_400,
+          frameRenderMode: 'classic',
+          edgeRenderMode: 'physical135',
+          imagingMode: 'spectral',
+        },
+        outputMode: 'single',
+      }));
+
+      const loaded = loadPreferences(defaults, 'single');
+      expect(loaded.migratedClassicEdge).toBe(true);
+      expect(loaded.settings).toMatchObject({
+        brandText: FilmType.KODAK_PORTRA_400,
+        frameRenderMode: 'real135',
+        edgeRenderMode: 'legacy-template',
+        imagingMode: 'legacy',
+      });
+
+      savePreferences(loaded.settings, loaded.outputMode);
+      expect(loadPreferences(defaults, 'single').migratedClassicEdge).toBe(false);
+    } finally {
+      if (original === undefined) savedValues.delete('filmFrame.preferences.v1');
+      else savedValues.set('filmFrame.preferences.v1', original);
+    }
+  });
+
+  it('keeps a legacy non-spectral classic preference unchanged', () => {
+    const original = savedValues.get('filmFrame.preferences.v1');
+    try {
+      savedValues.set('filmFrame.preferences.v1', JSON.stringify({
+        settings: {
+          brandText: FilmType.KODAK_COLORPLUS_200,
+          frameRenderMode: 'classic',
+          edgeRenderMode: 'legacy-template',
+          imagingMode: 'legacy',
+        },
+        outputMode: 'single',
+      }));
+
+      const loaded = loadPreferences(defaults, 'single');
+      expect(loaded.migratedClassicEdge).toBe(false);
+      expect(loaded.settings).toMatchObject({
+        brandText: FilmType.KODAK_COLORPLUS_200,
+        frameRenderMode: 'classic',
+        edgeRenderMode: 'legacy-template',
+        imagingMode: 'legacy',
+      });
+    } finally {
+      if (original === undefined) savedValues.delete('filmFrame.preferences.v1');
+      else savedValues.set('filmFrame.preferences.v1', original);
+    }
+  });
+
+  it('migrates an unsupported physical edge to the template edge', () => {
+    const original = savedValues.get('filmFrame.preferences.v1');
+    try {
+      savedValues.set('filmFrame.preferences.v1', JSON.stringify({
+        settings: {
+          brandText: FilmType.FUJI_VELVIA_100,
+          frameRenderMode: 'real135',
+          edgeRenderMode: 'physical135',
+          imagingMode: 'legacy',
+        },
+        outputMode: 'single',
+      }));
+
+      const loaded = loadPreferences(defaults, 'single');
+      expect(loaded.migratedUnsupportedEdge).toBe(true);
+      expect(loaded.settings).toMatchObject({
+        brandText: FilmType.FUJI_VELVIA_100,
+        edgeRenderMode: 'legacy-template',
+      });
+
+      savePreferences(loaded.settings, loaded.outputMode);
+      expect(loadPreferences(defaults, 'single').migratedUnsupportedEdge).toBe(false);
+
+      savedValues.set('filmFrame.preferences.v1', JSON.stringify({
+        settings: {
+          brandText: FilmType.KODAK_PORTRA_400,
+          frameRenderMode: 'real135',
+          edgeRenderMode: 'physical135',
+          imagingMode: 'spectral',
+        },
+        outputMode: 'single',
+      }));
+      const supported = loadPreferences(defaults, 'single');
+      expect(supported.migratedUnsupportedEdge).toBe(false);
+      expect(supported.settings.edgeRenderMode).toBe('physical135');
+    } finally {
+      if (original === undefined) savedValues.delete('filmFrame.preferences.v1');
+      else savedValues.set('filmFrame.preferences.v1', original);
+    }
+  });
+
   it('falls back safely when accessing localStorage itself throws', () => {
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')!;
     Object.defineProperty(globalThis, 'localStorage', {
@@ -264,7 +494,12 @@ describe('settings storage', () => {
       get() { throw new DOMException('Storage is blocked', 'SecurityError'); },
     });
     try {
-      expect(loadPreferences(defaults, 'strip')).toEqual({ settings: defaults, outputMode: 'strip' });
+      expect(loadPreferences(defaults, 'strip')).toEqual({
+        settings: defaults,
+        outputMode: 'strip',
+        migratedClassicEdge: false,
+        migratedUnsupportedEdge: false,
+      });
       expect(() => savePreferences(defaults, 'single')).not.toThrow();
     } finally {
       Object.defineProperty(globalThis, 'localStorage', descriptor);

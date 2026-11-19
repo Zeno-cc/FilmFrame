@@ -1,4 +1,7 @@
 import type { FilmSettings, RenderTransform } from '../../types';
+import type { SpectralBackend } from '../spectral/backend';
+import type { createPortraPipeline } from '../spectral/portraPipeline';
+import type { Vec3 } from '../spectral/math';
 import { solveBaseCancelingHoleDensity } from './density';
 import { createPhysicalCanvas, createPhysicalRaster, paintPhysicalFrame, paintPhysicalImprints, type PhysicalContext, type PhysicalImage } from './canvas';
 import type { ImprintOp } from './kodakEdge';
@@ -33,6 +36,41 @@ export function physicalEdgeExposureAtPoint(plan: PhysicalFilmPlan, s: number, t
   return { fog, leak };
 }
 
+export interface PhysicalSpectralSession {
+  pipeline: ReturnType<typeof createPortraPipeline>;
+  holeCmy: Vec3;
+  backend: SpectralBackend;
+}
+
+export async function createPhysicalSpectralSession(
+  settings: FilmSettings,
+  renderBudgetLimits: RenderBudgetLimits = {},
+  frameWidth = 1,
+  frameHeight = 1,
+): Promise<PhysicalSpectralSession> {
+  const resource = await loadSpectralStockResourceForPhysical(settings);
+  const pipeline = await createPipelineForPhysical(resource);
+  const hole = solveBaseCancelingHoleDensity(
+    pipeline.setup.arrays.filmChannelDensity,
+    pipeline.setup.arrays.filmBaseDensity,
+    pipeline.setup.arrays.filmSpectralValidMask,
+  );
+  if (!Number.isFinite(hole.maxBaseResidual)) {
+    throw new Error(`${settings.brandText} 的片基抵消残差无效，不能使用完整光谱片边。`);
+  }
+  const { createSpectralBackend } = await import('../spectral/backend');
+  return {
+    pipeline,
+    holeCmy: hole.cmy,
+    backend: createSpectralBackend({
+      pipeline,
+      prefer: settings.spectralBackend ?? 'auto',
+      canvas: createPhysicalCanvas(frameWidth, frameHeight, renderBudgetLimits),
+      limits: { maxPixels: frameWidth * frameHeight, maxWorkingSetBytes: frameWidth * frameHeight * 7 * 3 * 4 + 81 * 3 * 8 },
+    }),
+  };
+}
+
 export async function renderPhysicalSpectralCanvas(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   plan: PhysicalFilmPlan,
@@ -43,66 +81,51 @@ export async function renderPhysicalSpectralCanvas(
   imprintOverride?: readonly ImprintOp[],
   imprintPixels?: Uint8ClampedArray,
   renderBudgetLimits: RenderBudgetLimits = {},
+  session?: PhysicalSpectralSession,
 ): Promise<void> {
   assertCanvasBudget(canvas.width, canvas.height, renderBudgetLimits);
-  const resource = await loadSpectralStockResourceForPhysical(settings);
-  const pipeline = await createPipelineForPhysical(resource);
-  const hole = solveBaseCancelingHoleDensity(
-    pipeline.setup.arrays.filmChannelDensity,
-    pipeline.setup.arrays.filmBaseDensity,
-    pipeline.setup.arrays.filmSpectralValidMask,
-  );
-  // Upstream overscan.cpp uses this same least-squares CMY with no residual
-  // acceptance gate. A residual reflects the stock's own dye/base physics,
-  // not a solver failure; rendering proceeds with the solved CMY as upstream does.
-  if (!Number.isFinite(hole.maxBaseResidual)) {
-    throw new Error(`${settings.brandText} 的片基抵消残差无效，不能使用完整光谱片边。`);
-  }
-  const { width, height } = canvas;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Physical spectral canvas context unavailable');
-  const rgba = ctx.getImageData(0, 0, width, height);
-  const imprintCanvas = imprintPixels ? null : createPhysicalCanvas(width, height, renderBudgetLimits);
-  const imprintCtx = imprintCanvas?.getContext('2d') as PhysicalContext | null;
-  if (!imprintPixels && !imprintCtx) throw new Error('Physical imprint context unavailable');
-  if (imprintCtx) paintPhysicalImprints(imprintCtx, plan, settings, imprintOverride);
-  const imprint = imprintPixels ?? imprintCtx!.getImageData(0, 0, width, height).data;
-  const weights = edgeLightWeights(settings.brandText);
-  const pixels = new Float32Array(width * height * 3);
-  const { srgbByteToLinearProPhoto } = await import('../spectral/inputColor');
-  const imprintGain = physicalImprintExposure(settings.brandText);
-  for (let pixel = 0; pixel < width * height; pixel += 1) {
-    const x = pixel % width;
-    const y = Math.floor(pixel / width);
-    const point = canvasToFilm(plan, (x + 0.5) / plan.pxPerMm, (y + 0.5) / plan.pxPerMm);
-    const insideGate = point.s >= plan.gate.s && point.s <= plan.gate.s + plan.gate.width
-      && point.t >= plan.gate.t && point.t <= plan.gate.t + plan.gate.height;
-    const photoCoverage = insideGate ? 1 : 0;
-    const color = insideGate ? srgbByteToLinearProPhoto(
-      pipeline.setup,
-      rgba.data[pixel * 4],
-      rgba.data[pixel * 4 + 1],
-      rgba.data[pixel * 4 + 2],
-    ) : [0, 0, 0] as const;
-    const imprintCoverage = imprint[pixel * 4 + 3] / 255;
-    const { fog, leak } = physicalEdgeExposureAtPoint(plan, point.s, point.t);
-    const edgeBase = MID_GREY * (1 - photoCoverage) * 0.00002;
-    for (let channel = 0; channel < 3; channel += 1) {
-      pixels[pixel * 3 + channel] = color[channel] * photoCoverage
-        + edgeBase
-        + imprintCoverage * imprintGain * weights.edge[channel]
-        + (fog + leak) * weights.fog[channel];
-    }
-  }
-  const { createSpectralBackend } = await import('../spectral/backend');
-  const backend = createSpectralBackend({
-    pipeline,
-    prefer: settings.spectralBackend ?? 'auto',
-    canvas: createPhysicalCanvas(width, height, renderBudgetLimits),
-    limits: { maxPixels: width * height, maxWorkingSetBytes: width * height * 7 * 3 * 4 + 81 * 3 * 8 },
-  });
+  const ownedSession = session ? null : await createPhysicalSpectralSession(settings, renderBudgetLimits, canvas.width, canvas.height);
+  const active = session ?? ownedSession!;
   try {
-    const frame = await backend.render({ width, height, pixels }, presence, hole.cmy);
+    const pipeline = active.pipeline;
+    const { width, height } = canvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Physical spectral canvas context unavailable');
+    const rgba = ctx.getImageData(0, 0, width, height);
+    const imprintCanvas = imprintPixels ? null : createPhysicalCanvas(width, height, renderBudgetLimits);
+    const imprintCtx = imprintCanvas?.getContext('2d') as PhysicalContext | null;
+    if (!imprintPixels && !imprintCtx) throw new Error('Physical imprint context unavailable');
+    if (imprintCtx) paintPhysicalImprints(imprintCtx, plan, settings, imprintOverride);
+    const imprint = imprintPixels ?? imprintCtx!.getImageData(0, 0, width, height).data;
+    const weights = edgeLightWeights(settings.brandText);
+    const pixels = new Float32Array(width * height * 3);
+    const { srgbByteToLinearProPhoto } = await import('../spectral/inputColor');
+    const imprintGain = physicalImprintExposure(settings.brandText);
+    for (let pixel = 0; pixel < width * height; pixel += 1) {
+      const x = pixel % width;
+      const y = Math.floor(pixel / width);
+      const point = canvasToFilm(plan, (x + 0.5) / plan.pxPerMm, (y + 0.5) / plan.pxPerMm);
+      const insideGate = point.s >= plan.gate.s && point.s <= plan.gate.s + plan.gate.width
+        && point.t >= plan.gate.t && point.t <= plan.gate.t + plan.gate.height;
+      const photoCoverage = insideGate ? 1 : 0;
+      const color = insideGate ? srgbByteToLinearProPhoto(
+        pipeline.setup,
+        rgba.data[pixel * 4],
+        rgba.data[pixel * 4 + 1],
+        rgba.data[pixel * 4 + 2],
+      ) : [0, 0, 0] as const;
+      const imprintCoverage = imprint[pixel * 4 + 3] / 255;
+      const { fog, leak } = physicalEdgeExposureAtPoint(plan, point.s, point.t);
+      const edgeBase = MID_GREY * (1 - photoCoverage) * 0.00002;
+      for (let channel = 0; channel < 3; channel += 1) {
+        pixels[pixel * 3 + channel] = color[channel] * photoCoverage
+          + edgeBase
+          + imprintCoverage * imprintGain * weights.edge[channel]
+          + (fog + leak) * weights.fog[channel];
+      }
+    }
+    const backend = active.backend;
+    const frame = await backend.render({ width, height, pixels }, presence, active.holeCmy);
     try {
       const rgb = backend.readRgb(frame);
       for (let pixel = 0; pixel < width * height; pixel += 1) {
@@ -118,7 +141,7 @@ export async function renderPhysicalSpectralCanvas(
       backend.release(frame);
     }
   } finally {
-    backend.dispose();
+    ownedSession?.backend.dispose();
   }
 }
 

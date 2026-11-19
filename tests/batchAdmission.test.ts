@@ -82,19 +82,21 @@ describe('batch admission', () => {
   });
 
   it('uses the existing canvas hard budget before a strip allocation', () => {
+    // 6 GiB exceeds what the 32,767 px edge allows (about 4095.8 MiB), so an
+    // edge violation is the binding limit at the default budget.
     const result = evaluateBatchAdmission({
       operation: 'strip',
       includedImages: [image(1200, 800)],
-      stripCanvas: { width: 28_672, height: 6_401 },
+      stripCanvas: { width: 32_768, height: 6_400 },
     });
 
     expect(result).toMatchObject({
       status: 'blocked',
       reason: 'strip-canvas-exceeded',
       stripCanvas: {
-        pixels: 183_529_472,
-        estimatedBytes: 183_529_472 * RGBA_BYTES_PER_PIXEL,
-        budget: { ok: false, reason: 'max-pixels-exceeded' },
+        pixels: 32_768 * 6_400,
+        estimatedBytes: 32_768 * 6_400 * RGBA_BYTES_PER_PIXEL,
+        budget: { ok: false, reason: 'max-edge-exceeded' },
       },
     });
   });

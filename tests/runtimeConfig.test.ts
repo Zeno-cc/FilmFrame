@@ -59,7 +59,7 @@ describe('runtime render configuration', () => {
       .toThrow('missing or unsupported');
   });
 
-  it('returns a bounded 700 MiB fallback when the request fails', async () => {
+  it('returns a bounded 6 GiB fallback when the request fails', async () => {
     const fetchRuntimeConfig = vi.fn().mockRejectedValue(new Error('offline'));
     await expect(loadRuntimeRenderConfig({
       fetch: fetchRuntimeConfig as unknown as typeof fetch,

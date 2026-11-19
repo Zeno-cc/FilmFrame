@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 
 test.use({ launchOptions: { ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}), args: ['--enable-unsafe-swiftshader'] } });
 
@@ -13,14 +14,17 @@ test('new sessions default to physical 135 with an automatic equivalent backend'
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('physical135');
+  await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
+  await expect(page.getByRole('img', { name: 'film-base.png' })).toBeVisible();
+  const inspector = getRecipeInspector(page);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
+  await openRecipeAdvancedSettings(page, '高级色彩设置');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('physical135');
   await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
   await expect(inspector.getByLabel('光谱计算')).toHaveValue('auto');
-  await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
   await inspector.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90000 });
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
   await inspector.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90000 });
   await expect(page.getByRole('button', { name: '全部成片均为最新' })).toBeVisible();
@@ -38,18 +42,20 @@ test('legacy preference envelopes and explicit template rollback are preserved',
     }));
   });
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('legacy-template');
+  await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
+  await expect(page.getByRole('img', { name: 'film-base.png' })).toBeVisible();
+  const inspector = getRecipeInspector(page);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('legacy-template');
   await expect(inspector.getByLabel('成像方式')).toHaveValue('legacy');
   const saved = await page.evaluate(() => localStorage.getItem('filmFrame.preferences.v1'));
   expect(saved).toContain('"renderPreferenceVersion":1');
   expect(saved).toContain('"edgeRenderMode":"legacy-template"');
   expect(saved).toContain('"imagingMode":"legacy"');
-  await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
   await inspector.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90000 });
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  await page.getByLabel('长条审片台').getByRole('button', { name: '生成胶片长条' }).click();
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  await page.getByLabel('长条预览').getByRole('button', { name: '生成胶片长条' }).click();
   await expect(page.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 90000 });
 });
 
@@ -64,16 +70,18 @@ test('legacy recipes restore their original real-135 imaging and strip workflow'
     }]));
   });
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('physical135');
-  await inspector.getByLabel('选择本地配方').selectOption('legacy-portra');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('legacy-template');
-  await expect(inspector.getByLabel('成像方式')).toHaveValue('legacy');
   await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
+  await expect(page.getByRole('img', { name: 'film-base.png' })).toBeVisible();
+  const inspector = getRecipeInspector(page);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('physical135');
+  await inspector.getByLabel('选择本地配方').selectOption('legacy-portra');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('legacy-template');
+  await expect(inspector.getByLabel('成像方式')).toHaveValue('legacy');
   await inspector.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90000 });
-  await page.getByRole('tab', { name: /连底长条/ }).click();
-  await page.getByLabel('长条审片台').getByRole('button', { name: '生成胶片长条' }).click();
+  await page.getByRole('tab', { name: /胶片长条/ }).click();
+  await page.getByLabel('长条预览').getByRole('button', { name: '生成胶片长条' }).click();
   await expect(page.getByRole('img', { name: '已生成的胶片长条' })).toBeVisible({ timeout: 90000 });
 });
 
@@ -82,12 +90,14 @@ test('Pro 400H supports full physical spectral rendering like upstream overscan'
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await selectFilmStock(inspector, 'FUJI PRO 400H');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('physical135');
-  await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-  await inspector.getByLabel('光谱计算').selectOption('cpu');
   await page.locator('input[type=file]').setInputFiles('public/film-overlays/film-base.png');
+  await expect(page.getByRole('img', { name: 'film-base.png' })).toBeVisible();
+  const inspector = getRecipeInspector(page);
+  await selectFilmStock(inspector, 'FUJI PRO 400H');
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('physical135');
+  await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
+  await selectRecipeControl(page, '光谱计算', 'cpu');
   await inspector.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90000 });
   const accepted = await page.evaluate(async () => {

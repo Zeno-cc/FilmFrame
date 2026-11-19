@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
@@ -11,15 +12,17 @@ async function develop(page: Page, forceMain: boolean) {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  await expect(page.getByRole('img', { name: fixtureName })).toBeVisible();
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, FilmType.KODAK_VISION3_500T);
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   await inspector.getByLabel('齿孔颜色', { exact: true }).fill('#cc3344');
   await expect(inspector.getByLabel('齿孔颜色', { exact: true })).toHaveValue('#cc3344');
-  await inspector.getByLabel('光谱计算').selectOption('cpu');
+  await selectRecipeControl(page, '光谱计算', 'cpu');
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-  await page.locator('input[type=file]').setInputFiles(fixture);
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });
   return page.getByRole('img', { name: fixtureName }).evaluate(async element => {

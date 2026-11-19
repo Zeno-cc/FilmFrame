@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
+import { isDocumentedPublicGalleryRequest } from './publicRequests';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
@@ -10,20 +12,22 @@ for (const stock of [FilmType.FUJI_PROVIA_100F, FilmType.FUJI_VELVIA_100, FilmTy
     const external: string[] = [];
     const resources: string[] = [];
     page.on('request', request => {
+      if (isDocumentedPublicGalleryRequest(request)) return;
       if (!request.url().startsWith(`${test.info().project.use.baseURL}/`) && !request.url().startsWith('blob:')) external.push(request.url());
       if (request.url().includes('-setup')) resources.push(request.url());
     });
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    const inspector = page.getByRole('complementary', { name: '暗房配方' });
+    await page.locator('input[type=file]').setInputFiles(fixture);
+    const inspector = getRecipeInspector(page);
     await selectFilmStock(inspector, stock);
+    await openRecipeAdvancedSettings(page, '高级渲染设置');
     await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-    await expect(inspector.getByLabel('底片渲染')).toHaveValue('legacy-template');
-    await inspector.getByLabel('光谱计算').selectOption('cpu');
+    await expect(inspector.getByLabel('片边方式')).toHaveValue('legacy-template');
+    await selectRecipeControl(page, '光谱计算', 'cpu');
     await inspector.getByLabel('颗粒强度').fill('0');
     await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-    await page.locator('input[type=file]').setInputFiles(fixture);
     await expect(inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true })).toBeEnabled();
     await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
     await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });
@@ -45,12 +49,12 @@ test('positive CPU forced-main output matches Worker output', async ({ page }) =
     await target.goto('/');
     await target.evaluate(() => localStorage.clear());
     await target.reload();
-    const inspector = target.getByRole('complementary', { name: '暗房配方' });
+    await target.locator('input[type=file]').setInputFiles(fixture);
+    const inspector = target.getByRole('complementary', { name: '调整' });
     await selectFilmStock(inspector, FilmType.FUJI_VELVIA_100);
-    await inspector.getByLabel('光谱计算').selectOption('cpu');
+    await selectRecipeControl(target, '光谱计算', 'cpu');
     await inspector.getByLabel('颗粒强度').fill('0');
     await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-    await target.locator('input[type=file]').setInputFiles(fixture);
     await expect(inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true })).toBeEnabled();
     await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
     await expect(target.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });

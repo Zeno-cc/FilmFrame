@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Full physical rasters exercise millions of per-pixel transforms in Node.
+vi.setConfig({ testTimeout: 30_000 });
 import { isDeepStrictEqual } from 'node:util';
 import { FilmType, type FilmSettings } from '../types';
 import { canvasToFilm, createPhysicalFilmPlan, filmToCanvas, filmToRollPoint, type PhysicalFilmPlan } from '../services/physical135/plan';

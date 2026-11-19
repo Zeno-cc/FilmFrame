@@ -277,23 +277,6 @@ export function restorePhysicalFrameOrientation(
   ctx.drawImage(source, 0, 0);
 }
 
-export function createPhysicalRotatedImage(
-  image: PhysicalImage,
-  transform: RenderTransform | undefined,
-  limits: RenderBudgetLimits = {},
-): PhysicalCanvas | null {
-  const normalized = normalizeRenderTransform(transform);
-  if (normalized.quarterTurns === 0) return null;
-  const odd = normalized.quarterTurns % 2 === 1;
-  const canvas = createPhysicalCanvas(odd ? image.height : image.width, odd ? image.width : image.height, limits);
-  const context = canvas.getContext('2d') as PhysicalContext | null;
-  if (!context) throw new Error('Physical source rotation context unavailable');
-  context.translate(canvas.width / 2, canvas.height / 2);
-  context.rotate(normalized.quarterTurns * Math.PI / 2);
-  context.drawImage(image, -image.width / 2, -image.height / 2);
-  return canvas;
-}
-
 export function paintPhysicalFrame(
   ctx: PhysicalContext,
   image: PhysicalImage,

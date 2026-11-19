@@ -50,6 +50,11 @@ export function physicalEdgeForFilm(stock: FilmType): PhysicalEdgeDefinition | u
   return REGISTRY.get(stock);
 }
 
+/** False when this stock has no validated physical edge layout to print. */
+export function hasPhysicalEdgeLayout(stock: FilmType): boolean {
+  return REGISTRY.has(stock);
+}
+
 export function physicalEdgeDefinitions(): readonly [FilmType, PhysicalEdgeDefinition][] {
   return [...REGISTRY.entries()];
 }

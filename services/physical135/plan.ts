@@ -3,6 +3,7 @@ import { supportsSpectralStock } from '../spectral/stockRegistry';
 import { supportsPhysicalSpectralStock } from './capability';
 import { createBodyVariation, createFrameVariation } from './seed';
 import { physicalEdgeForFilm } from './edgeRegistry';
+import { EDGE_MODE_LABELS, FRAME_MODE_LABELS } from '../renderModePresentation';
 
 /**
  * Convert a point in this frame's local scan window to its identity on the
@@ -154,10 +155,10 @@ export function physicalRenderingKind(settings: Partial<Pick<FilmSettings, 'edge
 export function assertPhysicalCombination(settings: Pick<FilmSettings, 'brandText'> & Partial<Pick<FilmSettings, 'frameRenderMode' | 'edgeRenderMode' | 'imagingMode'>>): void {
   if (settings.edgeRenderMode !== 'physical135') return;
   if (settings.imagingMode === 'spectral' && !physicalEdgeForFilm(settings.brandText)) {
-    throw new Error(`${settings.brandText} 没有经验证的物理片边布局；请使用真实 135 兼容贴图。`);
+    throw new Error(`${settings.brandText} 没有经验证的物理片边布局；请改用${EDGE_MODE_LABELS['legacy-template']}。`);
   }
   if ((settings.frameRenderMode ?? 'real135') !== 'real135') {
-    throw new Error('物理 135 片边不能与经典片边同时启用。');
+    throw new Error(`${EDGE_MODE_LABELS.physical135}需要启用 ${FRAME_MODE_LABELS.real135}。`);
   }
   if (settings.imagingMode === 'spectral' && !supportsSpectralStock(settings.brandText)) {
     throw new Error(`${settings.brandText} 没有经验证的光谱负片资源，不能用于物理光谱片边。`);

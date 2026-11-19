@@ -1,7 +1,9 @@
 import { FILM_PRESETS, FilmType } from '../types';
 import type { FilmSettings, OutputMode } from '../types';
 import { defaultEdgeForStock, supportsPhysicalSpectralStock } from './physical135/capability';
+import { hasPhysicalEdgeLayout } from './physical135/edgeRegistry';
 import { supportsReal135Template } from './filmOverlay';
+import { supportsSpectralStock } from './spectral/stockRegistry';
 
 const STORAGE_KEY = 'filmFrame.preferences.v1';
 export const CURRENT_RENDER_PREFERENCE_VERSION = 1;
@@ -192,6 +194,46 @@ export function mergeSettings(defaults: FilmSettings, patch: unknown, renderPref
   };
 }
 
+export interface SpectralRenderMigration {
+  settings: FilmSettings;
+  migratedClassic: boolean;
+  migratedUnsupportedEdge: boolean;
+}
+
+/**
+ * Spectral-capable stocks only render 135 framing, so legacy classic choices
+ * migrate to the closest representable output once. A classic frame also never
+ * keeps physical edge settings that its renderer cannot express.
+ */
+export function normalizeSpectralRenderMode(settings: FilmSettings): SpectralRenderMigration {
+  const frameRenderMode = settings.frameRenderMode ?? 'real135';
+
+  if (frameRenderMode !== 'classic') {
+    return settings.edgeRenderMode === 'physical135' && !hasPhysicalEdgeLayout(settings.brandText)
+      ? { settings: { ...settings, edgeRenderMode: 'legacy-template' }, migratedClassic: false, migratedUnsupportedEdge: true }
+      : { settings, migratedClassic: false, migratedUnsupportedEdge: false };
+  }
+
+  if (supportsSpectralStock(settings.brandText)) {
+    return {
+      migratedClassic: true,
+      migratedUnsupportedEdge: false,
+      settings: {
+        ...settings,
+        frameRenderMode: 'real135',
+        edgeRenderMode: 'legacy-template',
+        imagingMode: 'legacy',
+      },
+    };
+  }
+
+  if (settings.edgeRenderMode === 'physical135') {
+    return { settings: { ...settings, edgeRenderMode: 'legacy-template' }, migratedClassic: false, migratedUnsupportedEdge: false };
+  }
+
+  return { settings, migratedClassic: false, migratedUnsupportedEdge: false };
+}
+
 export function normalizeOutputMode(value: unknown, fallback: OutputMode): OutputMode {
   return value === 'single' || value === 'strip' ? value : fallback;
 }
@@ -200,30 +242,37 @@ export function normalizeOutputMode(value: unknown, fallback: OutputMode): Outpu
 export function settingsForFilmStock(settings: FilmSettings, brandText: FilmType): FilmSettings {
   if (brandText === settings.brandText) return settings;
   const preset = FILM_PRESETS[brandText];
-  return mergeSettings(settings, {
+  return normalizeSpectralRenderMode(mergeSettings(settings, {
     brandText,
     textColor: preset.brandColor,
     holeType: preset.holeRounding > 0.4 ? 'rounded' : 'square',
     frameRenderMode: supportsReal135Template(brandText) ? settings.frameRenderMode : 'classic',
     ...(!supportsPhysicalSpectralStock(brandText) ? { edgeRenderMode: defaultEdgeForStock(brandText) } : {}),
-  });
+  })).settings;
 }
 
 function canUseLocalStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
+export interface LoadedPreferences {
+  settings: FilmSettings;
+  outputMode: OutputMode;
+  migratedClassicEdge: boolean;
+  migratedUnsupportedEdge: boolean;
+}
+
 export function loadPreferences(
   defaults: FilmSettings,
   fallbackMode: OutputMode
-): { settings: FilmSettings; outputMode: OutputMode } {
+): LoadedPreferences {
   try {
     if (!canUseLocalStorage()) {
-      return { settings: defaults, outputMode: fallbackMode };
+      return { settings: defaults, outputMode: fallbackMode, migratedClassicEdge: false, migratedUnsupportedEdge: false };
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { settings: defaults, outputMode: fallbackMode };
+      return { settings: defaults, outputMode: fallbackMode, migratedClassicEdge: false, migratedUnsupportedEdge: false };
     }
 
     const parsed: unknown = JSON.parse(raw);
@@ -232,13 +281,18 @@ export function loadPreferences(
     const renderPreferenceVersion = isRecord(parsed) && typeof parsed.renderPreferenceVersion === 'number'
       ? parsed.renderPreferenceVersion
       : 0;
+    const normalized = normalizeSpectralRenderMode(
+      mergeSettings(defaults, savedSettings, renderPreferenceVersion),
+    );
 
     return {
-      settings: mergeSettings(defaults, savedSettings, renderPreferenceVersion),
+      settings: normalized.settings,
       outputMode: normalizeOutputMode(savedOutputMode, fallbackMode),
+      migratedClassicEdge: normalized.migratedClassic,
+      migratedUnsupportedEdge: normalized.migratedUnsupportedEdge,
     };
   } catch {
-    return { settings: defaults, outputMode: fallbackMode };
+    return { settings: defaults, outputMode: fallbackMode, migratedClassicEdge: false, migratedUnsupportedEdge: false };
   }
 }
 
@@ -248,7 +302,7 @@ export function savePreferences(settings: FilmSettings, outputMode: OutputMode):
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        settings: normalizeSettingsPatch(settings),
+        settings: normalizeSettingsPatch(normalizeSpectralRenderMode(settings).settings),
         outputMode: normalizeOutputMode(outputMode, 'single'),
         renderPreferenceVersion: CURRENT_RENDER_PREFERENCE_VERSION,
       })

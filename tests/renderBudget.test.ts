@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_MAX_CANVAS_PIXELS,
   validateCanvasBudget,
   validateKodakStripBudget,
 } from '../services/renderBudget';
@@ -7,18 +8,20 @@ import { createRuntimeRenderConfig } from '../services/runtimeConfig';
 
 describe('canvas render budget', () => {
   it('accepts dimensions exactly at the default pixel limit', () => {
-    expect(validateCanvasBudget(28_672, 6_400)).toEqual({
+    expect(validateCanvasBudget(DEFAULT_MAX_CANVAS_PIXELS, 1, {
+      maxEdge: Number.MAX_SAFE_INTEGER,
+    })).toEqual({
       ok: true,
-      pixels: 183_500_800,
+      pixels: DEFAULT_MAX_CANVAS_PIXELS,
     });
   });
 
   it('rejects dimensions one pixel beyond the default pixel limit', () => {
-    expect(validateCanvasBudget(183_500_801, 1, {
+    expect(validateCanvasBudget(DEFAULT_MAX_CANVAS_PIXELS + 1, 1, {
       maxEdge: Number.MAX_SAFE_INTEGER,
     })).toEqual({
       ok: false,
-      pixels: 183_500_801,
+      pixels: DEFAULT_MAX_CANVAS_PIXELS + 1,
       reason: 'max-pixels-exceeded',
     });
   });
@@ -58,7 +61,7 @@ describe('canvas render budget', () => {
     });
   });
 
-  it.each([128, 700, 2_048])(
+  it.each([128, 700, 6_144])(
     'enforces the %i MiB threshold immediately below, at, and above it',
     (maxCanvasMiB) => {
       const limits = {

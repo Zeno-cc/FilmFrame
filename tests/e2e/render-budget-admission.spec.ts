@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openRecipeAdvancedSettings } from './recipeControls';
 
 const MAX_CANVAS_MIB = 128;
 const MAX_CANVAS_BYTES = MAX_CANVAS_MIB * 1024 * 1024;
@@ -13,6 +14,56 @@ type CanvasAllocationProbe = {
   offscreenCanvasAttempts: Array<{ width: number; height: number }>;
   workerAttempts: number;
 };
+
+test('accepts a 5000 MiB runtime budget that the former 4096 MiB ceiling rejected', async ({ page }) => {
+  let configRequests = 0;
+  await page.route('**/auth/refresh', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/runtime-config', route => {
+    configRequests += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        maxCanvasMiB: 5_000,
+        maxCanvasBytes: 5_000 * 1024 * 1024,
+        updatedAt: 1_785_859_200,
+      }),
+    });
+  });
+
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  const inspector = page.getByRole('complementary', { name: '调整' });
+  await page.locator('input[type="file"]').setInputFiles({ name: 'runtime-budget.png', mimeType: 'image/png', buffer: TINY_PNG });
+  await expect(page.getByRole('img', { name: 'runtime-budget.png' })).toBeVisible();
+  await openRecipeAdvancedSettings(page, '高级输出设置');
+  await expect(inspector.getByRole('button', { name: '高清出片' })).toBeEnabled();
+  await expect(page.getByText('运行配置暂时无法读取')).toHaveCount(0);
+  expect(configRequests).toBeGreaterThanOrEqual(2);
+});
+
+test('falls back to the 6144 MiB ceiling when the stored budget exceeds it', async ({ page }) => {
+  await page.route('**/auth/refresh', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/runtime-config', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      maxCanvasMiB: 6_145,
+      maxCanvasBytes: 6_145 * 1024 * 1024,
+      updatedAt: 1_785_859_200,
+    }),
+  }));
+
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await expect(page.getByText(/运行配置暂时无法读取，当前按 6144 MiB/)).toBeVisible();
+});
 
 test('128 MiB budget blocks a high-quality real-135 strip before Canvas allocation', async ({ page }) => {
   await page.route('**/auth/refresh', route => route.fulfill({ status: 204 }));
@@ -116,13 +167,7 @@ test('128 MiB budget blocks a high-quality real-135 strip before Canvas allocati
   await page.reload();
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
-  await expect(inspector.getByRole('button', { name: '高清出片' })).toBeEnabled();
-  await expect(inspector.getByRole('button', { name: '真实 135' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-
+  const inspector = page.getByRole('complementary', { name: '调整' });
   await page.locator('input[type="file"]').setInputFiles(
     Array.from({ length: 20 }, (_, index) => ({
       name: `bounded-strip-${String(index + 1).padStart(2, '0')}.png`,
@@ -131,14 +176,18 @@ test('128 MiB budget blocks a high-quality real-135 strip before Canvas allocati
     })),
   );
   await expect(page.getByRole('img', { name: 'bounded-strip-20.png' })).toBeVisible();
+  await openRecipeAdvancedSettings(page, '高级输出设置');
+  await expect(inspector.getByRole('button', { name: '高清出片' })).toBeEnabled();
+  await expect(inspector.getByRole('group', { name: '画幅样式' })).toHaveCount(0);
+  await expect(inspector.getByLabel('片边方式')).toBeVisible();
 
   await inspector.getByRole('button', { name: '高清出片' }).click();
   await expect(inspector.getByRole('button', { name: '高清出片' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
-  await page.getByRole('tab', { name: /连底长条 · 20 张入选/ }).click();
-  await page.getByLabel('长条审片台').getByRole('button', { name: '生成胶片长条' }).click();
+  await page.getByRole('tab', { name: /胶片长条 20 张入选/ }).click();
+  await page.getByLabel('长条预览').getByRole('button', { name: '生成胶片长条' }).click();
 
   const errorDialog = page.getByRole('dialog', { name: '需要处理' });
   await expect(errorDialog).toContainText('长条画布约');

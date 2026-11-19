@@ -112,7 +112,7 @@ describe('physical 135 planning', () => {
   });
 
   it('rejects classic-border combinations and unvalidated spectral stocks', () => {
-    expect(() => plan({ frameRenderMode: 'classic' })).toThrow('经典片边');
+    expect(() => plan({ frameRenderMode: 'classic' })).toThrow('需要启用 135 画幅');
     expect(() => createPhysicalFilmPlan({
       filmType: FilmType.CINESTILL_800T,
       settings,

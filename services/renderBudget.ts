@@ -17,7 +17,10 @@ export type RenderBudgetLimits = {
 };
 
 export const DEFAULT_MAX_CANVAS_EDGE = 32_767;
-export const DEFAULT_MAX_CANVAS_MIB = 700;
+// 6 GiB default. The 32,767 px edge ceiling caps one RGBA Canvas at about
+// 4095.8 MiB, so this removes the default budget gate while keeping the edge
+// guard and the aggregate working-set limits.
+export const DEFAULT_MAX_CANVAS_MIB = 6_144;
 export const MEBIBYTE = 1024 * 1024;
 export const RGBA_BYTES_PER_PIXEL = 4;
 export const DEFAULT_MAX_CANVAS_BYTES = DEFAULT_MAX_CANVAS_MIB * MEBIBYTE;

@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
+import { isDocumentedPublicGalleryRequest } from './publicRequests';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
@@ -12,10 +14,12 @@ async function develop(page: Page, stock: FilmType, forceMain = false) {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, stock);
-  await inspector.getByLabel('底片渲染').selectOption('legacy-template');
-  await inspector.getByLabel('光谱计算').selectOption('cpu');
+  await selectRecipeControl(page, '片边方式', 'legacy-template');
+  await selectRecipeControl(page, '光谱计算', 'cpu');
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   await inspector.getByLabel('颗粒强度').fill('0');
   const frameNumberColor = inspector.getByLabel('帧号颜色');
   await frameNumberColor.evaluate(input => {
@@ -26,8 +30,7 @@ async function develop(page: Page, stock: FilmType, forceMain = false) {
   await expect(frameNumberColor).toHaveValue('#16a34a');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
   await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('legacy-template');
-  await page.locator('input[type=file]').setInputFiles(fixture);
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('legacy-template');
   await expect(inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true })).toBeEnabled();
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });
@@ -59,6 +62,7 @@ for (const stock of [FilmType.FUJI_ACROS_II, FilmType.ILFORD_HP5, FilmType.KODAK
     const external: string[] = [];
     const resources: string[] = [];
     page.on('request', request => {
+      if (isDocumentedPublicGalleryRequest(request)) return;
       if (!request.url().startsWith(`${test.info().project.use.baseURL}/`) && !request.url().startsWith('blob:')) external.push(request.url());
       if (request.url().includes('-setup')) resources.push(request.url());
     });

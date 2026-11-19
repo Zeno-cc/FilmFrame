@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'tests/fixtures/physical-natural-portrait.png');
@@ -10,16 +11,19 @@ async function develop(page: Page, forceMain = false) {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, FilmType.CINESTILL_800T);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('legacy-template');
-  await inspector.getByLabel('光谱计算').selectOption('cpu');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('legacy-template');
+  await selectRecipeControl(page, '光谱计算', 'cpu');
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-  await page.locator('input[type=file]').setInputFiles(fixture);
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
-  await expect(page.getByRole('img', { name: path.basename(fixture) })).toBeVisible({ timeout: 90_000 });
+  // The source preview has the same accessible name and a Blob URL. Wait for
+  // the committed artifact before comparing Worker and main-thread pixels.
+  await expect(page.getByRole('img', { name: '已出片' })).toHaveCount(1, { timeout: 90_000 });
   await expect.poll(async () => page.getByRole('img', { name: path.basename(fixture) }).evaluate(async element => {
     const image = element as HTMLImageElement;
     if (!image.currentSrc.startsWith('blob:')) return 0;
@@ -30,7 +34,8 @@ async function develop(page: Page, forceMain = false) {
   }), { timeout: 90_000 }).toBeGreaterThan(0);
   return page.getByRole('img', { name: path.basename(fixture) }).evaluate(async element => {
     const image = element as HTMLImageElement;
-    const bitmap = await createImageBitmap(await (await fetch(image.currentSrc)).blob());
+    const blob = await (await fetch(image.currentSrc)).blob();
+    const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
     const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;

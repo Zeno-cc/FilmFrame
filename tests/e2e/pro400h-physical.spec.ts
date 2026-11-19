@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { FilmType } from '../../types';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 
 const fixture = path.resolve(process.cwd(), 'tests/fixtures/physical-natural-portrait.png');
 const fixtureName = path.basename(fixture);
@@ -99,17 +100,19 @@ async function develop(page: Page, backend: 'cpu' | 'webgl2', forceMain = false,
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, scenario.stock ?? FilmType.FUJI_PRO_400H);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('physical135');
-  await inspector.getByLabel('光谱计算').selectOption(backend);
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('physical135');
+  await selectRecipeControl(page, '光谱计算', backend);
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: scenario.format ?? 'PNG', exact: true }).click();
   if (scenario.aspect) {
+    await openRecipeAdvancedSettings(page, '高级输出设置');
     await inspector.getByRole('button', { name: scenario.aspect === '4:3' ? '保留扫描背景' : '仅保留底片', exact: true }).click();
   }
-  await page.locator('input[type=file]').setInputFiles(fixture);
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
   await expect(inspector.getByRole('button', { name: '全部成片均为最新', exact: true })).toBeVisible({ timeout: 90_000 });
   if (!forceMain) {

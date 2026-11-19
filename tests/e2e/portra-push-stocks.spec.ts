@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
+import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
+import { isDocumentedPublicGalleryRequest } from './publicRequests';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
@@ -13,14 +15,15 @@ async function prepare(page: Page, stock: FilmType, forceMain: boolean) {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  await page.locator('input[type=file]').setInputFiles(fixture);
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, stock);
+  await openRecipeAdvancedSettings(page, '高级渲染设置');
   await expect(inspector.getByLabel('成像方式')).toHaveValue('spectral');
-  await expect(inspector.getByLabel('底片渲染')).toHaveValue('physical135');
-  await inspector.getByLabel('光谱计算').selectOption('cpu');
+  await expect(inspector.getByLabel('片边方式')).toHaveValue('physical135');
+  await selectRecipeControl(page, '光谱计算', 'cpu');
   await inspector.getByLabel('颗粒强度').fill('0');
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
-  await page.locator('input[type=file]').setInputFiles(fixture);
   await expect(inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true })).toBeEnabled();
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });
@@ -46,6 +49,7 @@ for (const stock of [FilmType.KODAK_PORTRA_800_PUSH1, FilmType.KODAK_PORTRA_800_
     const external: string[] = [];
     const resources: string[] = [];
     page.on('request', request => {
+      if (isDocumentedPublicGalleryRequest(request)) return;
       if (!request.url().startsWith(`${test.info().project.use.baseURL}/`) && !request.url().startsWith('blob:')) external.push(request.url());
       if (request.url().includes('-setup')) resources.push(request.url());
     });
@@ -55,13 +59,13 @@ for (const stock of [FilmType.KODAK_PORTRA_800_PUSH1, FilmType.KODAK_PORTRA_800_
     expect(worker.height).toBeGreaterThan(0);
     expect(resources.some(url => url.includes(`${stock === FilmType.KODAK_PORTRA_800_PUSH1 ? 'kodak_portra_800_push1' : 'kodak_portra_800_push2'}-setup`))).toBe(true);
     await page.reload();
-    const persisted = page.getByRole('complementary', { name: '暗房配方' });
+    const persisted = getRecipeInspector(page);
     await expect(persisted.getByRole('button', { name: '胶片型号', exact: true })).toContainText(stock);
-    await expect(persisted.getByLabel('成像方式')).toHaveValue('spectral');
     await page.locator('input[type=file]').setInputFiles(fixture);
+    await expect(persisted.getByLabel('成像方式')).toHaveValue('spectral');
     await expect(page.getByRole('img', { name: fixtureName })).toBeVisible();
     await expect(persisted.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true })).toBeEnabled();
-    await persisted.getByLabel('光谱计算').selectOption('cpu');
+    await selectRecipeControl(page, '光谱计算', 'cpu');
     await persisted.getByLabel('颗粒强度').fill('0');
     await persisted.getByRole('button', { name: 'PNG', exact: true }).click();
     await persisted.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
@@ -84,7 +88,7 @@ test('push variants are separate stocks and do not reuse ordinary Portra 800 res
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const inspector = page.getByRole('complementary', { name: '暗房配方' });
+  const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, FilmType.KODAK_PORTRA_800_PUSH1);
   const push1 = await page.evaluate(async stock => {
     const module = await import(/* @vite-ignore */ `${location.origin}/services/spectral/stockResourceLoader.ts`) as typeof import('../../services/spectral/stockResourceLoader');

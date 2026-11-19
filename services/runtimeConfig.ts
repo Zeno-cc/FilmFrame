@@ -6,7 +6,7 @@ import {
 } from './renderBudget';
 
 export const MIN_MAX_CANVAS_MIB = 128;
-export const MAX_MAX_CANVAS_MIB = 4_096;
+export const MAX_MAX_CANVAS_MIB = 6_144;
 export { DEFAULT_MAX_CANVAS_MIB, MEBIBYTE, RGBA_BYTES_PER_PIXEL };
 
 export interface RuntimeRenderConfig {

@@ -6,7 +6,7 @@ import { paintPhysicalFrame, createPhysicalCanvas, createPhysicalImprints, paint
 import { physicalPlanForSettings } from './frame';
 import { createPhysicalRaster } from './canvas';
 import { createFrameVariation } from './seed';
-import { renderPhysicalSpectralCanvas } from './spectralAdapter';
+import { createPhysicalSpectralSession, renderPhysicalSpectralCanvas, type PhysicalSpectralSession } from './spectralAdapter';
 import type { PhysicalFilmPlan, PhysicalPlanInput } from './plan';
 import { canvasToFilm, rollToFilmPoint } from './plan';
 import { edgeLightWeights } from './filmLight';
@@ -139,6 +139,11 @@ export async function paintPhysicalStrip(
   // Keep one roll layout, but evaluate it in each frame's local scan window.
   // A full-roll rotation center cannot be cropped into a local frame mask.
   const imprint = createPhysicalImprints(plan, settings);
+  let session: PhysicalSpectralSession | undefined;
+  if (plan.kind === 'spectral-negative') {
+    session = await createPhysicalSpectralSession(settings, renderBudgetLimits, frameWidth, plan.outputHeight);
+  }
+  try {
   for (let index = 0; index < images.length; index += 1) {
     const item = images[index];
     const image = await decode(item);
@@ -151,7 +156,6 @@ export async function paintPhysicalStrip(
       frameNumber: getFrameNumberForImage(settings.frameNumber, item, index, settings.maxRollFrames ?? 36),
       physicalFrameSeed: framePlan.frameSeed,
     };
-    const frameStartX = Math.round(layout.frames[index].s * plan.pxPerMm);
     const localImprint = physicalStripFrameImprints(framePlan, imprint);
     imprintCtx.clearRect(0, 0, imprintCanvas.width, imprintCanvas.height);
     paintPhysicalImprints(imprintCtx, framePlan, frameSettings, localImprint);
@@ -159,7 +163,7 @@ export async function paintPhysicalStrip(
     const raster = createPhysicalRaster(framePlan);
     paintPhysicalFrame(context, image, framePlan, frameSettings, raster, item.transform, renderBudgetLimits);
     if (framePlan.kind === 'spectral-negative') {
-      await renderPhysicalSpectralCanvas(canvas, framePlan, frameSettings, raster.presence, raster.backing, raster.wall, undefined, imprintPixels, renderBudgetLimits);
+      await renderPhysicalSpectralCanvas(canvas, framePlan, frameSettings, raster.presence, raster.backing, raster.wall, undefined, imprintPixels, renderBudgetLimits, session);
     } else {
       const rgba = context.getImageData(0, 0, canvas.width, canvas.height);
       const weights = edgeLightWeights(settings.brandText);
@@ -183,5 +187,8 @@ export async function paintPhysicalStrip(
     } finally {
       if ('close' in image && typeof image.close === 'function') image.close();
     }
+  }
+  } finally {
+    session?.backend.dispose();
   }
 }
