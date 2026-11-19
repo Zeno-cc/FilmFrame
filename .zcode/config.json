@@ -8,7 +8,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "python3 \"${ZCODE_PROJECT_DIR}/.zcode/hooks/session-start.py\"",
+              "command": "python3 \"$(git rev-parse --show-toplevel)/.zcode/hooks/session-start.py\"",
               "timeout": 30
             }
           ]
@@ -19,7 +19,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "python3 \"${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-workflow-state.py\"",
+              "command": "python3 \"$(git rev-parse --show-toplevel)/.zcode/hooks/inject-workflow-state.py\"",
               "timeout": 15
             }
           ]
@@ -31,7 +31,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "python3 \"${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-subagent-context.py\"",
+              "command": "python3 \"$(git rev-parse --show-toplevel)/.zcode/hooks/inject-subagent-context.py\"",
               "timeout": 30
             }
           ]
@@ -41,12 +41,17 @@
           "hooks": [
             {
               "type": "command",
-              "command": "python3 \"${ZCODE_PROJECT_DIR}/.zcode/hooks/inject-shell-session-context.py\"",
+              "command": "python3 \"$(git rev-parse --show-toplevel)/.zcode/hooks/inject-shell-session-context.py\"",
               "timeout": 5
             }
           ]
         }
       ]
+    }
+  },
+  "plugins": {
+    "enabledPlugins": {
+      "design@zcode-plugins-official": true
     }
   }
 }

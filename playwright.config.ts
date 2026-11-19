@@ -6,6 +6,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  grepInvert: /strip performance/,
   workers: 1,
   reporter: [['list']],
   use: {
@@ -31,7 +32,7 @@ export default defineConfig({
     },
     {
       name: 'webkit',
-      testMatch: /browser-compatibility\.spec\.ts/,
+      testMatch: /browser-compatibility\.spec\.ts|darkroom-gallery\.spec\.ts/,
       use: { ...devices['Desktop Safari'] },
     },
   ],

@@ -19,6 +19,10 @@ vite.config.ts.timestamp-*.mjs
 output/playwright/
 generated/
 
+# Impeccable: downloaded research/reference material, not a deliverable.
+# The reviewed outcome lives in docs/asset-sources/, DESIGN.md and PRODUCT.md.
+.impeccable/reference/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
