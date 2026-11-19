@@ -353,20 +353,6 @@ export function registerPasskeyForSession(
   return transaction.immediate();
 }
 
-export function markPasskeyUsed(
-  database: AccessDatabase,
-  credentialId: string,
-  counter: number,
-  now: number,
-): void {
-  database
-    .prepare(
-      `UPDATE passkey_credentials SET counter = ?, last_used_at = ?
-       WHERE credential_id = ? AND revoked_at IS NULL`,
-    )
-    .run(counter, now, credentialId);
-}
-
 export function recoverSessionWithPasskey(
   database: AccessDatabase,
   input: {
@@ -484,28 +470,4 @@ export function pruneWebAuthnChallenges(database: AccessDatabase, now: number): 
     .prepare("DELETE FROM webauthn_challenges WHERE expires_at <= ? OR used_at <= ?")
     .run(now, now - WEBAUTHN_CHALLENGE_TTL_MS)
     .changes;
-}
-
-export function createSessionForInvite(
-  database: AccessDatabase,
-  inviteId: string,
-  now: number,
-): { sessionId: string; token: string; expiresAt: number } | null {
-  const transaction = database.transaction(() => {
-    const invite = database
-      .prepare("SELECT id FROM invites WHERE id = ? AND revoked_at IS NULL")
-      .get(inviteId) as { id: string } | undefined;
-    if (!invite) return null;
-    const token = randomBytes(32).toString("base64url");
-    const sessionId = randomUUID();
-    const expiresAt = now + SESSION_TTL_MS;
-    database
-      .prepare(
-        `INSERT INTO sessions (id, token_hash, invite_id, created_at, last_seen_at, expires_at, revoked_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-      )
-      .run(sessionId, hashValue(token), inviteId, now, now, expiresAt);
-    return { sessionId, token, expiresAt };
-  });
-  return transaction.immediate();
 }

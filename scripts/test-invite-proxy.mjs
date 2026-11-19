@@ -116,7 +116,7 @@ async function runBrowserWorkflow(cookie) {
 
     await page.goto("/", { waitUntil: "load" });
     await page.getByRole("heading", { name: "让这一卷，慢慢显影" }).waitFor();
-    const inspector = page.getByRole("complementary", { name: "暗房配方" });
+    const inspector = page.getByRole("complementary", { name: "调整", exact: true });
     await inspector.getByRole("button", { name: "胶片型号", exact: true }).click();
     await inspector
       .getByRole("listbox", { name: "胶片型号" })

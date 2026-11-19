@@ -12,7 +12,8 @@ from unittest.mock import patch
 from filmframe_updater.config import Config
 from filmframe_updater.deploy import ProductionDeployer, _extract_bundle
 from filmframe_updater.errors import DeploymentError, UpdaterError
-from filmframe_updater.system import CommandResult
+from filmframe_updater.models import CurrentRelease, Job
+from filmframe_updater.system import CommandFailed, CommandResult
 from tests.helpers import manifest
 
 
@@ -26,9 +27,10 @@ class UntrustedSource:
 
 
 class RecordingRunner:
-    def __init__(self, compose_config: dict | None = None) -> None:
+    def __init__(self, compose_config: dict | None = None, *, budget_output=None) -> None:
         self.calls: list[list[str]] = []
         self.compose_config = compose_config
+        self.budget_output = budget_output
 
     def run(self, arguments, **_options):
         args = list(arguments)
@@ -38,8 +40,40 @@ class RecordingRunner:
         if "inspect" in args:
             return CommandResult(b"healthy")
         if "exec" in args and "node" in args:
+            if "render_budget_settings" in args[-1]:
+                if isinstance(self.budget_output, BaseException):
+                    raise self.budget_output
+                if self.budget_output is not None:
+                    output = self.budget_output
+                    return CommandResult(
+                        output.encode() if isinstance(output, str) else output
+                    )
             return CommandResult(b"4")
         return CommandResult(b"")
+
+
+def budget_output(value) -> str:
+    return json.dumps([value, 0])
+
+
+def rollback_job(previous_version: str = "1.4.12") -> Job:
+    return Job(
+        id="9cb5c3d2-e26d-4f03-83d9-85e56e2b819b",
+        target_version="1.5.0",
+        target_revision="2" * 40,
+        state="rolling_back",
+        previous_version=previous_version,
+        previous_revision="1" * 40,
+        previous_release="previous",
+        staged_release="candidate",
+        created_at="2026-11-15T00:00:00Z",
+        updated_at="2026-11-15T00:00:00Z",
+        started_at="2026-11-15T00:00:00Z",
+        finished_at=None,
+        error_code="health_check_failed",
+        retry_of=None,
+        actor_hash="a" * 64,
+    )
 
 
 def secure_compose() -> dict:
@@ -296,6 +330,222 @@ class DeploymentBoundaryTests(unittest.TestCase):
             destination.mkdir()
             with self.assertRaises(ValueError):
                 _extract_bundle(archive, destination, "1.1.0")
+
+
+class CanvasBudgetCompatibilityTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.release_root = self.root / "releases"
+        self.release_root.mkdir()
+        self.old = self.release_root / "old"
+        self.old.mkdir()
+        self.env = self.old / ".env"
+        self.env.write_text(
+            "FILMFRAME_VERSION=1.4.12\n"
+            f"FILMFRAME_REVISION={'1' * 40}\n"
+            "FILMFRAME_IMAGE=filmframe:old\n"
+            "FILMFRAME_ACCESS_IMAGE=filmframe-access:old\n"
+            "SECRET=preserved\n",
+            encoding="utf-8",
+        )
+        self.env.chmod(0o600)
+        self.current = self.root / "current"
+        self.current.symlink_to(self.old)
+        self.config = Config(
+            origin_ip="192.0.2.10",
+            release_root=self.release_root,
+            current_link=self.current,
+            artifact_root=self.root / "artifacts",
+            socket_group_gids=frozenset({10001}),
+        )
+        self.manifest = manifest("1.5.0", "2" * 40)
+        self.job = rollback_job()
+        self.job = Job(**{**self.job.__dict__, "previous_release": str(self.old)})
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def deployer(self, runner):
+        return ProductionDeployer(self.config, runner, NoopSource())  # type: ignore[arg-type]
+
+    def test_upgrade_accepts_128_700_and_2048_with_a_read_only_query(self) -> None:
+        for value in (128, 700, 2048):
+            with self.subTest(value=value):
+                runner = RecordingRunner(secure_compose(), budget_output=budget_output(value))
+                with patch.object(
+                    self.deployer(runner), "_test_openresty"
+                ), patch("filmframe_updater.deploy.shutil.disk_usage") as disk:
+                    disk.return_value.free = 3 * 1024 * 1024 * 1024
+                    current = CurrentRelease("1.4.12", "1" * 40, True, 3, str(self.old))
+                    self.deployer(runner).preflight(self.manifest, current)
+                budget_calls = [
+                    call for call in runner.calls if "render_budget_settings" in call[-1]
+                ]
+                self.assertEqual(len(budget_calls), 1)
+                script = budget_calls[0][-1]
+                self.assertIn("readonly:true", script)
+                self.assertIn("fileMustExist:true", script)
+                self.assertIn("SELECT max_canvas_mib,updated_at", script)
+                self.assertNotIn("UPDATE", script)
+                self.assertNotIn("INSERT", script)
+
+    def test_upgrade_accepts_6144_for_the_first_6gib_candidate(self) -> None:
+        self.manifest = manifest("1.5.0")
+        runner = RecordingRunner(secure_compose(), budget_output=budget_output(6144))
+        deployer = self.deployer(runner)
+        current = CurrentRelease("1.4.12", "1" * 40, True, 3, str(self.old))
+        with patch.object(deployer, "_test_openresty"), patch(
+            "filmframe_updater.deploy.shutil.disk_usage"
+        ) as disk:
+            disk.return_value.free = 3 * 1024 * 1024 * 1024
+            deployer.preflight(self.manifest, current)
+        self.assertTrue(any("render_budget_settings" in call[-1] for call in runner.calls))
+
+    def test_upgrade_rejects_4096_for_the_published_1412_release(self) -> None:
+        runner = RecordingRunner(secure_compose(), budget_output=budget_output(4096))
+        deployer = self.deployer(runner)
+        current = CurrentRelease("1.4.11", "1" * 40, True, 3, str(self.old))
+        with patch.object(deployer, "_test_openresty"), patch(
+            "filmframe_updater.deploy.shutil.disk_usage"
+        ) as disk:
+            disk.return_value.free = 3 * 1024 * 1024 * 1024
+            with self.assertRaises(DeploymentError) as raised:
+                deployer.preflight(manifest("1.4.12"), current)
+        self.assertEqual(raised.exception.code, "migration_incompatible")
+        self.assertFalse(any("pull" in call for call in runner.calls))
+
+    def test_upgrade_rejects_values_outside_the_candidate_range(self) -> None:
+        for value in (127, 6145):
+            with self.subTest(value=value):
+                runner = RecordingRunner(secure_compose(), budget_output=budget_output(value))
+                deployer = self.deployer(runner)
+                current = CurrentRelease("1.4.12", "1" * 40, True, 3, str(self.old))
+                with patch.object(deployer, "_test_openresty"), patch(
+                    "filmframe_updater.deploy.shutil.disk_usage"
+                ) as disk:
+                    disk.return_value.free = 3 * 1024 * 1024 * 1024
+                    with self.assertRaises(DeploymentError) as raised:
+                        deployer.preflight(self.manifest, current)
+                self.assertEqual(raised.exception.code, "migration_incompatible")
+                self.assertEqual(self.current.resolve(), self.old.resolve())
+
+    def test_rollback_accepts_128_700_and_2048_before_switching(self) -> None:
+        for value in (128, 700, 2048):
+            with self.subTest(value=value):
+                runner = RecordingRunner(budget_output=budget_output(value))
+                deployer = self.deployer(runner)
+                with patch.object(deployer, "switch") as switch, patch.object(
+                    deployer, "verify_loopback"
+                ), patch.object(deployer, "verify_origin"), patch.object(
+                    deployer, "verify_public"
+                ):
+                    deployer.rollback(self.job, self.manifest)
+                switch.assert_called_once_with(self.old, self.job)
+
+    def test_rollback_accepts_6144_at_or_above_the_fixed_capability_boundary(self) -> None:
+        for previous_version, manifest_version in (("1.5.0", "1.5.0"), ("1.5.1", "1.5.0"), ("1.5.0", "1.5.1")):
+            with self.subTest(previous_version=previous_version, manifest_version=manifest_version):
+                runner = RecordingRunner(budget_output=budget_output(6144))
+                deployer = self.deployer(runner)
+                job = Job(**{**self.job.__dict__, "previous_version": previous_version})
+                with patch.object(deployer, "switch"), patch.object(
+                    deployer, "verify_loopback"
+                ), patch.object(deployer, "verify_origin"), patch.object(
+                    deployer, "verify_public"
+                ):
+                    deployer.rollback(job, manifest(manifest_version))
+
+    def test_rollback_rejects_2049_and_4096_without_switch_or_mutation(self) -> None:
+        for value in (2049, 4096):
+            with self.subTest(value=value):
+                runner = RecordingRunner(budget_output=budget_output(value))
+                deployer = self.deployer(runner)
+                with patch.object(deployer, "switch") as switch, patch.object(
+                    deployer, "verify_loopback"
+                ) as verify:
+                    with self.assertRaises(DeploymentError) as raised:
+                        deployer.rollback(self.job, self.manifest)
+                self.assertEqual(raised.exception.code, "migration_incompatible")
+                switch.assert_not_called()
+                verify.assert_not_called()
+                self.assertFalse(any("up" in call for call in runner.calls))
+                self.assertEqual(self.current.resolve(), self.old.resolve())
+                self.assertEqual(
+                    self.env.read_text(encoding="utf-8"),
+                    "FILMFRAME_VERSION=1.4.12\n"
+                    f"FILMFRAME_REVISION={'1' * 40}\n"
+                    "FILMFRAME_IMAGE=filmframe:old\n"
+                    "FILMFRAME_ACCESS_IMAGE=filmframe-access:old\n"
+                    "SECRET=preserved\n",
+                )
+
+    def test_malformed_missing_and_failed_reads_fail_closed(self) -> None:
+        cases = (
+            "not-json",
+            "[]",
+            "[700]",
+            "[700,0,1]",
+            '["700",0]',
+            "[700,-1]",
+            "[true,0]",
+            CommandFailed("missing table or row"),
+            OSError("read failed"),
+        )
+        for output in cases:
+            with self.subTest(output=output):
+                runner = RecordingRunner(budget_output=output)
+                deployer = self.deployer(runner)
+                current = CurrentRelease("1.4.12", "1" * 40, True, 3, str(self.old))
+                with patch.object(deployer, "_test_openresty"), patch.object(
+                    deployer, "switch"
+                ) as switch, patch("filmframe_updater.deploy.shutil.disk_usage") as disk:
+                    disk.return_value.free = 3 * 1024 * 1024 * 1024
+                    with self.assertRaises(DeploymentError) as raised:
+                        deployer.preflight(self.manifest, current)
+                self.assertEqual(raised.exception.code, "migration_incompatible")
+                switch.assert_not_called()
+                self.assertEqual(self.current.resolve(), self.old.resolve())
+
+    def test_recovery_verifies_the_previous_running_release_without_switching(self) -> None:
+        runner = RecordingRunner(budget_output=budget_output(2048))
+        deployer = self.deployer(runner)
+        current = CurrentRelease("1.4.12", "1" * 40, True, 7, str(self.old.resolve()))
+        with patch.object(deployer, "inspect_current", return_value=current), patch.object(
+            deployer, "switch"
+        ) as switch, patch.object(deployer, "verify_loopback") as loopback, patch.object(
+            deployer, "verify_origin"
+        ) as origin, patch.object(deployer, "verify_public") as public:
+            deployer.verify_recovery(self.job, self.manifest)
+        switch.assert_not_called()
+        loopback.assert_called_once()
+        origin.assert_called_once()
+        public.assert_called_once()
+
+    def test_recovery_rejects_wrong_or_unhealthy_release_and_preserves_lock_state(self) -> None:
+        runner = RecordingRunner(budget_output=budget_output(4096))
+        deployer = self.deployer(runner)
+        with patch.object(deployer, "inspect_current", return_value=CurrentRelease(
+            "1.4.12", "1" * 40, True, 7, str(self.old)
+        )), patch.object(deployer, "switch") as switch, patch.object(
+            deployer, "verify_loopback"
+        ) as loopback:
+            with self.assertRaises(DeploymentError) as raised:
+                deployer.verify_recovery(self.job, self.manifest)
+        self.assertEqual(raised.exception.code, "migration_incompatible")
+        switch.assert_not_called()
+        loopback.assert_not_called()
+        self.assertEqual(self.current.resolve(), self.old.resolve())
+
+    def test_rollback_read_failure_preserves_the_specific_recovery_error(self) -> None:
+        runner = RecordingRunner(budget_output=CommandFailed("database unreadable"))
+        deployer = self.deployer(runner)
+        with patch.object(deployer, "switch") as switch:
+            with self.assertRaises(DeploymentError) as raised:
+                deployer.rollback(self.job, self.manifest)
+        self.assertEqual(raised.exception.code, "migration_incompatible")
+        switch.assert_not_called()
+        self.assertEqual(self.current.resolve(), self.old.resolve())
 
 
 if __name__ == "__main__":

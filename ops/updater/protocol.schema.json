@@ -6,6 +6,7 @@
     { "$ref": "#/$defs/check" },
     { "$ref": "#/$defs/createJob" },
     { "$ref": "#/$defs/getJob" },
+    { "$ref": "#/$defs/recoverPrevious" },
     { "$ref": "#/$defs/getActiveJob" },
     { "$ref": "#/$defs/listHistory" }
   ],
@@ -60,6 +61,12 @@
       "allOf": [
         { "$ref": "#/$defs/requestBase" },
         { "properties": { "action": { "const": "get_job" }, "params": { "type": "object", "required": ["jobId"], "additionalProperties": false, "properties": { "jobId": { "type": "string", "format": "uuid" } } } } }
+      ]
+    },
+    "recoverPrevious": {
+      "allOf": [
+        { "$ref": "#/$defs/requestBase" },
+        { "properties": { "action": { "const": "recover_previous" }, "params": { "type": "object", "required": ["jobId"], "additionalProperties": false, "properties": { "jobId": { "type": "string", "format": "uuid" } } } } }
       ]
     },
     "getActiveJob": {

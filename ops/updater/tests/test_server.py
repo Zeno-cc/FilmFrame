@@ -42,6 +42,10 @@ class ServerClientIntegrationTests(unittest.TestCase):
             Config(origin_ip="192.0.2.10", socket_path=self.socket_path),
             FakeApplication(),  # type: ignore[arg-type]
         )
+        self.recovery_calls: list[str] = []
+        self.server.application.coordinator = type("RecoveryCoordinator", (), {
+            "recover_previous": lambda _self, job_id: self.recovery_calls.append(job_id) or {"state": "rolled_back"},
+        })()
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -68,6 +72,20 @@ class ServerClientIntegrationTests(unittest.TestCase):
             thread.join(timeout=5)
             self.assertFalse(thread.is_alive())
             self.socket_path.unlink(missing_ok=True)
+
+    def test_recovery_requires_root_and_does_not_dispatch_through_access(self) -> None:
+        job_id = "c099fb33-ff67-4e38-a984-d19b56f2d28b"
+        with patch("filmframe_updater.server.authorize_peer"), patch(
+            "filmframe_updater.server.peer_credentials", return_value=(1, 10001, 10001)
+        ):
+            from filmframe_updater.errors import UpdaterError
+            with self.assertRaises(UpdaterError) as raised:
+                self.round_trip("recover_previous", {"jobId": job_id})
+            self.assertEqual(raised.exception.code, "peer_forbidden")
+        self.assertEqual(self.recovery_calls, [])
+        with patch("filmframe_updater.server.peer_credentials", return_value=(1, 0, 0)):
+            self.assertEqual(self.round_trip("recover_previous", {"jobId": job_id}), {"state": "rolled_back"})
+        self.assertEqual(self.recovery_calls, [job_id])
 
     def test_direct_null_and_job_results_survive_real_socket_round_trip(self) -> None:
         self.assertIsNone(self.round_trip("get_active_job", {}))

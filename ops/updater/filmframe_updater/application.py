@@ -131,23 +131,48 @@ class DeploymentCoordinator:
                     self._transition(job.id, "rolling_back", error_code="health_check_failed")
                 return self._complete_rollback(job.id, manifest, "health_check_failed")
             return self._resume_verification(job.id, manifest)
-        except (DeploymentError, UpdaterError, CommandFailed, OSError, ValueError):
+        except (DeploymentError, UpdaterError, CommandFailed, OSError, ValueError) as exc:
             current = self.store.get_job(job.id)
             if current and current.state != "rolling_back":
                 try:
                     self._transition(job.id, "rolling_back", error_code="interrupted")
                 except ValueError:
                     pass
-            try:
-                manifest = self.releases.resolve(job.target_version)
-                return self._complete_rollback(job.id, manifest, "interrupted")
-            except Exception:
+            if isinstance(exc, DeploymentError) and exc.code == "migration_incompatible":
                 current = self.store.get_job(job.id)
                 if current and current.state == "rolling_back":
-                    result = self._transition(job.id, "recovery_required", error_code="rollback_failed")
+                    result = self._transition(
+                        job.id, "recovery_required", error_code=exc.code
+                    )
                     self._cleanup(result)
                     return result
                 return current
+            try:
+                manifest = self.releases.resolve(job.target_version)
+                return self._complete_rollback(job.id, manifest, "interrupted")
+            except Exception as exc:
+                current = self.store.get_job(job.id)
+                if current and current.state == "rolling_back":
+                    result = self._transition(
+                        job.id,
+                        "recovery_required",
+                        error_code=_recovery_error_code(exc),
+                    )
+                    self._cleanup(result)
+                    return result
+                return current
+
+    def recover_previous(self, job_id: str) -> Job:
+        """A root-only server/CLI boundary must gate this state transition."""
+        with DeploymentLock(self.lock_path):
+            job = self._job(job_id)
+            if job.state != "recovery_required":
+                raise UpdaterError("invalid_request")
+            manifest = self.releases.resolve(job.target_version)
+            self.deployer.verify_recovery(job, manifest)
+            result = self._transition(job_id, "rolled_back", error_code=job.error_code)
+            self._cleanup(result)
+            return result
 
     def _resume_verification(self, job_id: str, manifest: ReleaseManifest) -> Job:
         job = self._job(job_id)
@@ -187,10 +212,14 @@ class DeploymentCoordinator:
         try:
             manifest = self.releases.resolve(job.target_version)
             self._complete_rollback(job_id, manifest, error_code)
-        except (DeploymentError, UpdaterError, OSError, ValueError):
+        except (DeploymentError, UpdaterError, OSError, ValueError) as exc:
             current = self.store.get_job(job_id)
             if current and current.state == "rolling_back":
-                self._transition(job_id, "recovery_required", error_code="rollback_failed")
+                self._transition(
+                    job_id,
+                    "recovery_required",
+                    error_code=_recovery_error_code(exc),
+                )
 
     def _complete_rollback(self, job_id: str, manifest: ReleaseManifest, error_code: str) -> Job:
         self.deployer.rollback(self._job(job_id), manifest)
@@ -301,6 +330,12 @@ class UpdaterApplication:
             daemon=True,
         )
         thread.start()
+
+
+def _recovery_error_code(exc: Exception) -> str:
+    if isinstance(exc, DeploymentError) and exc.code == "migration_incompatible":
+        return exc.code
+    return "rollback_failed"
 
 
 def _blocked_reason(manifest: ReleaseManifest, current) -> Optional[str]:

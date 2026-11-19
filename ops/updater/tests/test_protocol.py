@@ -35,6 +35,7 @@ class ProtocolTests(unittest.TestCase):
                 },
             ),
             ("get_job", {"jobId": str(uuid.uuid4())}),
+            ("recover_previous", {"jobId": str(uuid.uuid4())}),
             ("get_active_job", {}),
             ("list_history", {"limit": 50}),
         ]

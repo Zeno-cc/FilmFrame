@@ -48,8 +48,16 @@ class FakeDeployer:
 
     def _call(self, name: str) -> None:
         self.calls.append(name)
-        if self.fail_at == name:
-            code = "rollback_failed" if name == "rollback" else "health_check_failed"
+        if self.fail_at == name or (
+            name in {"rollback", "preflight"}
+            and self.fail_at in {"rollback_migration", "preflight_migration"}
+        ):
+            if self.fail_at in {"rollback_migration", "preflight_migration"}:
+                code = "migration_incompatible"
+            elif name == "rollback":
+                code = "rollback_failed"
+            else:
+                code = "health_check_failed"
             raise DeploymentError(code)
 
     def inspect_current(self):
@@ -75,6 +83,7 @@ class FakeDeployer:
     def verify_origin(self): self._call("verify_origin")
     def verify_public(self): self._call("verify_public")
     def rollback(self, job, manifest_obj): self._call("rollback")
+    def verify_recovery(self, job, manifest_obj): self._call("verify_recovery")
     def cleanup_artifacts(self, job): self._call("cleanup_artifacts")
 
 
@@ -288,6 +297,89 @@ with open(sys.argv[1], 'a') as lock:
             self.store.transition(job.id, state)
         coordinator.reconcile()
         self.assertEqual(self.store.get_job(job.id).state, "recovery_required")  # type: ignore[union-attr]
+
+    def test_incompatible_upgrade_stops_before_artifacts_switch_or_rollback(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="preflight_migration")
+        job = self.create()
+        original_current = deployer.current
+        self.coordinator(deployer).run_job(job.id)
+        result = self.store.get_job(job.id)
+        self.assertEqual(result.state, "failed_pre_switch")  # type: ignore[union-attr]
+        self.assertEqual(result.error_code, "migration_incompatible")  # type: ignore[union-attr]
+        self.assertEqual(deployer.current, original_current)
+        self.assertNotIn("pull_artifacts", deployer.calls)
+        self.assertNotIn("switch", deployer.calls)
+        self.assertNotIn("rollback", deployer.calls)
+        self.assertNotIn("rolled_back", self.store.event_states(job.id))
+
+    def test_incompatible_rollback_holds_lock_and_never_reports_rolled_back(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="rollback_migration")
+        job = self.create()
+        self.advance_to_switching(job)
+        coordinator = self.coordinator(deployer)
+        result = coordinator.reconcile()
+        self.assertEqual(result.state, "recovery_required")  # type: ignore[union-attr]
+        self.assertEqual(result.error_code, "migration_incompatible")  # type: ignore[union-attr]
+        self.assertNotIn("rolled_back", self.store.event_states(job.id))
+        rollback_calls = deployer.calls.count("rollback")
+        self.assertEqual(rollback_calls, 1)
+        active = self.store.get_active_job()
+        self.assertEqual(active.id, job.id)  # type: ignore[union-attr]
+        self.assertEqual(active.state, "recovery_required")  # type: ignore[union-attr]
+        self.assert_process_sees_lock(held=False)
+
+        retried = coordinator.reconcile()
+        self.assertEqual(retried, result)
+        self.assertEqual(deployer.calls.count("rollback"), rollback_calls)
+        self.assertNotIn("rolled_back", self.store.event_states(job.id))
+        with self.assertRaises(UpdaterError) as raised:
+            self.store.create_job(
+                manifest("1.2.0", "b" * 40),
+                idempotency_key=str(uuid.uuid4()),
+                actor_hash="a" * 64,
+            )
+        self.assertEqual(raised.exception.code, "update_busy")
+
+    def test_recovery_requires_health_verification_and_preserves_the_original_error(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="rollback_migration")
+        job = self.create()
+        self.advance_to_switching(job)
+        coordinator = self.coordinator(deployer)
+        coordinator.reconcile()
+        with patch.object(
+            deployer, "verify_recovery", side_effect=DeploymentError("migration_incompatible")
+        ):
+            with self.assertRaises(DeploymentError):
+                coordinator.recover_previous(job.id)
+        self.assertEqual(self.store.get_job(job.id).state, "recovery_required")  # type: ignore[union-attr]
+        self.assertNotIn("switch", deployer.calls)
+
+        result = coordinator.recover_previous(job.id)
+        self.assertEqual(result.state, "rolled_back")
+        self.assertEqual(result.error_code, "migration_incompatible")
+        self.assertIsNone(self.store.get_active_job())
+        self.assertNotIn("switch", deployer.calls)
+        self.assertIn("cleanup_artifacts", deployer.calls)
+
+    def test_post_switch_incompatible_rollback_runs_only_once(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="verify_origin")
+        job = self.create()
+        coordinator = self.coordinator(deployer)
+        with patch.object(
+            deployer,
+            "rollback",
+            side_effect=DeploymentError("migration_incompatible"),
+        ) as rollback:
+            coordinator.run_job(job.id)
+            result = self.store.get_job(job.id)
+            self.assertEqual(result.state, "recovery_required")  # type: ignore[union-attr]
+            self.assertEqual(result.error_code, "migration_incompatible")  # type: ignore[union-attr]
+            self.assertEqual(rollback.call_count, 1)
+            self.assertNotIn("rolled_back", self.store.event_states(job.id))
+            events = self.store.event_states(job.id)
+            self.assertEqual(coordinator.reconcile(), result)
+            self.assertEqual(rollback.call_count, 1)
+            self.assertEqual(self.store.event_states(job.id), events)
 
     def test_reconcile_marks_pre_switch_interruption_failed(self) -> None:
         deployer = FakeDeployer(self.root)

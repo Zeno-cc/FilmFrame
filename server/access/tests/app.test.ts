@@ -1000,7 +1000,7 @@ describe("administrator routes", () => {
     assert.equal(valid.status, 200);
     assert.match(valid.text, /暗房管理/);
     assert.match(valid.text, /运行配置/);
-    assert.match(valid.text, /min="128" max="4096"/);
+    assert.match(valid.text, /min="128" max="6144"/);
   });
 
   it("reads and updates the global Canvas budget within inclusive bounds", async () => {
@@ -1014,19 +1014,19 @@ describe("administrator routes", () => {
     const initial = await read();
     assert.equal(initial.status, 200);
     assert.deepEqual(initial.body.renderBudget, {
-      maxCanvasMiB: 700,
-      maxCanvasBytes: 700 * 1024 * 1024,
+      maxCanvasMiB: 6144,
+      maxCanvasBytes: 6144 * 1024 * 1024,
       updatedAt: 0,
     });
 
-    for (const value of [128, 4_096]) {
+    for (const value of [128, 6_144]) {
       const updated = await renderBudgetRequest(app, config, { maxCanvasMiB: value });
       assert.equal(updated.status, 200);
       assert.equal(updated.body.renderBudget.maxCanvasMiB, value);
       assert.equal(updated.body.renderBudget.maxCanvasBytes, value * 1024 * 1024);
       assert.equal(updated.body.renderBudget.updatedAt, 2_000);
     }
-    assert.equal((await read()).body.renderBudget.maxCanvasMiB, 4_096);
+    assert.equal((await read()).body.renderBudget.maxCanvasMiB, 6_144);
   });
 
   it("rejects insecure or invalid Canvas-budget writes without mutation", async () => {
@@ -1040,7 +1040,7 @@ describe("administrator routes", () => {
 
     for (const body of [
       { maxCanvasMiB: 127 },
-      { maxCanvasMiB: 4_097 },
+      { maxCanvasMiB: 6_145 },
       { maxCanvasMiB: 700.5 },
       { maxCanvasMiB: 700, unknown: true },
       {},
@@ -1052,7 +1052,7 @@ describe("administrator routes", () => {
       .get("/api/runtime-settings/render-budget")
       .set("Host", config.adminHost)
       .set("Cf-Access-Jwt-Assertion", "valid-access-token");
-    assert.equal(current.body.renderBudget.maxCanvasMiB, 700);
+    assert.equal(current.body.renderBudget.maxCanvasMiB, 6144);
   });
 
   it("emits a redacted audit event when the Canvas budget changes", async () => {
@@ -1073,7 +1073,7 @@ describe("administrator routes", () => {
     assert.equal(event.action, "runtime_setting.update");
     assert.equal(event.targetId, "render_budget");
     assert.deepEqual(event.affected, {
-      previousMaxCanvasMiB: 700,
+      previousMaxCanvasMiB: 6144,
       maxCanvasMiB: 1_024,
     });
     assert.equal(JSON.stringify(event).includes(config.adminEmail), false);

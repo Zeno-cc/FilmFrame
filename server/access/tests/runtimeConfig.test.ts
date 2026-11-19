@@ -15,7 +15,7 @@ import {
 } from "../src/runtimeConfig.js";
 
 describe("runtime render budget", () => {
-  it("seeds the existing 700 MiB behavior through migration 007", () => {
+  it("seeds the 6 GiB default through migration 008", () => {
     const database = openDatabase(":memory:");
     assert.deepEqual(readRenderBudgetSetting(database), {
       maxCanvasMiB: DEFAULT_MAX_CANVAS_MIB,
@@ -24,7 +24,7 @@ describe("runtime render budget", () => {
     });
     assert.deepEqual(
       database.prepare("SELECT version FROM schema_migrations ORDER BY version").all(),
-      [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }],
+      [{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }],
     );
     database.close();
   });
@@ -48,7 +48,7 @@ describe("runtime render budget", () => {
 
   it("rejects invalid values and timestamps without changing the stored row", () => {
     const database = openDatabase(":memory:");
-    for (const value of [127, 4_097, 700.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const value of [127, 6_145, 700.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       assert.throws(() => updateRenderBudgetSetting(database, value, 1_000), RangeError);
     }
     assert.throws(
@@ -59,7 +59,7 @@ describe("runtime render budget", () => {
     database.close();
   });
 
-  it("upgrades a pre-007 database constraint before accepting 4,096 MiB", () => {
+  it("upgrades a pre-007 database constraint before accepting 6,144 MiB", () => {
     const directory = mkdtempSync(join(tmpdir(), "filmframe-render-budget-"));
     const legacyMigrations = join(directory, "migrations");
     const databasePath = join(directory, "access.sqlite");
@@ -71,9 +71,9 @@ describe("runtime render budget", () => {
       const legacy = openDatabase(databasePath, { migrationsDirectory: legacyMigrations });
       legacy.close();
       const upgraded = openDatabase(databasePath);
-      assert.equal(upgraded.prepare("SELECT version FROM schema_migrations ORDER BY version").all().at(-1)?.version, 7);
-      updateRenderBudgetSetting(upgraded, 4_096, 4_000);
-      assert.equal(readRenderBudgetSetting(upgraded).maxCanvasMiB, 4_096);
+      assert.equal(upgraded.prepare("SELECT version FROM schema_migrations ORDER BY version").all().at(-1)?.version, 8);
+      updateRenderBudgetSetting(upgraded, 6_144, 4_000);
+      assert.equal(readRenderBudgetSetting(upgraded).maxCanvasMiB, 6_144);
       upgraded.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });

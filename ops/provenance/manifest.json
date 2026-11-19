@@ -194,15 +194,15 @@
           "sha256": "5d6a2935e88995c681a017f79e916840f6418d5c4d6879c7823ae4b31612763f"
         },
         {
-          "path": "public/film-overlays/aperture-mask.png",
+          "path": "docs/asset-sources/aperture-mask.png",
           "sha256": "6bc34cf20ccfc0831c25cc610b445504fe079e42f62624caed75f6b5ca4e478a"
         },
         {
-          "path": "public/film-overlays/aperture-shadow-clean.png",
+          "path": "docs/asset-sources/aperture-shadow-clean.png",
           "sha256": "0264a7ace429fdcdeab83f8ec9359f5732f3b5849c612dbf65952478b336eaf2"
         },
         {
-          "path": "public/film-overlays/aperture-shadow-cutout.png",
+          "path": "docs/asset-sources/aperture-shadow-cutout.png",
           "sha256": "8ec4b5e077b727cd0f4b12112ed743bb2d766120923bf183c7693c634484e211"
         },
         {
@@ -210,7 +210,7 @@
           "sha256": "d9f3055afa80abea0977ffdcfa7442380c7285c7ec2167529d974699c1f0c309"
         },
         {
-          "path": "public/film-overlays/aperture-shadow.png",
+          "path": "docs/asset-sources/aperture-shadow.png",
           "sha256": "5fc313e1d8bf076dd8a862fd29a005a9eb342191e501d982fdd3f6fca33fc076"
         }
       ],

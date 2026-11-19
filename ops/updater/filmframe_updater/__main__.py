@@ -29,8 +29,8 @@ def build(config: Config) -> tuple[UpdaterApplication, DeploymentCoordinator]:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
-    if len(sys.argv) != 2 or sys.argv[1] not in {"serve", "check", "status", "reconcile"}:
-        print("usage: python3 -m filmframe_updater {serve|check|status|reconcile}", file=sys.stderr)
+    if len(sys.argv) != 2 or sys.argv[1] not in {"serve", "check", "status", "reconcile", "recover-previous"}:
+        print("usage: python3 -m filmframe_updater {serve|check|status|reconcile|recover-previous}", file=sys.stderr)
         return 2
     config = Config.load()
     command = sys.argv[1]
@@ -43,7 +43,14 @@ def main() -> int:
         result = call(config.socket_path, "check", {"force": command == "check"})
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         return 0
-    _application, coordinator = build(config)
+    application, coordinator = build(config)
+    if command == "recover-previous":
+        active = application.store.get_active_job()
+        if not active:
+            raise UpdaterError("job_not_found")
+        job = coordinator.recover_previous(active.id)
+        print(json.dumps({"job": job.public_dict()}, separators=(",", ":")))
+        return 0
     job = coordinator.reconcile()
     print(json.dumps({"job": job.public_dict() if job else None}, separators=(",", ":")))
     return 0

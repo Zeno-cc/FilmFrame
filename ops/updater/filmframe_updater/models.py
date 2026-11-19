@@ -66,7 +66,7 @@ ALLOWED_TRANSITIONS = {
     "succeeded": frozenset(),
     "failed_pre_switch": frozenset(),
     "rolled_back": frozenset(),
-    "recovery_required": frozenset(),
+    "recovery_required": frozenset({"rolled_back"}),
 }
 
 DEPLOYMENT_ERROR_CODES = frozenset(

@@ -81,7 +81,7 @@ def decode_request(data: bytes) -> Request:
             params["idempotencyKey"] = _uuid(params["idempotencyKey"])
             if not isinstance(params["actorHash"], str) or not ACTOR_HASH_PATTERN.fullmatch(params["actorHash"]):
                 raise ValueError("invalid actor hash")
-        elif action == "get_job":
+        elif action == "get_job" or action == "recover_previous":
             require_exact_keys(params, {"jobId"})
             params["jobId"] = _uuid(params["jobId"])
         elif action == "get_active_job":

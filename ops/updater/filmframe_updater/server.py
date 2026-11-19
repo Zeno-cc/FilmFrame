@@ -10,7 +10,7 @@ from typing import Optional
 from .application import UpdaterApplication
 from .config import Config
 from .errors import UpdaterError
-from .protocol import authorize_peer, decode_request, error_response, read_message, success_response
+from .protocol import authorize_peer, decode_request, error_response, peer_credentials, read_message, success_response
 
 LOGGER = logging.getLogger("filmframe-updater")
 
@@ -47,7 +47,13 @@ class UnixServer:
             authorize_peer(connection, self.config.allowed_peer_uids)
             request = decode_request(read_message(connection))
             request_id = request.request_id
-            result = self.application.dispatch(request.action, request.params)
+            if request.action == "recover_previous":
+                _pid, uid, _gid = peer_credentials(connection)
+                if uid != 0:
+                    raise UpdaterError("peer_forbidden")
+                result = self.application.coordinator.recover_previous(request.params["jobId"])
+            else:
+                result = self.application.dispatch(request.action, request.params)
             connection.sendall(success_response(request.request_id, result))
         except UpdaterError as error:
             connection.sendall(error_response(request_id, error))

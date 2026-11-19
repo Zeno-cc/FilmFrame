@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -44,6 +45,10 @@ EXECUTABLE_RELEASE_FILES = frozenset(
     }
 )
 BACKUP_NAME = re.compile(r"^access-[0-9]{8}T[0-9]{6}Z\.sqlite$")
+LOGGER = logging.getLogger("filmframe-updater")
+# The published v1.4.12 tag still enforces 2048 MiB. The next minor release is
+# the fixed 6 GiB capability boundary; do not infer it from the target manifest.
+FIRST_6_GIB_VERSION = "1.5.0"
 
 SCHEMA_SCRIPT = """
 import Database from 'better-sqlite3';
@@ -53,6 +58,16 @@ db.close();
 if(!Number.isInteger(row?.version))process.exit(2);
 process.stdout.write(String(row.version));
 """.strip()
+
+CANVAS_BUDGET_SCRIPT = """
+import Database from 'better-sqlite3';
+const db=new Database('/data/access.sqlite',{readonly:true,fileMustExist:true});
+const row=db.prepare('SELECT max_canvas_mib,updated_at FROM render_budget_settings WHERE singleton=1').get();
+db.close();
+if(!row||!Number.isSafeInteger(row.max_canvas_mib)||!Number.isSafeInteger(row.updated_at)||row.updated_at<0)process.exit(2);
+process.stdout.write(JSON.stringify([row.max_canvas_mib,row.updated_at]));
+""".strip()
+
 
 class Deployer(Protocol):
     def inspect_current(self) -> CurrentRelease: ...
@@ -84,6 +99,8 @@ class Deployer(Protocol):
     def verify_public(self) -> None: ...
 
     def rollback(self, job: Job, manifest: ReleaseManifest) -> None: ...
+
+    def verify_recovery(self, job: Job, manifest: ReleaseManifest) -> None: ...
 
     def cleanup_artifacts(self, job: Job) -> None: ...
 
@@ -139,6 +156,9 @@ class ProductionDeployer:
                 raise DeploymentError("updater_upgrade_required")
             if not manifest.database.backward_compatible:
                 raise DeploymentError("migration_incompatible")
+            self._assert_canvas_budget_compatible(
+                Path(current.release_path), manifest.version
+            )
             self.config.release_root.mkdir(mode=0o750, parents=True, exist_ok=True)
             if self.config.release_root.is_symlink():
                 raise DeploymentError("preflight_failed")
@@ -378,9 +398,10 @@ class ProductionDeployer:
             raise DeploymentError("health_check_failed") from exc
 
     def rollback(self, job: Job, manifest: ReleaseManifest) -> None:
-        if not job.previous_release or not job.previous_revision:
+        if not job.previous_release or not job.previous_version or not job.previous_revision:
             raise DeploymentError("rollback_failed")
         previous = Path(job.previous_release)
+        self._assert_canvas_budget_compatible(previous, job.previous_version)
         try:
             self.switch(previous, job)
             self.verify_loopback(
@@ -395,6 +416,36 @@ class ProductionDeployer:
             self.verify_public()
         except DeploymentError as exc:
             raise DeploymentError("rollback_failed") from exc
+
+    def verify_recovery(self, job: Job, manifest: ReleaseManifest) -> None:
+        """Verify an operator-selected healthy release before clearing its lock."""
+        if not job.previous_release or not job.previous_version or not job.previous_revision:
+            raise DeploymentError("rollback_failed")
+        previous = Path(job.previous_release)
+        self._assert_canvas_budget_compatible(previous, job.previous_version)
+        current = self.inspect_current()
+        try:
+            if (
+                current.release_path != str(self._validated_release_path(previous))
+                or current.version != job.previous_version
+                or current.revision != job.previous_revision
+                or not current.healthy
+            ):
+                raise DeploymentError("health_check_failed")
+            self.verify_loopback(
+                manifest,
+                revision=job.previous_revision,
+                release=previous,
+                allowed_schemas=frozenset(
+                    {manifest.database.schema_from, manifest.database.schema_to}
+                ),
+            )
+            self.verify_origin()
+            self.verify_public()
+        except DeploymentError:
+            raise
+        except (CommandFailed, OSError, ValueError) as exc:
+            raise DeploymentError("health_check_failed") from exc
 
     def cleanup_artifacts(self, job: Job) -> None:
         container = f"filmframe-update-rehearsal-{job.id[:12]}"
@@ -534,6 +585,48 @@ class ProductionDeployer:
         if not result.isdigit():
             raise DeploymentError("health_check_failed")
         return int(result)
+
+    def _assert_canvas_budget_compatible(self, release: Path, target_version: str) -> None:
+        try:
+            result = self._compose(
+                release=release,
+                tail=[
+                    "exec",
+                    "-T",
+                    "access",
+                    "node",
+                    "--input-type=module",
+                    "-e",
+                    CANVAS_BUDGET_SCRIPT,
+                ],
+                timeout=30,
+            ).text()
+            payload = json.loads(result)
+            if not isinstance(payload, list) or len(payload) != 2:
+                raise ValueError("invalid Canvas budget response")
+            budget, updated_at = payload
+            if (
+                isinstance(budget, bool)
+                or not isinstance(budget, int)
+                or isinstance(updated_at, bool)
+                or not isinstance(updated_at, int)
+                or updated_at < 0
+            ):
+                raise ValueError("invalid Canvas budget")
+        except (CommandFailed, OSError, UnicodeDecodeError, ValueError) as exc:
+            raise DeploymentError("migration_incompatible") from exc
+
+        # A later updater keeps this published capability boundary independent
+        # of the version that happens to be installing or rolling back.
+        limit = 6144 if parse_semver(target_version) >= parse_semver(FIRST_6_GIB_VERSION) else 2048
+        if not 128 <= budget <= limit:
+            LOGGER.error(
+                "Canvas budget %s MiB is incompatible with target %s (supported range 128-%s MiB)",
+                budget,
+                target_version,
+                limit,
+            )
+            raise DeploymentError("migration_incompatible")
 
     def _verify_container_identity(self, release: Path, expected: RuntimeIdentity) -> None:
         for service, expected_image in (
