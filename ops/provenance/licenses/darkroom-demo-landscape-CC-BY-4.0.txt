@@ -1,0 +1,14 @@
+Photograph attribution and license notice
+
+Work: Mountains in snow, Mountain lake, Chola Valley, Nepal, Himalayas
+Creator: Vyacheslav Argenberg (Wikimedia Commons user Argenberg), own work.
+Source: https://commons.wikimedia.org/wiki/File:Mountains_in_snow,_Mountain_lake,_Chola_Valley,_Nepal,_Himalayas.jpg
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: https://creativecommons.org/licenses/by/4.0/legalcode
+License summary: https://creativecommons.org/licenses/by/4.0/
+
+Local file: public/images/darkroom-demo-landscape.jpg
+Modification: proportionally resized from 4032x2688 to 1200x800, JPEG quality 88. Embedded metadata retains this attribution and modification record.
+Purpose: empty-darkroom photographic illustration, explicitly not a rendered film result. No third-party runtime image request.
+
+This is a source and attribution record, not a replacement for the complete CC BY 4.0 legal text or other assets' owner-review decisions.
