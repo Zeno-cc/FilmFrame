@@ -2,12 +2,13 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
 import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
+import { blockDifference, readImageSignature, type ImageSignature } from './routeComparison';
 import { FilmType } from '../../types';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
 const fixtureName = path.basename(fixture);
 
-async function develop(page: Page, forceMain: boolean) {
+async function develop(page: Page, forceMain: boolean): Promise<ImageSignature> {
   if (forceMain) await page.addInitScript(() => Object.defineProperty(window, 'Worker', { value: undefined }));
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
@@ -25,21 +26,13 @@ async function develop(page: Page, forceMain: boolean) {
   await inspector.getByRole('button', { name: 'PNG', exact: true }).click();
   await inspector.getByRole('button', { name: '冲洗待更新照片 (1)', exact: true }).click();
   await expect(page.getByRole('img', { name: '已出片' })).toBeVisible({ timeout: 90_000 });
-  return page.getByRole('img', { name: fixtureName }).evaluate(async element => {
-    const image = element as HTMLImageElement;
-    const bitmap = await createImageBitmap(await (await fetch(image.currentSrc)).blob());
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
-    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-    bitmap.close();
-    return Array.from(pixels);
-  });
+  return readImageSignature(page, fixtureName);
 }
 
 test('Vision3 uses a generic compatibility edge without borrowing another stock scan', async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
+  // Both routes render the same spectral frame on CPU, so the budget covers two
+  // 90s waits instead of the previous single-route 180s.
+  test.setTimeout(420_000);
   const origin = new URL(testInfo.project.use.baseURL as string).origin;
   const assetRequests: string[] = [];
   page.on('request', request => {
@@ -49,5 +42,18 @@ test('Vision3 uses a generic compatibility edge without borrowing another stock 
   const worker = await develop(page, false);
   expect(assetRequests).toEqual([]);
   const main = await page.context().newPage();
-  expect(await develop(main, true)).toEqual(worker);
+  const mainOutput = await develop(main, true);
+  const difference = blockDifference(worker, mainOutput);
+  testInfo.attach('vision3-route-comparison.json', {
+    body: JSON.stringify({
+      worker: { width: worker.width, height: worker.height, pixels: worker.pixels, file: worker.file },
+      main: { width: mainOutput.width, height: mainOutput.height, pixels: mainOutput.pixels, file: mainOutput.file },
+      difference,
+    }, null, 2),
+    contentType: 'application/json',
+  });
+  expect(mainOutput.width).toBe(worker.width);
+  expect(mainOutput.height).toBe(worker.height);
+  // Same resampling tolerance as the Gold route comparison.
+  expect(difference.maxAbs).toBeLessThan(4);
 });

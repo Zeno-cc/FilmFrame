@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
 import { getRecipeInspector, selectRecipeControl } from './recipeControls';
+import { blockDifference, readImageSignature } from './routeComparison';
 
 const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png');
 const fixtureName = path.basename(fixture);
@@ -57,13 +58,13 @@ test('Gold layered rendering does not require the disabled aperture shadow', asy
   await page.route('**/film-overlays/aperture-shadow-derived.png', route => route.fulfill({ status: 404 }));
   await selectGoldSpectral(page);
   await develop(page);
-  const workerOutput = await readDevelopedOutput(page);
+  const workerOutput = await readImageSignature(page, fixtureName);
   const main = await page.context().newPage();
   await main.addInitScript(() => Object.defineProperty(window, 'Worker', { value: undefined }));
   await main.route('**/film-overlays/aperture-shadow-derived.png', route => route.fulfill({ status: 404 }));
   await selectGoldSpectral(main);
   await develop(main);
-  const mainOutput = await readDevelopedOutput(main);
+  const mainOutput = await readImageSignature(main, fixtureName);
   // Compare decoded pixels, not the encoded file: a Worker exports through
   // OffscreenCanvas.convertToBlob while the main thread uses canvas.toBlob, and
   // both encoders may pick different PNG filters for identical frames.
@@ -85,64 +86,6 @@ test('Gold layered rendering does not require the disabled aperture shadow', asy
   // shadow that only one route still draws.
   expect(difference.maxAbs).toBeLessThan(4);
 });
-
-type DevelopedOutput = {
-  width: number;
-  height: number;
-  pixels: string;
-  file: string;
-  blocks: number[];
-};
-
-/** 8x8 block means keep the route comparison diagnosable without moving megabytes. */
-function blockDifference(a: DevelopedOutput, b: DevelopedOutput) {
-  const size = Math.min(a.blocks.length, b.blocks.length);
-  let maxAbs = 0;
-  let sum = 0;
-  for (let index = 0; index < size; index += 1) {
-    const delta = Math.abs(a.blocks[index] - b.blocks[index]);
-    if (delta > maxAbs) maxAbs = delta;
-    sum += delta;
-  }
-  return { maxAbs, meanAbs: size ? sum / size : 0, compared: size };
-}
-
-async function readDevelopedOutput(target: Page): Promise<DevelopedOutput> {
-  return target.getByRole('img', { name: fixtureName }).evaluate(async element => {
-    const bytes = await (await fetch((element as HTMLImageElement).currentSrc)).arrayBuffer();
-    const fileDigest = await crypto.subtle.digest('SHA-256', bytes);
-    const bitmap = await createImageBitmap(new Blob([bytes]));
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Missing output inspection canvas');
-    context.drawImage(bitmap, 0, 0);
-    const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-    const pixelDigest = await crypto.subtle.digest('SHA-256', pixels);
-    const hex = (digest: ArrayBuffer) =>
-      Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-    const block = 8;
-    const columns = Math.ceil(bitmap.width / block);
-    const rows = Math.ceil(bitmap.height / block);
-    const blocks: number[] = [];
-    for (let row = 0; row < rows; row += 1) {
-      for (let column = 0; column < columns; column += 1) {
-        let sum = 0;
-        let count = 0;
-        for (let y = row * block; y < Math.min((row + 1) * block, bitmap.height); y += 1) {
-          for (let x = column * block; x < Math.min((column + 1) * block, bitmap.width); x += 1) {
-            const index = (y * bitmap.width + x) * 4;
-            sum += pixels[index] + pixels[index + 1] + pixels[index + 2];
-            count += 3;
-          }
-        }
-        blocks.push(count ? sum / count : 0);
-      }
-    }
-    return { width: bitmap.width, height: bitmap.height, pixels: hex(pixelDigest), file: hex(fileDigest), blocks };
-  });
-}
 
 test('Gold layered asset failure preserves spectral failure and legacy fallback semantics', async ({ page }) => {
   await page.route('**/film-overlays/film-base.png', route => route.fulfill({ status: 404 }));
