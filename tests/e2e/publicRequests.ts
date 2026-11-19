@@ -24,8 +24,10 @@ export function isDocumentedPublicGalleryRequest(request: Request): boolean {
     return false;
   }
   if (url.protocol !== 'https:' || !PUBLIC_GALLERY_HOSTS.has(url.hostname)) return false;
+  // Playwright reports an omitted header as an empty string rather than as a
+  // missing key, so both shapes have to count as "no cookie / no referrer".
   const headers = request.headers();
-  expect(headers['cookie']).toBeUndefined();
-  expect(headers['referer']).toBeUndefined();
+  expect(headers['cookie'] ?? '').toBe('');
+  expect(headers['referer'] ?? '').toBe('');
   return true;
 }

@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { FilmType } from '../../types';
 import { selectFilmStock } from './stockPicker';
 import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
+import { explicitWebgl2SpectralUsable, NO_HARDWARE_WEBGL2_REASON } from './gpuSupport';
 
 const fixture = path.resolve(process.cwd(), 'tests/fixtures/physical-natural-portrait.png');
 const fixtureName = path.basename(fixture);
@@ -249,6 +250,8 @@ for (const scenario of physicalCpuScenarios) {
 test('Pro 400H physical CPU and WebGL2 outputs match across real Worker and forced-main routes', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.goto('/');
+  // This case is specifically CPU-versus-GPU, so it needs a hardware backend.
+  test.skip(!(await explicitWebgl2SpectralUsable(page)), NO_HARDWARE_WEBGL2_REASON);
   await page.evaluate(() => caches.delete('pro400h-test-frames'));
   try {
     const cpu = await developWorkerAndMain(page, 'cpu');

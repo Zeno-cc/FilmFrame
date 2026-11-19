@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
 import { getRecipeInspector, openRecipeAdvancedSettings, selectRecipeControl } from './recipeControls';
 import { isDocumentedPublicGalleryRequest } from './publicRequests';
+import { explicitWebgl2SpectralUsable, resolveSpectralBackend } from './gpuSupport';
 import { getScannerCanvasSize } from '../../services/filmResolution';
 import { FilmType, type FilmSettings } from '../../types';
 import type { PhysicalFilmPlan } from '../../services/physical135/plan';
@@ -17,29 +18,6 @@ const fixture = path.resolve(process.cwd(), 'public/film-overlays/film-base.png'
 const naturalFixture = path.resolve(process.cwd(), 'tests/fixtures/physical-portrait-gradient.png');
 const portraitFixture = path.resolve(process.cwd(), 'tests/fixtures/physical-natural-portrait.png');
 
-/**
- * An explicit WebGL2 request is rejected on a software renderer, which is what
- * headless CI and the bundled Chromium both report. These cases are about
- * physical geometry, panels and lifecycle rather than the GPU backend, so they
- * fall back to the CPU backend instead of failing for an environment reason.
- * The GPU path itself is covered by the spectral suites and the release gate.
- */
-async function explicitWebgl2SpectralUsable(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2');
-    if (!gl) return false;
-    const debug = gl.getExtension('WEBGL_debug_renderer_info');
-    const renderer = debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : '';
-    return !/swiftshader|llvmpipe|software/i.test(renderer);
-  });
-}
-
-async function resolveBackend(page: Page, backend: 'cpu' | 'webgl2'): Promise<'cpu' | 'webgl2'> {
-  if (backend !== 'webgl2') return backend;
-  return (await explicitWebgl2SpectralUsable(page)) ? 'webgl2' : 'cpu';
-}
-
 async function preparePhysical(page: Page, backend: 'cpu' | 'webgl2' = 'cpu', input = fixture) {
   await page.route('**/api/runtime-config', route => route.fulfill({
     status: 200,
@@ -50,7 +28,7 @@ async function preparePhysical(page: Page, backend: 'cpu' | 'webgl2' = 'cpu', in
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  const resolvedBackend = await resolveBackend(page, backend);
+  const resolvedBackend = await resolveSpectralBackend(page, backend);
   await page.locator('input[type=file]').setInputFiles(input);
   const inspector = getRecipeInspector(page);
   await selectFilmStock(inspector, 'KODAK GOLD 200');

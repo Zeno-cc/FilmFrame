@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { selectFilmStock } from './stockPicker';
 import { getRecipeInspector, selectRecipeControl } from './recipeControls';
@@ -242,8 +242,12 @@ for (const stock of [FilmType.KODAK_GOLD_200, FilmType.KODAK_PORTRA_400] as cons
         body: JSON.stringify(evidence, null, 2),
         contentType: 'application/json',
       });
+      // Kept next to the other ignored Playwright output: the task directory
+      // this used to live in is archived once the task closes.
+      const evidenceDir = path.resolve('output/playwright/spectral-parity');
+      await mkdir(evidenceDir, { recursive: true });
       await writeFile(
-        path.join('.trellis/tasks/11-19-spectral-template-strip', `parity-${stock.replace(/\s+/g, '-').toLowerCase()}-${backend}.json`),
+        path.join(evidenceDir, `parity-${stock.replace(/\s+/g, '-').toLowerCase()}-${backend}.json`),
         JSON.stringify(evidence, null, 2),
       );
       // The strip frame must be spectrally developed: it has to match the single

@@ -78,10 +78,13 @@ test('desktop empty darkroom exposes one clear import action and a complete film
 
   const track = page.getByTestId('empty-darkroom-film-track');
   await expect(track).toBeVisible();
-  await expect(track).toHaveCSS('transition-property', 'none');
-  await expect(track).toHaveCSS('transition-duration', '0s');
-  await expect(page.getByTestId('empty-darkroom-exposure-frame')).toHaveCount(8);
-  await expect(page.getByRole('group', { name: '人文摄影示意' })).toBeVisible();
+  // The strip scrolls through the Web Animations API, so there is no CSS
+  // transition or keyframe animation carrying the motion.
+  expect(await track.evaluate(element => element.getAnimations().length)).toBeGreaterThan(0);
+  await expect(track).toHaveCSS('animation-name', 'none');
+  // Twelve reviewed photographs plus the duplicated set that makes the loop seamless.
+  await expect(page.getByTestId('empty-darkroom-exposure-frame')).toHaveCount(24);
+  await expect(page.getByRole('group', { name: '经典纪实摄影示意' })).toBeVisible();
   expect(new Set(await page.locator('.ff-empty-darkroom__photo').evaluateAll(images => images.map(image => image.getAttribute('src')))).size).toBeGreaterThan(1);
 
   const frameGeometry = await page.getByTestId('empty-darkroom-exposure-frame').first().evaluate(element => {
@@ -128,10 +131,13 @@ test('desktop empty darkroom exposes one clear import action and a complete film
   const advancedX = await track.evaluate(element => element.getBoundingClientRect().x);
   expect(advancedX).toBeLessThan(initialX);
   await emptyDarkroom.hover();
-  await expect(track).toHaveCSS('transition-property', 'none');
+  // Pausing is a Web Animation pause, not a CSS transition running back.
+  await expect(emptyDarkroom).toHaveAttribute('data-gallery-paused', 'true');
+  await expect(track).toHaveCSS('transition-duration', '0s');
   await page.mouse.move(0, 0);
   await emptyDarkroom.getByRole('button', { name: '选择照片' }).filter({ visible: true }).focus();
-  await expect(track).toHaveCSS('transition-property', 'none');
+  await expect(emptyDarkroom).toHaveAttribute('data-gallery-paused', 'true');
+  await expect(track).toHaveCSS('transition-duration', '0s');
 
   await page.setViewportSize({ width: 1180, height: 900 });
   await expect(page.locator('.ff-empty-darkroom__demo-frame').first()).toBeVisible();
