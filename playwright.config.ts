@@ -4,7 +4,10 @@ export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './output/playwright/test-results',
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // CI runners are several times slower than a development machine, and a 10s
+  // expectation on an interaction or a React state change is not enough there:
+  // the tag workflow failed twice on cases that pass locally in seconds.
+  expect: { timeout: 20_000 },
   fullyParallel: false,
   grepInvert: /strip performance/,
   workers: 1,

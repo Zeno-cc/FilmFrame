@@ -1,6 +1,18 @@
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+/**
+ * The `data-gallery-paused` attribute is painted from React state before the
+ * effect pauses the Web Animation, so a position sampled right after the flag
+ * can still drift a fraction of a pixel under CI load. Wait for the animation
+ * itself before asserting that the frame is actually frozen.
+ */
+async function expectPausedAnimation(track: Locator) {
+  await expect
+    .poll(() => track.evaluate(element => element.getAnimations()[0]?.playState ?? 'none'), { timeout: 10_000 })
+    .toBe('paused');
+}
 
 const NOW = new Date('2026-11-17T00:00:00Z');
 const TTL = 7 * 24 * 60 * 60 * 1000;
@@ -219,6 +231,7 @@ test('twelve real JPEG responses move continuously and pause without changing im
   }
   await darkroom.hover();
   await expect(darkroom).toHaveAttribute('data-gallery-paused', 'true');
+  await expectPausedAnimation(track);
   await page.waitForTimeout(50);
   const pausedX = (await readX()).x;
   await page.waitForTimeout(350);
@@ -236,6 +249,7 @@ test('twelve real JPEG responses move continuously and pause without changing im
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await expect(darkroom).toHaveAttribute('data-gallery-paused', 'true');
+  await expectPausedAnimation(track);
   const hiddenX = (await readX()).x;
   await page.waitForTimeout(250);
   expect((await readX()).x).toBeCloseTo(hiddenX, 1);
@@ -263,6 +277,7 @@ test('pause preserves actual position and reduced motion shows the first static 
   await page.waitForTimeout(700);
   await darkroom.hover();
   await expect(darkroom).toHaveAttribute('data-gallery-paused', 'true');
+  await expectPausedAnimation(track);
   const pausedX = await readX();
   await page.waitForTimeout(300);
   expect(await readX()).toBeCloseTo(pausedX, 1);
