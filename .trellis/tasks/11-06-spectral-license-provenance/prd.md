@@ -43,14 +43,18 @@ Make the approved open-source reuse route auditable before a FilmFrame build con
 - SpektraLab pinned `02d82b56cf65f0f8e802a708612edc4e9a4790af`; upstream spektrafilm pinned `3bb2c2d2801ff68b92019cf1dbcbb133d60832bc`.
 - `README.md:202-204` currently records that FilmFrame has no license and warns against assuming code/asset reuse permission.
 
-## Release gate status (2026-11-20)
+## Release outcome (2026-11-20)
 
-A 1.5.0 release was prepared locally and deliberately not published. Verified state:
+`v1.5.2` is published as a GitHub Release (tagged commit `a69cbb6`, container images and deploy bundle pinned by digest with attested provenance). Resolved before distributing:
 
-- `npm run verify:provenance` validates 17 entries and still prints "Distribution remains blocked pending" with 16 items: project distribution rights, corresponding source, spectral constants, the four derived-table families, the CineStill spatial model, and owner review for film templates, layer masks, sprocket masks, the payment image and `heic-to`.
-- The repository has no root LICENSE file while `services/spectral` derives from GPL-3.0-or-later SpektraLab code and CC BY-SA 4.0 spektrafilm profiles.
-- `origin/main` contains no `services/spectral`, `services/physical135` or `services/darkroomGallery.ts` file, so pushing `main` would be the first public distribution of that derived code, and `gh repo view` reports the repository as public.
-- `ops/release/README.md` steps 5-6 forbid creating or pushing a stable tag until every reported blocker is resolved with owner/legal evidence; the technical gate alone does not authorize distribution.
-- The stable version must be `1.5.0`: `ops/updater/filmframe_updater/deploy.py` pins `FIRST_6_GIB_VERSION = "1.5.0"` as the fixed boundary for the 6144 MiB Canvas budget.
+- Root `LICENSE` carrying the unmodified GPL-3.0 text and `NOTICE` with project attribution, upstream revisions, dependency inventory, corresponding-source instructions and the residual risk.
+- `projectDistribution.rightsStatus` verified and `correspondingSource.status` ready: the canonical repository publishes the source of each tagged build plus the build instructions.
+- Owner-supplied film templates, layer masks, sprocket masks and the payment image recorded as project artwork licensed by the owner; `heic-to` recorded with retained LGPL text and pinned upstream source; the CC BY-SA derived tables verified with retained license text and `PROFILE-CHANGELOG.md`.
 
-Remaining work: root LICENSE carrying the GPL text, a corresponding-source offer or publication, per-asset notices, and owner/legal evidence for each item the validator lists.
+Still unresolved, and deliberately NOT marked verified (this is the residual the owner accepted on 2026-11-20, and `npm run verify:provenance` prints it for every build):
+
+- `spektrafilm-spectral-constants` — the hanatos spectral-upsampling coefficients have no source-specific terms.
+- `portra-setup-derived-tables`, `product-monochrome-derived-tables` — derived tables that inherit that data or come from product profile work with unconfirmed redistribution terms.
+- `cinestill-spatial-model` — translated GPL code whose independent numerical verification is still open.
+
+Remaining work: replace the affected constants with independently sourced standards data, or obtain source-specific permission, then verify the entries and withdraw the acceptance.

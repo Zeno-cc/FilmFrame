@@ -1,6 +1,8 @@
 # FilmFrame 项目交接入口
 
 > 最后核验：2026-11-14。本文描述当前源码工作区；分支、HEAD 和未提交改动以 `git status --short --branch -uall` 为准。
+>
+> 发布状态（2026-11-20）：`v1.5.2` 已作为正式 GitHub Release 发布（标签提交 `a69cbb6`，镜像与部署包带签名 manifest）。项目以 GPL-3.0-or-later 发布，见 `LICENSE` 与 `NOTICE`。`npm run verify:provenance` 仍会列出 4 项未获权利核实的上游数据条目——项目所有者已于 2026-11-20 在有记录的风险接受前提下决定分发，这些条目不会被标记为已核实；对应的后续工作是 `11-06-spectral-license-provenance` 与 `11-11-spektralab-full-stock-migration`。
 
 ## 接手顺序
 

@@ -53,14 +53,18 @@ Build a complete, source-pinned mapping between SpektraLab's stock catalog and F
 - Inventing missing measured resources, treating a geometry-compatible edge as spectral development, or using another film's DX/paper/profile.
 - Uploading photos, using a server GPU or importing unlicensed SpektraLab artwork, icons, covers or proprietary fonts.
 
-## 发布就绪度（2026-11-20）
+## 发行结果（2026-11-20）
 
-1.5.0 已在本地准备好但**没有发布**，因为分发门禁未过。核实结果：
+`v1.5.2` 已作为正式 GitHub Release 发布（标签提交 `a69cbb6`，镜像与部署包按 digest 固定并带签名 provenance）。发布前已解决：
 
-- `npm run verify:provenance` 校验 17 条记录通过，同时输出 16 条未解的分发阻塞：项目分发权利、对应源码、spectral constants、四类 derived tables、CineStill spatial model，以及胶片模板、图层掩膜、齿孔掩膜、支付图与 `heic-to` 的 owner 复核。
-- 仓库没有根 LICENSE，而 `services/spectral` 衍生自 GPL-3.0-or-later 的 SpektraLab，profile 来自 CC BY-SA 4.0 的 spektrafilm。
-- `origin/main` 不含 `services/spectral`、`services/physical135`、`services/darkroomGallery.ts`；`gh repo view` 显示仓库为公开仓库，所以推送 main 会成为这批衍生代码的**首次公开分发**。
-- `ops/release/README.md` 第 5–6 步明确：在阻塞全部按 owner/法务证据解决前不得创建或推送稳定标签，技术门禁通过不等于获得分发许可。
-- 版本号必须为 1.5.0：`ops/updater/filmframe_updater/deploy.py` 的 `FIRST_6_GIB_VERSION = "1.5.0"` 是 6144 MiB 预算的固定能力边界，v1.4.12 仍上限 2048 MiB。
+- 根 `LICENSE`（未经修改的 GPL-3.0 文本）与 `NOTICE`（项目署名、上游修订号、依赖清单、对应源码说明与残余风险）。
+- `projectDistribution.rightsStatus` 已核实、`correspondingSource.status` 已就绪：每个发行标签所指的提交就是对应源码，构建说明随仓库发布。
+- 所有者提供的胶片模板、图层掩膜、齿孔掩膜与支付图按项目作品记录并授权；`heic-to` 记录为保留 LGPL 文本与上游源码固定的依赖；CC BY-SA 派生表以保留许可文本和 `PROFILE-CHANGELOG.md` 核实。
 
-尚需完成：根 LICENSE、GPL 对应源码的提供方式、逐项 notice，以及验证器列出的每一条阻塞的 owner/法务证据。
+仍**未**标记为已核实、按所有者 2026-11-20 的风险接受分发，且 `npm run verify:provenance` 对每个构建都会列出：
+
+- `spektrafilm-spectral-constants`：hanatos 光谱上采样常量缺少针对该数据本身的许可条款。
+- `portra-setup-derived-tables`、`product-monochrome-derived-tables`：继承该常量的派生表，或来自再分发条款未确认的产品 profile 工作。
+- `cinestill-spatial-model`：翻译自 GPL 代码，独立数值验证仍未完成。
+
+待办：用独立来源的标准数据替换受影响常量，或取得该数据自身的许可，然后核实这些条目并撤销风险接受。
