@@ -42,3 +42,15 @@ Make the approved open-source reuse route auditable before a FilmFrame build con
 - Parent research: `../11-06-integrate-spektralab-negative/research/spektralab-negative-pipeline.md` and `spektralab-film-edge-and-licensing.md`.
 - SpektraLab pinned `02d82b56cf65f0f8e802a708612edc4e9a4790af`; upstream spektrafilm pinned `3bb2c2d2801ff68b92019cf1dbcbb133d60832bc`.
 - `README.md:202-204` currently records that FilmFrame has no license and warns against assuming code/asset reuse permission.
+
+## Release gate status (2026-11-20)
+
+A 1.5.0 release was prepared locally and deliberately not published. Verified state:
+
+- `npm run verify:provenance` validates 17 entries and still prints "Distribution remains blocked pending" with 16 items: project distribution rights, corresponding source, spectral constants, the four derived-table families, the CineStill spatial model, and owner review for film templates, layer masks, sprocket masks, the payment image and `heic-to`.
+- The repository has no root LICENSE file while `services/spectral` derives from GPL-3.0-or-later SpektraLab code and CC BY-SA 4.0 spektrafilm profiles.
+- `origin/main` contains no `services/spectral`, `services/physical135` or `services/darkroomGallery.ts` file, so pushing `main` would be the first public distribution of that derived code, and `gh repo view` reports the repository as public.
+- `ops/release/README.md` steps 5-6 forbid creating or pushing a stable tag until every reported blocker is resolved with owner/legal evidence; the technical gate alone does not authorize distribution.
+- The stable version must be `1.5.0`: `ops/updater/filmframe_updater/deploy.py` pins `FIRST_6_GIB_VERSION = "1.5.0"` as the fixed boundary for the 6144 MiB Canvas budget.
+
+Remaining work: root LICENSE carrying the GPL text, a corresponding-source offer or publication, per-asset notices, and owner/legal evidence for each item the validator lists.

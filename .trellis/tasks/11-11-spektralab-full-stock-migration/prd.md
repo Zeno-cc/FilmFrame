@@ -52,3 +52,15 @@ Build a complete, source-pinned mapping between SpektraLab's stock catalog and F
 - Claiming all 33 catalog entries are 135 color-negative or pixel-identical native SpektraLab output.
 - Inventing missing measured resources, treating a geometry-compatible edge as spectral development, or using another film's DX/paper/profile.
 - Uploading photos, using a server GPU or importing unlicensed SpektraLab artwork, icons, covers or proprietary fonts.
+
+## 发布就绪度（2026-11-20）
+
+1.5.0 已在本地准备好但**没有发布**，因为分发门禁未过。核实结果：
+
+- `npm run verify:provenance` 校验 17 条记录通过，同时输出 16 条未解的分发阻塞：项目分发权利、对应源码、spectral constants、四类 derived tables、CineStill spatial model，以及胶片模板、图层掩膜、齿孔掩膜、支付图与 `heic-to` 的 owner 复核。
+- 仓库没有根 LICENSE，而 `services/spectral` 衍生自 GPL-3.0-or-later 的 SpektraLab，profile 来自 CC BY-SA 4.0 的 spektrafilm。
+- `origin/main` 不含 `services/spectral`、`services/physical135`、`services/darkroomGallery.ts`；`gh repo view` 显示仓库为公开仓库，所以推送 main 会成为这批衍生代码的**首次公开分发**。
+- `ops/release/README.md` 第 5–6 步明确：在阻塞全部按 owner/法务证据解决前不得创建或推送稳定标签，技术门禁通过不等于获得分发许可。
+- 版本号必须为 1.5.0：`ops/updater/filmframe_updater/deploy.py` 的 `FIRST_6_GIB_VERSION = "1.5.0"` 是 6144 MiB 预算的固定能力边界，v1.4.12 仍上限 2048 MiB。
+
+尚需完成：根 LICENSE、GPL 对应源码的提供方式、逐项 notice，以及验证器列出的每一条阻塞的 owner/法务证据。
