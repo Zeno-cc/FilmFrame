@@ -277,9 +277,11 @@ try {
     headers: { Cookie: cookie },
   });
   assert.equal(runtimeConfig.status, 200);
+  // Migration 008 raises the untouched historical 700 MiB seed to the 6 GiB
+  // default, so the protected route must expose the migrated value.
   assert.deepEqual(JSON.parse(runtimeConfig.body), {
-    maxCanvasMiB: 700,
-    maxCanvasBytes: 700 * 1024 * 1024,
+    maxCanvasMiB: 6144,
+    maxCanvasBytes: 6144 * 1024 * 1024,
     updatedAt: 0,
   });
 
