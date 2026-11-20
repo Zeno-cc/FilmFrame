@@ -1,0 +1,87 @@
+FilmFrame — notices, licenses and corresponding source
+=====================================================
+
+Copyright (C) 2026 Zeno-cc and FilmFrame contributors.
+
+FilmFrame is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. FilmFrame is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. The complete license text is in LICENSE.
+
+FilmFrame incorporates code and data derived from GPL-3.0-or-later and
+CC BY-SA 4.0 works, so every distributed build is conveyed under those terms.
+A global project license does not by itself clear independently licensed
+assets; see "Recorded residual risk" below.
+
+Corresponding source
+--------------------
+Each distributed build corresponds to the exact commit named by its release tag
+in the canonical repository https://github.com/Zeno-cc/FilmFrame. That commit
+holds the complete corresponding source of the static application, the Access
+service and the updater.
+
+Build instructions for the corresponding source:
+
+- static application: README.md, section 快速开始 (`npm ci`, `npm run build`).
+- Access service: server/access/README.md (`npm ci`, `npm run build`).
+- host updater: ops/updater/README.md.
+- container images: built from the same commit by
+  `.github/workflows/release.yml`; the build inputs are the repository itself.
+
+Upstream works
+--------------
+- SpektraLab — https://github.com/JamesQiu2005/SpektraLab, pinned revision
+  02d82b56cf65f0f8e802a708612edc4e9a4790af, GPL-3.0-or-later. C++/Metal film and
+  print engine that the spectral pipeline, the physical 135 edge model and the
+  product monochrome data were translated from. No SpektraLab name, icon, cover,
+  font, artwork or endorsement is used.
+- spektrafilm — https://github.com/andreavolpato/spektrafilm, pinned revision
+  3bb2c2d2801ff68b92019cf1dbcbb133d60832bc, GPL-3.0-or-later with the measured
+  profiles, LUTs and their direct derivatives under CC BY-SA 4.0. Film/paper
+  process model and the measured film, paper and positive profiles that the
+  shipped spectral stock data derives from. Both license texts are retained
+  under ops/provenance/licenses/, and every modification or derivative is
+  recorded in ops/provenance/PROFILE-CHANGELOG.md.
+- Empty-darkroom documentary photographs are public-domain or CC-licensed works;
+  per-image attribution and the asset provenance records live in
+  docs/asset-sources/ and ops/provenance/licenses/.
+
+Runtime dependencies
+--------------------
+Shipped to the browser by the built application:
+
+- react 19.2.5 — MIT
+- react-dom 19.2.5 — MIT
+- exif-js 2.3.0 — MIT
+- heic-to 1.5.2 — LGPL-3.0-or-later, used unmodified as a separate module that
+  the application loads on first HEIC import. The license text ships at
+  ops/provenance/licenses/heic-to-LGPL-3.0.txt; the corresponding library source
+  is the published npm package at gitHead
+  f37af866f9aa6212ddc84b67a279c9f2386aba4f. Replacing or relinking it requires no
+  change to FilmFrame's own code.
+
+Build-time dependencies (Vite, Tailwind CSS, TypeScript, Playwright) are not
+conveyed in the distributed artifact; their licenses remain their own.
+
+Recorded residual risk (owner decision, 2026-11-20)
+---------------------------------------------------
+The owner authorized distribution of this build while the following provenance
+questions are NOT rights-verified. They are recorded as an accepted risk, not as
+a clearance, and `npm run verify:provenance` keeps reporting them:
+
+- `spektrafilm-spectral-constants` — the spectral upsampling coefficients
+  integrated from the hanatos spectral-upsampling research are redistributed
+  without source-specific terms; the upstream CC BY-SA profile notice does not
+  establish separate permission for every constant.
+- `portra-setup-derived-tables`, `product-monochrome-derived-tables`,
+  `cinestill-spatial-model` — derived tables that inherit that unresolved
+  upstream data or that come from product profile work whose redistribution
+  terms were not independently confirmed.
+
+Recipients who need those bytes under a fully documented chain of title should
+treat this part of the data as unresolved. Replacing the affected constants with
+independently sourced standards data is the tracked follow-up; the engineering
+record is ops/provenance/README.md and the tasks
+11-06-spectral-license-provenance and 11-11-spektralab-full-stock-migration.
