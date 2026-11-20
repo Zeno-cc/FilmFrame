@@ -65,7 +65,7 @@ describe("publicOriginForRequest", () => {
     sessionCookieName: DEVELOPMENT_SESSION_COOKIE,
   });
 
-  it("derives local HTTP from the validated request Host without forwarded hosts", () => {
+  it("derives the browser origin from the validated request Host behind a TLS proxy", () => {
     assert.equal(
       publicOriginForRequest(
         local,
@@ -73,7 +73,13 @@ describe("publicOriginForRequest", () => {
       ),
       "http://filmframe.example.test:5175",
     );
-    assert.equal(publicOriginForRequest(local, originRequest("https", "filmframe.example.test:5175")), null);
+    // A development deployment reached through a TLS-terminating proxy still
+    // needs the https origin for its CSRF allow-list and WebAuthn verification.
+    assert.equal(
+      publicOriginForRequest(local, originRequest("https", "filmframe.example.test:5175")),
+      "https://filmframe.example.test:5175",
+    );
+    assert.equal(publicOriginForRequest(local, originRequest("ftp", "filmframe.example.test:5175")), null);
     assert.equal(publicOriginForRequest(local, originRequest("http", "attacker.example.test:5175")), null);
     assert.equal(publicOriginForRequest(local, originRequest("http", "filmframe.example.test.evil")), null);
     assert.equal(publicOriginForRequest(local, originRequest("http", "user@filmframe.example.test")), null);

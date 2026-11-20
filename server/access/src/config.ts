@@ -84,6 +84,32 @@ export interface PublicOriginRequest {
   get(name: "host"): string | undefined;
 }
 
+function pinnedRequestOrigin(
+  request: PublicOriginRequest,
+  filmframeHost: string,
+): string | null {
+  const host = request.get("host");
+  if (!host) return null;
+  if (request.protocol !== "http" && request.protocol !== "https") return null;
+
+  try {
+    const parsed = new URL(`${request.protocol}://${host}`);
+    if (
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.hostname !== filmframeHost
+    ) {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function publicOriginForRequest(
   config: Pick<
     AccessConfig,
@@ -95,25 +121,12 @@ export function publicOriginForRequest(
     return config.publicOrigin;
   }
 
-  const host = request.get("host");
-  if (!host || request.protocol !== "http") return null;
-
-  try {
-    const parsed = new URL(`http://${host}`);
-    if (
-      parsed.username ||
-      parsed.password ||
-      parsed.pathname !== "/" ||
-      parsed.search ||
-      parsed.hash ||
-      parsed.hostname !== config.filmframeHost
-    ) {
-      return null;
-    }
-    return parsed.origin;
-  } catch {
-    return null;
-  }
+  // An insecure-cookie deployment still sits behind a TLS-terminating proxy.
+  // The CSRF Origin allow-list and the WebAuthn expected origin both have to
+  // equal the origin the browser used, so the forwarded protocol is taken as
+  // given: only the Host is pinned to the configured public host, and the
+  // forwarded protocol cannot bypass that pin.
+  return pinnedRequestOrigin(request, config.filmframeHost);
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AccessConfig {
