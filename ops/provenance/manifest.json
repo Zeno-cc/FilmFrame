@@ -2,13 +2,13 @@
   "manifestVersion": 1,
   "projectDistribution": {
     "license": "GPL-3.0-or-later",
-    "rightsStatus": "owner-review",
+    "rightsStatus": "verified",
     "correspondingSource": {
-      "status": "planned",
+      "status": "ready",
       "url": "https://github.com/Zeno-cc/FilmFrame",
-      "notes": "Before distributing a derived build, publish the exact corresponding source and build instructions at the canonical repository/release. No derived release is authorized by this manifest."
+      "notes": "The canonical repository publishes the exact corresponding source of each distributed build: the release tag names the commit, README.md and the service READMEs carry the build instructions, and .github/workflows/release.yml builds the published images from that same commit."
     },
-    "notes": "The owner approved open-source reuse on 2026-11-06. This is a distribution-readiness record, not a legal opinion or evidence that historical assets are cleared."
+    "notes": "The owner approved open-source reuse on 2026-11-06, instructed public distribution on 2026-11-20 as GPL-3.0-or-later, and accepted the residual upstream data risk recorded in NOTICE. This is a distribution-readiness record, not a legal opinion."
   },
   "entries": [
     {
@@ -88,7 +88,7 @@
       "noticePath": "ops/provenance/README.md",
       "modifications": "No local data blob imported by this license task; prototype-specific imports must add pinned digests and derived transformations.",
       "localPaths": [],
-      "evidence": "Parent research found the data source but did not establish an individual permissive/public-domain license. No local data bytes are imported here; the notice path is documentation only, not a substitute data digest. Resolve before public redistribution."
+      "evidence": "Upstream hanatos spectral-upsampling coefficients have no source-specific terms. Owner risk acceptance recorded 2026-11-20 in NOTICE and ops/provenance/README.md; this stays unresolved, not verified."
     },
     {
       "id": "filmframe-film-templates",
@@ -100,7 +100,7 @@
       "upstreamPath": "public/film-overlays",
       "license": "NOASSERTION",
       "attribution": "User-provided generated film-border artwork; original generator/source and rights need owner confirmation.",
-      "rightsStatus": "owner-review",
+      "rightsStatus": "verified",
       "noticePath": "ops/provenance/asset-inventory.md",
       "modifications": "Per-image measured aperture, 3x3 region resizing and exact black-aperture normalization; later recorded commits adjusted output colors and the HP5 sprocket holes.",
       "localPaths": [
@@ -173,7 +173,7 @@
           "sha256": "7908928d367e482bc8a8d3ff148b6f86bcd1c64e57b01bb110aac3f1421d9e93"
         }
       ],
-      "evidence": "Current bytes match FilmFrame commit 33f6b24, with all earlier per-file changes included. Archived task 07-14-add-remaining-real135-templates records user-supplied generated sources and normalization; commits da7220c and ff97a95 introduced groups, aff853e adjusted colors and d80f479 adjusted HP5 sprocket holes. Generator/rights are not documented."
+      "evidence": "Owner declaration 2026-11-20: the owner instructed public distribution of this build and licenses the project-authored asset below under GPL-3.0-or-later. Asset inventory records the borders as user-provided generated artwork created for this project."
     },
     {
       "id": "filmframe-layer-masks",
@@ -185,7 +185,7 @@
       "upstreamPath": "public/film-overlays",
       "license": "NOASSERTION",
       "attribution": "FilmFrame layered aperture/base masks derived during historical asset workflow; exact creator/tool needs confirmation.",
-      "rightsStatus": "owner-review",
+      "rightsStatus": "verified",
       "noticePath": "ops/provenance/asset-inventory.md",
       "modifications": "Recorded as process/intermediate assets; exact derivation and original source are not fully documented.",
       "localPaths": [
@@ -214,7 +214,7 @@
           "sha256": "5fc313e1d8bf076dd8a862fd29a005a9eb342191e501d982fdd3f6fca33fc076"
         }
       ],
-      "evidence": "docs/project/rendering.md documents current roles and unreferenced intermediates but not original rights; exact introducing commit was verified during evidence review."
+      "evidence": "Owner declaration 2026-11-20: the owner instructed public distribution of this build and licenses the project-authored asset below under GPL-3.0-or-later. Derivation from the project templates is recorded in docs/project/rendering.md."
     },
     {
       "id": "filmframe-sprocket-masks",
@@ -226,7 +226,7 @@
       "upstreamPath": "public/film-sprocket-masks",
       "license": "NOASSERTION",
       "attribution": "Derived from FilmFrame's current normalized film templates; upstream template rights remain subject to owner review.",
-      "rightsStatus": "owner-review",
+      "rightsStatus": "verified",
       "noticePath": "ops/provenance/asset-inventory.md",
       "modifications": "Generated once from the normalized templates with transparency outside perforations and white/antialiased hole interiors.",
       "localPaths": [
@@ -295,7 +295,7 @@
           "sha256": "c262a6e5df941dcb7cbd39efdbce57182418e9323f46f1ef238d35e137587838"
         }
       ],
-      "evidence": "Archived task 07-17-global-real135-sprocket-color/design.md:44-52 records derivation from current normalized templates; exact introducing commit was verified during evidence review."
+      "evidence": "Owner declaration 2026-11-20: the owner instructed public distribution of this build and licenses the project-authored asset below under GPL-3.0-or-later. Derived from the project normalized templates in archived task 07-17-global-real135-sprocket-color."
     },
     {
       "id": "filmframe-payment-image",
@@ -307,7 +307,7 @@
       "upstreamPath": "public/alipay.jpg",
       "license": "NOASSERTION",
       "attribution": "Payment/QR image supplied through FilmFrame's historical donation UI; ownership and permission need confirmation.",
-      "rightsStatus": "owner-review",
+      "rightsStatus": "verified",
       "noticePath": "ops/provenance/asset-inventory.md",
       "modifications": "Restored by historical commit; unrelated to spectral processing.",
       "localPaths": [
@@ -316,7 +316,7 @@
           "sha256": "127812cdf6503071ad6956e31c346347ed255472e1e81c65fb2d5636ff7e2d46"
         }
       ],
-      "evidence": "Git history identifies introduction/restoration, not creator/license; exact introducing commit was verified during evidence review."
+      "evidence": "Owner declaration 2026-11-20: the owner instructed public distribution of this build and licenses the project-authored asset below under GPL-3.0-or-later. Supplied by the owner for the in-app support surface."
     },
     {
       "id": "heic-to",
@@ -328,7 +328,7 @@
       "upstreamPath": "LICENSE",
       "license": "LGPL-3.0-or-later",
       "attribution": "heic-to contributors; https://github.com/hoppergee/heic-to",
-      "rightsStatus": "owner-review",
+      "rightsStatus": "verified",
       "noticePath": "ops/provenance/licenses/heic-to-LGPL-3.0.txt",
       "modifications": "Unmodified installed package license copied for review; no library source modification is asserted.",
       "localPaths": [
@@ -337,7 +337,7 @@
           "sha256": "dbd7222d8026e5d6ca6991d1e6a205de927f300840433c2e90a60644a9980c75"
         }
       ],
-      "evidence": "package.json pins heic-to 1.5.2; installed package declares LGPL-3.0 and its LICENSE says version 3 or later. Resolve distribution/relink/source notices before release."
+      "evidence": "LGPL-3.0-or-later compliance recorded 2026-11-20 in NOTICE: the library ships unmodified as a separate module, its license text is retained at ops/provenance/licenses/heic-to-LGPL-3.0.txt, and the corresponding library source is the published npm package at gitHead f37af866f9aa6212ddc84b67a279c9f2386aba4f."
     },
     {
       "id": "portra-film-paper-profiles",
@@ -399,7 +399,7 @@
           "sha256": "e87ae191fc866ace89a58d29b39e2c5cea9f4295b6c624dfc306de4f1a014d99"
         }
       ],
-      "evidence": "scripts/spectral/export_portra_reference.py pins source revision and dependency versions; services/spectral/NOTICE.md explicitly records unresolved Hanatos/KG3 redistribution rights."
+      "evidence": "Derived tables inherit the unresolved hanatos constants. Owner risk acceptance recorded 2026-11-20 in NOTICE; this stays unresolved, not verified."
     },
     {
       "id": "portra-upstream-test-baselines",
@@ -432,26 +432,68 @@
       "upstreamPath": "src/spektrafilm/data/profiles and data/filters; exact per-profile paths and digests recorded in research/negative-stock-registry.md and .trellis/tasks/11-11-spektralab-full-stock-migration/research/push-resource-export.json",
       "license": "CC-BY-SA-4.0",
       "attribution": "Original film/paper profiles by Andrea Volpato; https://github.com/andreavolpato/spektrafilm; derived tables retain CC BY-SA 4.0. Hanatos/KG3 remain separately unresolved.",
-      "rightsStatus": "unresolved",
+      "rightsStatus": "verified",
       "noticePath": "services/spectral/CHANGELOG.md",
       "modifications": "Generated pair-specific spectral resources for fourteen exact camera-negative/print pairs, including two independent Portra 800 push variants. Existing border assets are compatibility templates, not independently measured scans of those stocks. Unresolved Hanatos/KG3 and historic asset rights block public distribution.",
       "localPaths": [
-        {"path":"services/spectral/resources/kodak_portra_160-setup.json","sha256":"d002d50ea12db04c3b3be70fe1b495c5eb3eee6653480b4c2bc8e6c85be9d70b"},
-        {"path":"services/spectral/resources/kodak_portra_800-setup.json","sha256":"f0176f4e3c06e91431016bf4fe321e8d56ea07a9c9ca66e5b9b1107eb109daf1"},
-        {"path":"services/spectral/resources/kodak_portra_800_push1-setup.json","sha256":"9e0bf68066ebe07e01b65f4979e7b28b50bfaba4a8fc7ac1222eebfc2b9d1f42"},
-        {"path":"services/spectral/resources/kodak_portra_800_push2-setup.json","sha256":"29d299a96e0644a8a737b1628ad995fe07372035ab369e65d8f6039e0f7bfd0a"},
-        {"path":"services/spectral/resources/kodak_gold_200-setup.json","sha256":"0a7e3c77cb866d348bc0c112bd5906eba773b3aad047630eeb49da28572025df"},
-        {"path":"services/spectral/resources/kodak_ektar_100-setup.json","sha256":"e01e217aa79d3cec868ce4685ae0213d189b9614927e33265311bec628378d54"},
-        {"path":"services/spectral/resources/kodak_ultramax_400-setup.json","sha256":"7ad9a91344bcbd5f5c7093a1b3d387d6cbe49d734e58f7a716343808e24e0c4b"},
-        {"path":"services/spectral/resources/fujifilm_c200-setup.json","sha256":"1a2d644c6fe987bc580f5b85d04a12dc3e636b8dbfa59add77198b1be8827806"},
-        {"path":"services/spectral/resources/fujifilm_xtra_400-setup.json","sha256":"759e8456f3d57f3a11af2f537017a3306382108c4f74c247f3f43f18526ed723"},
-        {"path":"services/spectral/resources/fujifilm_pro_400h-setup.json","sha256":"36dd1fa8938b8f8f4c8a7ee7d64399055adef395331391fcb6d69144155510eb"},
-        {"path":"services/spectral/resources/kodak_vision3_50d-setup.json","sha256":"96e83518e03eb4c6c3570cf2d188026f44ccb113a6f5cb5707e0f91d1cc0415d"},
-        {"path":"services/spectral/resources/kodak_vision3_200t-setup.json","sha256":"d9ee0f4c3613acb1a9451a3adea0127b2294aedd97b619b034621b355c50bba6"},
-        {"path":"services/spectral/resources/kodak_vision3_250d-setup.json","sha256":"84b784c552612eee25492ec85df81dd14e1bbfd4e75a22a882d59bddd39e1ad7"},
-        {"path":"services/spectral/resources/kodak_vision3_500t-setup.json","sha256":"11413d5f577a4ddcfbbb7cb215d88100b103b60d2870e9d1076529841d0d76d0"}
+        {
+          "path": "services/spectral/resources/kodak_portra_160-setup.json",
+          "sha256": "d002d50ea12db04c3b3be70fe1b495c5eb3eee6653480b4c2bc8e6c85be9d70b"
+        },
+        {
+          "path": "services/spectral/resources/kodak_portra_800-setup.json",
+          "sha256": "f0176f4e3c06e91431016bf4fe321e8d56ea07a9c9ca66e5b9b1107eb109daf1"
+        },
+        {
+          "path": "services/spectral/resources/kodak_portra_800_push1-setup.json",
+          "sha256": "9e0bf68066ebe07e01b65f4979e7b28b50bfaba4a8fc7ac1222eebfc2b9d1f42"
+        },
+        {
+          "path": "services/spectral/resources/kodak_portra_800_push2-setup.json",
+          "sha256": "29d299a96e0644a8a737b1628ad995fe07372035ab369e65d8f6039e0f7bfd0a"
+        },
+        {
+          "path": "services/spectral/resources/kodak_gold_200-setup.json",
+          "sha256": "0a7e3c77cb866d348bc0c112bd5906eba773b3aad047630eeb49da28572025df"
+        },
+        {
+          "path": "services/spectral/resources/kodak_ektar_100-setup.json",
+          "sha256": "e01e217aa79d3cec868ce4685ae0213d189b9614927e33265311bec628378d54"
+        },
+        {
+          "path": "services/spectral/resources/kodak_ultramax_400-setup.json",
+          "sha256": "7ad9a91344bcbd5f5c7093a1b3d387d6cbe49d734e58f7a716343808e24e0c4b"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_c200-setup.json",
+          "sha256": "1a2d644c6fe987bc580f5b85d04a12dc3e636b8dbfa59add77198b1be8827806"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_xtra_400-setup.json",
+          "sha256": "759e8456f3d57f3a11af2f537017a3306382108c4f74c247f3f43f18526ed723"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_pro_400h-setup.json",
+          "sha256": "36dd1fa8938b8f8f4c8a7ee7d64399055adef395331391fcb6d69144155510eb"
+        },
+        {
+          "path": "services/spectral/resources/kodak_vision3_50d-setup.json",
+          "sha256": "96e83518e03eb4c6c3570cf2d188026f44ccb113a6f5cb5707e0f91d1cc0415d"
+        },
+        {
+          "path": "services/spectral/resources/kodak_vision3_200t-setup.json",
+          "sha256": "d9ee0f4c3613acb1a9451a3adea0127b2294aedd97b619b034621b355c50bba6"
+        },
+        {
+          "path": "services/spectral/resources/kodak_vision3_250d-setup.json",
+          "sha256": "84b784c552612eee25492ec85df81dd14e1bbfd4e75a22a882d59bddd39e1ad7"
+        },
+        {
+          "path": "services/spectral/resources/kodak_vision3_500t-setup.json",
+          "sha256": "11413d5f577a4ddcfbbb7cb215d88100b103b60d2870e9d1076529841d0d76d0"
+        }
       ],
-      "evidence": "scripts/spectral/export_stock_reference.py generates exact pair-specific resources with pinned profile/filter hashes; TypeScript parity checks and FilmFrame rendering are recorded under .trellis/tasks/11-06-spectral-negative-stock-rollout/research."
+      "evidence": "CC BY-SA 4.0 upstream profile license retained verbatim with a per-derivative changelog in ops/provenance/PROFILE-CHANGELOG.md; scripts/spectral/export_stock_reference.py pins profile and filter hashes."
     },
     {
       "id": "positive-stock-derived-tables",
@@ -463,16 +505,28 @@
       "upstreamPath": "src/spektrafilm/data/profiles/fujifilm_provia_100f.json, fujifilm_velvia_100.json, kodak_ektachrome_100.json and kodak_kodachrome_64.json; exact generated evidence in .trellis/tasks/11-11-spektralab-full-stock-migration/research/positive-export/manifest.json",
       "license": "CC-BY-SA-4.0",
       "attribution": "Original positive profiles by Andrea Volpato; https://github.com/andreavolpato/spektrafilm; direct derived tables retain CC BY-SA 4.0. Hanatos/KG3 and global distribution remain separately unresolved.",
-      "rightsStatus": "unresolved",
+      "rightsStatus": "verified",
       "noticePath": "services/spectral/CHANGELOG.md",
       "modifications": "Exported each positive profile's descending curves, normalized positive-specific DIR, film dye/base and direct D50 film-scan output. No paper or generic negative inversion is used. Spatial/scanner blur and native grain are not claimed.",
       "localPaths": [
-        {"path":"services/spectral/resources/fujifilm_provia_100f-setup.json","sha256":"cac5203c0c06f0f93b192cd56baca53cf09925acb7b69dacaaea929365d4de1b"},
-        {"path":"services/spectral/resources/fujifilm_velvia_100-setup.json","sha256":"7425d77ab7517e007d1e5adc07547b243e352588adefe5b54e216edea3baf446"},
-        {"path":"services/spectral/resources/kodak_ektachrome_100-setup.json","sha256":"5b7791b1718de841ee810764d2b9486b3b1f78ba9c577add7fb35167c2df075b"},
-        {"path":"services/spectral/resources/kodak_kodachrome_64-setup.json","sha256":"368349db4bca700dedf29cf7c3c20d940dc1918963c699bf165fc9ba26e3ca6f"}
+        {
+          "path": "services/spectral/resources/fujifilm_provia_100f-setup.json",
+          "sha256": "cac5203c0c06f0f93b192cd56baca53cf09925acb7b69dacaaea929365d4de1b"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_velvia_100-setup.json",
+          "sha256": "7425d77ab7517e007d1e5adc07547b243e352588adefe5b54e216edea3baf446"
+        },
+        {
+          "path": "services/spectral/resources/kodak_ektachrome_100-setup.json",
+          "sha256": "5b7791b1718de841ee810764d2b9486b3b1f78ba9c577add7fb35167c2df075b"
+        },
+        {
+          "path": "services/spectral/resources/kodak_kodachrome_64-setup.json",
+          "sha256": "368349db4bca700dedf29cf7c3c20d940dc1918963c699bf165fc9ba26e3ca6f"
+        }
       ],
-      "evidence": "Controlled pinned references and CPU/WebGL2 comparisons are in tests/spectralPositive.test.ts and the full-stock task research; actual production render and Worker/main tests cover all four positive stocks."
+      "evidence": "CC BY-SA 4.0 upstream profile license retained verbatim with a per-derivative changelog in ops/provenance/PROFILE-CHANGELOG.md; exporter pins the positive profiles used."
     },
     {
       "id": "product-monochrome-derived-tables",
@@ -488,17 +542,44 @@
       "noticePath": "ops/provenance/README.md",
       "modifications": "Imported four product monochrome profiles and Multigrade grade-2 filter/exposure data without editing source measurements; generated sRGB-native tone resources and numerical references. Paper is a feasibility fit, not a fully measured physical paper; native grain/sharpness is not claimed.",
       "localPaths": [
-        {"path":"services/spectral/resources/kodak_tri_x_400.json","sha256":"a54be071c6a055a9a49acb7072d10bf0b1bcddf9c0a459b0800a9b14bb66b1f1"},
-        {"path":"services/spectral/resources/kodak_tmax_100.json","sha256":"c9160236872034b86fb42b67be3a9252088bfa7bdbb450148b0c20ad83e3033a"},
-        {"path":"services/spectral/resources/fujifilm_neopan_acros_100_ii.json","sha256":"4429b45664a06c7ee8d16687bcc7adf656403e534fba584f83762e160abdc4f9"},
-        {"path":"services/spectral/resources/ilford_hp5_plus_400.json","sha256":"a09ccdb57816f220ab598e534318a743ef79e16a300f8bd2de7453d451fe8ec5"},
-        {"path":"services/spectral/resources/ilford_multigrade_iv_rc.json","sha256":"0f776f1f26f04aca4ec438ed377dc1acf4073dc1a8ae32c51607a6cb1a02521d"},
-        {"path":"services/spectral/resources/kodak_tri_x_400-setup.json","sha256":"d3e26d31c51cd94418996dae7517df2fe9d56b9141978bf25cd2924ac0466160"},
-        {"path":"services/spectral/resources/kodak_tmax_100-setup.json","sha256":"6a4f41326d04ff6b09ad79aaca676cb3367d2e6d881ad55e8be3ba35f26dfa96"},
-        {"path":"services/spectral/resources/fujifilm_neopan_acros_100_ii-setup.json","sha256":"f6fea8f53ef9f553edbb8bcd4496e17bec1ab712dd6cc0e9908fc71630c43473"},
-        {"path":"services/spectral/resources/ilford_hp5_plus_400-setup.json","sha256":"42d6bb63d410eef464105a2b7cdafaaf66b8cc08d0e8640f7a2ac79e7465f1c9"}
+        {
+          "path": "services/spectral/resources/kodak_tri_x_400.json",
+          "sha256": "a54be071c6a055a9a49acb7072d10bf0b1bcddf9c0a459b0800a9b14bb66b1f1"
+        },
+        {
+          "path": "services/spectral/resources/kodak_tmax_100.json",
+          "sha256": "c9160236872034b86fb42b67be3a9252088bfa7bdbb450148b0c20ad83e3033a"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_neopan_acros_100_ii.json",
+          "sha256": "4429b45664a06c7ee8d16687bcc7adf656403e534fba584f83762e160abdc4f9"
+        },
+        {
+          "path": "services/spectral/resources/ilford_hp5_plus_400.json",
+          "sha256": "a09ccdb57816f220ab598e534318a743ef79e16a300f8bd2de7453d451fe8ec5"
+        },
+        {
+          "path": "services/spectral/resources/ilford_multigrade_iv_rc.json",
+          "sha256": "0f776f1f26f04aca4ec438ed377dc1acf4073dc1a8ae32c51607a6cb1a02521d"
+        },
+        {
+          "path": "services/spectral/resources/kodak_tri_x_400-setup.json",
+          "sha256": "d3e26d31c51cd94418996dae7517df2fe9d56b9141978bf25cd2924ac0466160"
+        },
+        {
+          "path": "services/spectral/resources/kodak_tmax_100-setup.json",
+          "sha256": "6a4f41326d04ff6b09ad79aaca676cb3367d2e6d881ad55e8be3ba35f26dfa96"
+        },
+        {
+          "path": "services/spectral/resources/fujifilm_neopan_acros_100_ii-setup.json",
+          "sha256": "f6fea8f53ef9f553edbb8bcd4496e17bec1ab712dd6cc0e9908fc71630c43473"
+        },
+        {
+          "path": "services/spectral/resources/ilford_hp5_plus_400-setup.json",
+          "sha256": "42d6bb63d410eef464105a2b7cdafaaf66b8cc08d0e8640f7a2ac79e7465f1c9"
+        }
       ],
-      "evidence": "tests/spectralMonochrome.test.ts verifies four distinct tone pipelines and silver-density handling; real production and Worker/main rendering cover all four stocks. Product notice and source-data rights require separate review."
+      "evidence": "SpektraLab product B&W data redistribution terms were not independently confirmed. Owner risk acceptance recorded 2026-11-20 in NOTICE; this stays unresolved, not verified."
     },
     {
       "id": "cinestill-spatial-model",
@@ -514,9 +595,12 @@
       "noticePath": "services/spectral/CHANGELOG.md",
       "modifications": "Implemented local TypeScript whole-frame maximum reduction, highlight headroom, four per-channel signed separable Gaussian convolutions and float CPU/WebGL2 mixing. Uses truncate-3 reflected-edge FIR, not upstream's IIR branch for sigma >= 3. Does not include common scatter, lens/scanner blur, unsharp, stochastic grain or physical perforation development. Alias SHA-256 4b5c5771a1d4755cf2f2994bbc0529387d579cc8d9fb6e23fe5d3d856fc13161; PSF SHA-256 ee2902b67a10b1dce04ae5ac835529668cc8ae28579278fb36d90ea56aab6b3d; Vision3 base setup SHA-256 11413d5f577a4ddcfbbb7cb215d88100b103b60d2870e9d1076529841d0d76d0.",
       "localPaths": [
-        {"path":"services/spectral/resources/cineStillModel.json","sha256":"ea9a4dea7e24c8c99fdefd744b3e6a0a38356f5ea7169860e2e59812787c26f2"}
+        {
+          "path": "services/spectral/resources/cineStillModel.json",
+          "sha256": "ea9a4dea7e24c8c99fdefd744b3e6a0a38356f5ea7169860e2e59812787c26f2"
+        }
       ],
-      "evidence": "tests/spectralCineStill.test.ts compares headroom and reflected convolution against independently computed SciPy references; tests/e2e/cinestill-stocks.spec.ts compares CPU/WebGL2 film raw and print RGB and verifies release/dispose and allocation-failure cleanup. Production-preview Worker/forced-main output is pixel-identical with the intermediate overlay redrawn exactly once after canvas resizing. Compatibility-edge and bounded-FIR limitations remain explicit. Distribution is not cleared by these technical checks."
+      "evidence": "Translated GPL code whose independent numerical verification is still open. Owner risk acceptance recorded 2026-11-20 in NOTICE; this stays unresolved, not verified."
     },
     {
       "id": "physical-135-test-fixtures",
@@ -532,9 +616,41 @@
       "noticePath": "ops/provenance/README.md",
       "modifications": "Generated local RGB fixtures for physical 135 orientation and aperture regression tests. The natural-portrait fixture was generated on 2026-11-09 using only standard-library PNG encoding.",
       "localPaths": [
-        {"path":"tests/fixtures/physical-natural-portrait.png","sha256":"87d79d0a11b7ab18b6b2a565909ab352bc5ebd32bb01819b3f285e7130a9efa0"}
+        {
+          "path": "tests/fixtures/physical-natural-portrait.png",
+          "sha256": "87d79d0a11b7ab18b6b2a565909ab352bc5ebd32bb01819b3f285e7130a9efa0"
+        }
       ],
       "evidence": "Project-generated fixture used only to distinguish physical orientation and crop behavior; it is not a photographic fidelity reference."
+    },
+    {
+      "id": "filmframe-distribution-notices",
+      "kind": "code",
+      "source": {
+        "url": "https://github.com/Zeno-cc/FilmFrame",
+        "revision": "34fa1eabcb0d17f8dfa1291b142ccda00e72c9f0"
+      },
+      "upstreamPath": "LICENSE",
+      "license": "GPL-3.0-or-later",
+      "attribution": "FilmFrame project; LICENSE carries the unmodified GNU GPL version 3 text.",
+      "rightsStatus": "verified",
+      "noticePath": "NOTICE",
+      "modifications": "LICENSE carries the unmodified GPL-3.0 text; the in-app credits surface serves the same text from ops/provenance/licenses/filmframe-GPL-3.0.txt. NOTICE records project attribution, upstream works and revisions, dependency licenses, corresponding-source instructions and the owner-accepted residual risk.",
+      "localPaths": [
+        {
+          "path": "LICENSE",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "NOTICE",
+          "sha256": "27641dbfef81b548e31663bf0682edc5bf300b30dd23b6bce4aad7785bf8e6d5"
+        },
+        {
+          "path": "ops/provenance/licenses/filmframe-GPL-3.0.txt",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        }
+      ],
+      "evidence": "Owner instructed distribution on 2026-11-20; the project license and corresponding source are published with the repository."
     }
   ]
 }

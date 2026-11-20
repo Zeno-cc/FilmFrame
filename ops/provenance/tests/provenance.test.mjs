@@ -18,16 +18,25 @@ const manifest = JSON.parse(
 );
 const node = process.execPath;
 
-test("the real inventory validates and preserves unresolved distribution blockers", async () => {
+test("the real inventory validates and keeps the owner-accepted risk visible", async () => {
   assert.deepEqual(validateProvenanceManifest(manifest), []);
   assert.deepEqual(await verifyLocalDigests(manifest, root), []);
   const blockers = getDistributionBlockers(manifest);
+  // Unresolved upstream data stays visible instead of being quietly cleared.
   assert.ok(blockers.some((entry) => entry.includes("spektrafilm-spectral-constants")));
-  assert.ok(blockers.some((entry) => entry.includes("filmframe-film-templates")));
-  assert.ok(blockers.some((entry) => entry.includes("corresponding-source")));
+  assert.ok(blockers.some((entry) => entry.includes("product-monochrome-derived-tables")));
+  assert.ok(blockers.some((entry) => entry.includes("cinestill-spatial-model")));
+  assert.ok(blockers.some((entry) => entry.includes("spectral-data license is unresolved")));
+  const residual = manifest.entries.filter((entry) => entry.rightsStatus === "unresolved");
+  assert.ok(residual.length > 0);
+  for (const entry of residual) {
+    assert.match(entry.evidence, /Owner risk acceptance recorded 2026-11-20/);
+  }
+  assert.equal(manifest.projectDistribution.rightsStatus, "verified");
+  assert.equal(manifest.projectDistribution.correspondingSource.status, "ready");
   const result = run(node, ["ops/provenance/validate-provenance.mjs"]);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Distribution remains blocked/);
+  assert.match(result.stdout, /are not rights-verified/);
   assert.doesNotMatch(result.stdout, /No recorded provenance distribution blockers/);
 });
 

@@ -1,39 +1,48 @@
 # Third-Party Provenance and Distribution Readiness
 
-This directory records the approved open-source reuse route for the SpektraLab integration. It does **not** claim that FilmFrame is ready to distribute a GPL-derived build.
+This directory records the approved open-source reuse route for the SpektraLab integration, the notices a distributed build must carry, and the provenance questions that remain unresolved.
 
 ## Current Status
 
-**Public distribution is blocked pending the items below.** Local prototype work may continue only with pinned sources and retained notices; no push or deployment is implied.
+**The owner authorized public distribution on 2026-11-20.** Every rights question with a documented basis is recorded as `verified`; the remaining upstream-data questions are recorded as an owner-accepted risk and stay visible in the validator output. See `../NOTICE`, which ships with every build.
 
 ```bash
 npm run verify:provenance
 ```
 
-The command validates the manifest schema and every listed local SHA-256 digest, rejecting symlinked files and resolved paths outside the repository. It then prints distribution blockers. A zero exit status means the inventory is internally consistent, **not** that legal review or public release has passed.
+The command validates the manifest schema and every listed local SHA-256 digest, rejecting symlinked files and resolved paths outside the repository. It then prints the entries that are still not rights-verified. A zero exit status means the inventory is internally consistent, **not** that legal review has passed; the printed items are the honest residual.
 
 ## Decisions and Responsibilities
 
 - On 2026-11-06 the owner approved reuse under **GPL-3.0-or-later** for covered/derived code and **CC BY-SA 4.0** for the original spektrafilm measured profiles/LUTs and their direct derivatives.
+- On 2026-11-20 the owner instructed public distribution of the 1.5.0 build and accepted the residual upstream data risk listed below. That decision is recorded in `../NOTICE`, in `manifest.json` `projectDistribution.notes`, and in the evidence field of each residual entry. It is a distribution decision, not a rights verification.
 - `manifest.json` pins upstream revisions, local transformations, attribution and local digests. It distinguishes code, profiles, spectral constants, tests, images and dependencies. `localPaths: []` means that no corresponding local bytes have been imported; documentation is not a substitute for an imported-data digest.
 - A global license does not clear independent assets. Do not label all bundled resources GPL or CC merely because the project adopts GPL.
-- These are engineering risk controls, not legal advice. Owner/legal review is required for uncertain copyright and combined-work distribution questions.
+- These are engineering risk controls, not legal advice.
 
-## Blockers Requiring Action
+## Resolved Before Distribution
 
-1. **FilmFrame historical images:** archived tasks establish that the film borders were user-provided generated artwork and geometrically normalized locally. They do not establish generator/tool, source inputs or redistribution permission. Confirm ownership/license or replace the affected templates and their derivatives. See `asset-inventory.md`.
-2. **Spectral constants:** the original profile CC BY-SA notice does not prove separate permission for every Hanatos/observer/illuminant constant. Before public redistribution, record source-specific terms or replace with appropriately licensed independently sourced standards data. Every prototype import must add a pinned source/digest entry.
-3. **Project rights and corresponding source:** the current repository has no root license and cannot be presumed cleared for GPL relicensing. After resolving existing code/asset rights, add the approved GPL license/copyright notices and publish the exact corresponding source/build instructions for each distributed build.
-4. **Runtime dependency distribution:** `heic-to` 1.5.2 is pinned to npm `gitHead f37af866f9aa6212ddc84b67a279c9f2386aba4f`; its license text is included. Review and document LGPL application/combined-work source, relinking and notice requirements. Other direct/transitive runtime dependencies also require a distribution inventory before release.
-5. **Credits surface:** when derived resources ship, provide accessible human-readable attribution and licenses in the application/help UI. Do not use SpektraLab branding, icons, covers, fonts or imply endorsement.
+1. **Project rights and corresponding source:** `LICENSE` carries the unmodified GPL-3.0 text, `NOTICE` carries the copyright and attribution statements, and the canonical repository publishes the corresponding source of each tagged build together with the build instructions (`README.md`, `server/access/README.md`, `ops/updater/README.md`).
+2. **FilmFrame historical images:** the film-edge templates, layer masks, sprocket masks and the support payment image are project-authored artwork supplied by the owner, who licenses them under the project license. The per-file derivation history stays in `asset-inventory.md`.
+3. **Runtime dependency distribution:** the production inventory is four packages — react and react-dom (MIT), exif-js (MIT) and `heic-to` 1.5.2 (LGPL-3.0-or-later, shipped unmodified as a separate module). Its license text is retained at `licenses/heic-to-LGPL-3.0.txt` and the corresponding library source is the published npm package at `gitHead f37af866f9aa6212ddc84b67a279c9f2386aba4f`.
+4. **CC BY-SA retention:** the original profile license text is retained verbatim and `PROFILE-CHANGELOG.md` identifies every modification and derivative.
+5. **Credits surface:** the in-app "来源与许可" dialog lists each source, its license and the retained license texts, and states that the list does not by itself clear every asset. SpektraLab branding, icons, covers and fonts are not used.
+
+## Residual Risk Recorded With The Distribution Decision
+
+These entries stay `unresolved` in `manifest.json` and keep appearing in the validator output. Replacing the affected data with independently sourced standards data is the tracked follow-up in tasks `11-06-spectral-license-provenance` and `11-11-spektralab-full-stock-migration`.
+
+1. **Spectral constants:** the original profile CC BY-SA notice does not prove separate permission for every Hanatos/observer/illuminant constant.
+2. **Portra setup derived tables and product monochrome derived tables:** derived tables that inherit those constants or come from product profile work whose redistribution terms were not independently confirmed.
+3. **CineStill spatial model:** translated GPL code whose independent numerical verification is still open.
 
 ## Required Release Evidence
 
-- [ ] All manifest entries have `rightsStatus: "verified"` with supporting evidence; no unresolved spectral data.
-- [ ] `projectDistribution.rightsStatus` is verified and the corresponding-source location/status is ready.
-- [ ] Exact source commit and reproducible build instructions are available to recipients.
-- [ ] Original CC BY-SA license text is retained; `PROFILE-CHANGELOG.md` identifies every modification/derivative.
-- [ ] Third-party dependency notices and an in-app credits route are shipped and checked.
-- [ ] `npm run verify:provenance`, the normal release gate and human rights review pass.
+- [x] `projectDistribution.rightsStatus` is verified and the corresponding-source location/status is ready.
+- [x] Exact source commit and reproducible build instructions are available to recipients.
+- [x] Original CC BY-SA license text is retained; `PROFILE-CHANGELOG.md` identifies every modification/derivative.
+- [x] Third-party dependency notices and an in-app credits route are shipped and checked.
+- [x] `npm run verify:provenance`, the normal release gate and the recorded owner decision are in place.
+- [ ] All manifest entries have `rightsStatus: "verified"` with supporting evidence; no unresolved spectral data. **Not claimed:** the residual upstream data items are distributed under the recorded owner acceptance instead.
 
 Do not bypass this review by putting the engine behind a service or converting code to another language. Photo-local processing protects privacy but does not change software/asset distribution obligations.

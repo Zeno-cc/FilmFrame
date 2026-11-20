@@ -18,16 +18,19 @@ manifest. It does not publish `latest`.
 4. Add one to six concise Chinese summary entries. Plaintext, URLs, HTML, and
    non-Chinese-only summaries are rejected.
 5. Run `npm run verify:provenance` and resolve every reported distribution
-   blocker with owner/legal evidence. Its successful schema/hash validation is
-   not a legal clearance; `check:release` prints the blockers to keep them
-   visible during the technical gate. See `ops/provenance/README.md`.
+   blocker with owner/legal evidence. An item that cannot be rights-verified can
+   still ship only if the owner records a dated risk acceptance that names it:
+   the acceptance belongs in `NOTICE`, in the `evidence` field of that manifest
+   entry and in `ops/provenance/README.md`, and the item must keep appearing in
+   the validator output. Successful schema/hash validation is not a legal
+   clearance. See `ops/provenance/README.md`.
 6. Run `npm run check:release`, the reusable technical pre-tag gate for release
    input and contracts, provenance consistency, frontend/Access, updater,
    desktop browsers, backup, access proxy, and deployment configuration. This
-   gate exits successfully when valid provenance records still have distribution
-   blockers. Do not create or push a stable tag until step 5 is completely
-   resolved and the required human rights review is recorded; a successful
-   technical gate alone does not authorize distribution.
+   gate exits successfully when valid provenance records still carry recorded
+   owner-accepted items. Do not create or push a stable tag until step 5 is
+   resolved or covered by that recorded owner acceptance; a successful technical
+   gate alone does not authorize distribution.
 7. Fetch the live remote and verify the release commit is contained in
    canonical `main`. Do not select a tag target from a stale tracking ref.
 8. Create and push the protected tag. Do not rerun a release by moving a tag.

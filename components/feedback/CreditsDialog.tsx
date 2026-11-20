@@ -6,6 +6,7 @@ export interface CreditsDialogProps {
 }
 
 const licenseUrls = {
+  project: new URL('../../ops/provenance/licenses/filmframe-GPL-3.0.txt', import.meta.url).href,
   spektralab: new URL('../../ops/provenance/licenses/SpektraLab-GPL-3.0.txt', import.meta.url).href,
   spektrafilm: new URL('../../ops/provenance/licenses/spektrafilm-profiles-CC-BY-SA-4.0.txt', import.meta.url).href,
   heicTo: new URL('../../ops/provenance/licenses/heic-to-LGPL-3.0.txt', import.meta.url).href,
@@ -13,6 +14,12 @@ const licenseUrls = {
 };
 
 const sources = [
+  {
+    title: 'FilmFrame · GPL-3.0-or-later',
+    body: '本项目以 GPL-3.0-or-later 发布，完整文本见 LICENSE，署名与对应源码说明见 NOTICE。每个发行标签所指的提交就是对应源码，构建步骤见仓库 README。',
+    href: 'https://github.com/Zeno-cc/FilmFrame',
+    license: licenseUrls.project,
+  },
   {
     title: 'SpektraLab · GPL-3.0-or-later',
     body: '物理片边、负片流程与 CineStill no-rem-jet 背反射参考其实现。保留原作者与修改声明，不使用其名称、图标、封面、截图或字体作为 FilmFrame 品牌资源。',
@@ -74,7 +81,7 @@ export function CreditsDialog({ open, onClose }: CreditsDialogProps) {
       <section className="rounded-[5px] border border-[var(--ff-warning)] p-3">
         <h3 className="text-sm font-medium text-[var(--ff-paper)]">仍需权利审核</h3>
         <p className="mt-2 text-xs leading-6 text-[var(--ff-paper-muted)]">
-          历史胶片图片、部分光谱常量、项目整体权利与对应源码、其他运行时依赖及 B&W 数据仍有独立审核事项。技术测试通过不等于这些事项已解决；未获明确批准前不公开发布。
+          Hanatos 光谱上采样常量、两个继承该常量的派生表与 CineStill 空间模型的来源权利仍未核实。项目所有者已于 2026-11-20 在有记录的风险接受前提下决定分发，`npm run verify:provenance` 会持续列出这些条目，它们不会被标记为已核实。完整清单见来源与发布清单与 NOTICE。
         </p>
         <a className="mt-2 inline-block text-xs text-[var(--ff-amber)] underline underline-offset-2" href={licenseUrls.provenance} target="_blank" rel="noopener noreferrer">完整来源与发布清单</a>
       </section>

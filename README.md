@@ -209,4 +209,8 @@ Worker 或 OffscreenCanvas 不可用时，应用会回退到主线程 Canvas。�
 
 ## 许可证
 
-仓库目前没有根许可证文件。光谱与物理片边集成包含 GPL-3.0-or-later 代码和具有独立许可的数据；`heic-to` 1.5.2 使用 LGPL-3.0。来源与许可入口已在应用中提供，详细状态见 [来源与分发清单](ops/provenance/README.md)。该清单仍有未解决的权利与对应源码事项，校验成功不代表已获准公开分发。
+FilmFrame 以 **GPL-3.0-or-later** 发布，完整文本见 [LICENSE](LICENSE)，版权与署名声明见 [NOTICE](NOTICE)。因为本仓库包含 GPL-3.0-or-later 代码和 CC BY-SA 4.0 数据的衍生部分，任何分发构建都必须保留这些条款；每个发行标签所指的提交就是对应的完整源码，构建步骤见上文「快速开始」、`server/access/README.md` 与 `ops/updater/README.md`。
+
+`heic-to` 1.5.2 使用 LGPL-3.0-or-later，以未修改的独立模块形式随包分发，许可文本保留在 `ops/provenance/licenses/`。
+
+仍有 4 项上游数据来源未获得权利核实（Hanatos 光谱上采样常量、两个继承该常量的派生表、以及 CineStill 空间模型的独立数值验证）：owner 于 2026-11-20 决定在有记录的风险接受前提下分发，`npm run verify:provenance` 会持续列出这些条目。逐项状态、保留的许可文本与修改记录见 [来源与分发清单](ops/provenance/README.md) 与 [NOTICE](NOTICE)。

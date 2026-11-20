@@ -28,7 +28,7 @@ if (errors.length > 0) fail(`invalid provenance manifest:\n- ${errors.join("\n- 
 const blockers = getDistributionBlockers(manifest);
 console.log(`Validated ${manifest.entries.length} provenance entries and local SHA-256 digests.`);
 if (blockers.length > 0) {
-  console.log("Distribution remains blocked pending:");
+  console.log(`${blockers.length} item(s) are not rights-verified; each one is recorded as owner-accepted residual risk in NOTICE:`);
   for (const blocker of blockers) console.log(`- ${blocker}`);
 } else {
   console.log("No recorded provenance distribution blockers; human release review is still required.");
