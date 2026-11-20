@@ -1,0 +1,36 @@
+{
+  "version": "1.5.2",
+  "minUpdaterVersion": "1.0.2",
+  "database": {
+    "schemaFrom": 6,
+    "schemaTo": 8,
+    "rollbackFloor": "1.4.0",
+    "backwardCompatible": true
+  },
+  "summaryZh": [
+    {
+      "kind": "feature",
+      "text": "24 款彩色与黑白胶片加入 81 个波长的光谱显影，按实测胶片与相纸曲线成像，默认 Gold 200 使用光谱模式"
+    },
+    {
+      "kind": "feature",
+      "text": "片边方式简化为模板片边与物理片边，没有实测片边的型号会禁用物理片边并说明原因"
+    },
+    {
+      "kind": "feature",
+      "text": "光谱成像现在支持连续胶片长条，整条只加载一次光谱资源"
+    },
+    {
+      "kind": "feature",
+      "text": "空暗房改用公共领域纪实摄影连续片轨，联网匿名换批，失败时保留本地照片"
+    },
+    {
+      "kind": "fix",
+      "text": "移除物理底片里无法解释的随机种子控件，渲染结果保持不变"
+    },
+    {
+      "kind": "feature",
+      "text": "单张画布的准入预算上限提升到 6144 MiB，需要 1.5.0 及以上版本"
+    }
+  ]
+}
