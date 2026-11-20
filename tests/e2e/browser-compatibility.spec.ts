@@ -25,6 +25,9 @@ async function uploadFixtures(page: Page, fixtures: string[]) {
 }
 
 test('local photo workflow remains compatible across browser engines', async ({ page }, testInfo) => {
+  // Upload, develop, preview, strip and download in one case; the CPU spectral
+  // backend makes the default 60s budget unworkable under machine load.
+  test.setTimeout(300_000);
   const applicationOrigin = new URL(testInfo.project.use.baseURL as string).origin;
   const externalRequests: string[] = [];
   const unexpectedMutations: string[] = [];

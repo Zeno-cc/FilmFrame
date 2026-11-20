@@ -47,7 +47,9 @@ async function develop(page: Page, forceMain = false) {
 }
 
 test('CineStill production Worker and forced-main outputs are identical', async ({ page }) => {
-  test.setTimeout(180_000);
+  // Two full spectral develops plus hashing; the CPU backend needs 12-65s per
+  // frame, so a shared machine can push this past the previous 180s budget.
+  test.setTimeout(420_000);
   const worker = await develop(page);
   const main = await page.context().newPage();
   expect(await develop(main, true)).toEqual(worker);
