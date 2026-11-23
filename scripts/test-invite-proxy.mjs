@@ -111,6 +111,7 @@ async function runBrowserWorkflow(cookie) {
         origin: url.origin,
         pathname: url.pathname,
         bodyBytes: outgoing.postDataBuffer()?.byteLength ?? 0,
+        outgoing,
       });
     });
 
@@ -137,8 +138,45 @@ async function runBrowserWorkflow(cookie) {
     assert.ok(downloadPath, "the protected browser workflow must produce a ZIP file");
     assert.ok((await stat(downloadPath)).size > 22, "the exported ZIP must not be empty");
 
+    // The empty darkroom rotates public-domain photographs from Wikimedia
+    // Commons; that is the one third-party request the README documents. Each
+    // allowed host is bound to its own path, the request must be a bodyless GET,
+    // and the full header set must stay anonymous. `allHeaders()` is used on
+    // purpose: `headers()` omits the cookie-related security headers, so a
+    // cookie check through it would pass vacuously. Failures report only the
+    // method, the origin and the reason, never headers or query parameters.
+    const galleryAllowlist = new Map([
+      ["https://commons.wikimedia.org", (pathname) => pathname === "/w/api.php"],
+      ["https://upload.wikimedia.org", (pathname) => pathname.startsWith("/wikipedia/commons/")],
+      ["https://thumb.wikimedia.org", (pathname) => pathname.startsWith("/wikipedia/commons/")],
+    ]);
     const external = requests.filter((entry) => entry.origin !== baseUrl);
-    assert.deepEqual(external, [], "the browser workflow must not contact third-party origins");
+    const violations = [];
+    let galleryRequests = 0;
+    for (const entry of external) {
+      const pathRule = galleryAllowlist.get(entry.origin);
+      let reason;
+      if (entry.method !== "GET") reason = "only a GET is allowed";
+      else if (entry.bodyBytes !== 0) reason = "the request must not carry a body";
+      else if (!pathRule) reason = "the origin is not a documented public gallery origin";
+      else if (!pathRule(entry.pathname)) reason = "the path is not a documented public gallery path";
+      else {
+        const headers = await entry.outgoing.allHeaders();
+        if (headers.cookie) reason = "the request must not carry a cookie";
+        else if (headers.authorization) reason = "the request must not carry an authorization header";
+        else if (headers.referer) reason = "the request must not carry a referrer";
+      }
+      if (reason) violations.push({ method: entry.method, origin: entry.origin, reason });
+      else galleryRequests += 1;
+    }
+    assert.deepEqual(
+      violations,
+      [],
+      "external requests must be limited to the documented anonymous Wikimedia gallery GETs",
+    );
+    console.log(
+      `# ${galleryRequests} documented anonymous Wikimedia gallery request(s) observed`,
+    );
     const writes = requests.filter((entry) => entry.method !== "GET");
     assert.ok(
       writes.some(

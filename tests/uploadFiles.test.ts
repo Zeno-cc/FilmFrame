@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import EXIF from 'exif-js';
 import {
   LARGE_FILE_BYTES,
   LARGE_IMAGE_EDGE,
   prepareUploadedImages,
+  readExifDate,
 } from '../services/uploadFiles';
 import {
   HEIC_JPEG_QUALITY,
@@ -11,6 +13,29 @@ import {
 } from '../services/heicConversion';
 
 type TestFile = Pick<File, 'name' | 'size' | 'type'>;
+
+describe('original file EXIF date', () => {
+  it('avoids loading an entire non-JPEG file into memory', async () => {
+    const file = new Blob([Uint8Array.of(0x89, 0x50, 0x4e, 0x47)]);
+    const readWholeFile = vi.spyOn(file, 'arrayBuffer');
+
+    await expect(readExifDate(file)).resolves.toBe('');
+    expect(readWholeFile).not.toHaveBeenCalled();
+  });
+
+  it('preserves JPEG capture dates and surfaces parser errors to upload preparation', async () => {
+    const file = new Blob([Uint8Array.of(0xff, 0xd8, 0xff, 0xd9)]);
+    const parse = vi.spyOn(EXIF, 'readFromBinaryFile');
+    try {
+      parse.mockReturnValueOnce({ DateTimeOriginal: '2026:11:20 15:30:00' });
+      await expect(readExifDate(file)).resolves.toBe('2026/11/20');
+      parse.mockImplementationOnce(() => { throw new RangeError('Invalid JPEG metadata'); });
+      await expect(readExifDate(file)).rejects.toThrow('Invalid JPEG metadata');
+    } finally {
+      parse.mockRestore();
+    }
+  });
+});
 
 describe('uploaded image preparation', () => {
   it('keeps JPEG, PNG, and WebP behavior, rejects unsupported types, and reports large images', async () => {

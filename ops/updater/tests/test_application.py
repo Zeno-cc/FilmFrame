@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import uuid
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -64,7 +65,10 @@ class FakeDeployer:
         self._call("inspect_current")
         return self.current
 
-    def preflight(self, manifest_obj, current): self._call("preflight")
+    def preflight(self, manifest_obj, current, *, rollback=None):
+        self._call("preflight")
+        if current.schema_version != manifest_obj.database.schema_from and rollback is None:
+            raise DeploymentError("migration_incompatible")
     def pull_artifacts(self, manifest_obj, job): self._call("pull_artifacts"); return self.root / "bundle"
     def stage_release(self, manifest_obj, job, bundle): self._call("stage_release"); return self.root / "new"
     def rehearse_migration(self, manifest_obj, job): self._call("rehearse_migration")
@@ -297,6 +301,72 @@ with open(sys.argv[1], 'a') as lock:
             self.store.transition(job.id, state)
         coordinator.reconcile()
         self.assertEqual(self.store.get_job(job.id).state, "recovery_required")  # type: ignore[union-attr]
+
+    def test_same_release_can_retry_after_rollback_with_migrated_database(self) -> None:
+        deployer = FakeDeployer(self.root, fail_at="verify_origin")
+        coordinator = self.coordinator(deployer)
+        app = UpdaterApplication(self.store, self.releases, deployer, coordinator, worker_launcher=coordinator.run_job)
+        first = self.create()
+        coordinator.run_job(first.id)
+        self.assertEqual(self.store.get_job(first.id).state, "rolled_back")
+
+        deployer.fail_at = None
+        deployer.current = replace(deployer.current, schema_version=4)
+        self.assertTrue(app.status(force=False)["candidate"]["installable"])
+        retry = app.create_job({
+            "version": first.target_version,
+            "idempotencyKey": str(uuid.uuid4()),
+            "actorHash": "a" * 64,
+        })
+        self.assertEqual(retry["retryOf"], first.id)
+        self.assertEqual(self.store.get_job(retry["id"]).state, "succeeded")
+        self.assertEqual(deployer.calls.count("rehearse_migration"), 2)
+        self.assertEqual(deployer.calls.count("final_backup"), 2)
+
+    def test_migrated_database_requires_matching_rollback_evidence(self) -> None:
+        deployer = FakeDeployer(self.root)
+        coordinator = self.coordinator(deployer)
+        app = UpdaterApplication(self.store, self.releases, deployer, coordinator, worker_launcher=lambda _: None)
+        current = replace(deployer.current, schema_version=4)
+        deployer.current = current
+        self.assertFalse(app.status(force=False)["candidate"]["installable"])
+
+        first = self.create()
+        self.advance_to_switching(first)
+        self.store.transition(first.id, "rolling_back")
+        self.store.transition(first.id, "rolled_back")
+        for mismatched in (
+            replace(current, revision="9" * 40),
+            replace(current, release_path=str(self.root / "new")),
+            replace(current, schema_version=5),
+        ):
+            with self.subTest(current=mismatched):
+                deployer.current = mismatched
+                self.assertFalse(app.status(force=False)["candidate"]["installable"])
+
+        deployer.current = current
+        self.releases.release = manifest(first.target_version, "b" * 40)
+        self.assertFalse(app.status(force=False)["candidate"]["installable"])
+        self.releases.release = manifest("1.2.0")
+        self.assertFalse(app.status(force=False)["candidate"]["installable"])
+
+        deployer.current = replace(current, schema_version=3)
+        later = self.create()
+        coordinator.run_job(later.id)
+        self.assertEqual(self.store.get_job(later.id).state, "succeeded")
+        deployer.current = current
+        self.releases.release = manifest(first.target_version, first.target_revision)
+        self.assertFalse(app.status(force=False)["candidate"]["installable"])
+
+    def test_queued_update_rejects_a_changed_candidate_revision(self) -> None:
+        deployer = FakeDeployer(self.root)
+        job = self.create()
+        self.releases.release = manifest(job.target_version, "b" * 40)
+        self.coordinator(deployer).run_job(job.id)
+        self.assertEqual(self.store.get_job(job.id).state, "failed_pre_switch")
+        self.assertEqual(self.store.get_job(job.id).error_code, "release_untrusted")
+        self.assertNotIn("pull_artifacts", deployer.calls)
+        self.assertNotIn("switch", deployer.calls)
 
     def test_incompatible_upgrade_stops_before_artifacts_switch_or_rollback(self) -> None:
         deployer = FakeDeployer(self.root, fail_at="preflight_migration")

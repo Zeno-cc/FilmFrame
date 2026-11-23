@@ -386,3 +386,19 @@ class Job:
             "errorCode": self.error_code,
             "retryOf": self.retry_of,
         }
+
+
+def matches_migrated_rollback(
+    manifest: ReleaseManifest,
+    current: CurrentRelease,
+    rollback: Optional[Job],
+) -> bool:
+    return (
+        current.schema_version == manifest.database.schema_to
+        and rollback is not None
+        and rollback.state == "rolled_back"
+        and (rollback.target_version, rollback.target_revision) == (manifest.version, manifest.commit)
+        and bool(current.release_path)
+        and (rollback.previous_version, rollback.previous_revision, rollback.previous_release)
+        == (current.version, current.revision, current.release_path)
+    )

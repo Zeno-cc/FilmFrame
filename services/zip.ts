@@ -129,7 +129,7 @@ export async function createZipBlob(files: ZipFileEntry[]): Promise<Blob> {
     writeUint16(localView, 28, 0);
     localHeader.set(nameBytes, 30);
 
-    chunks.push(asArrayBuffer(localHeader), asArrayBuffer(data));
+    chunks.push(asArrayBuffer(localHeader), file.blob);
     offset += localHeaderSize + size;
 
     const centralHeader = createHeader(centralHeaderSize);

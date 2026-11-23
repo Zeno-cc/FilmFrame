@@ -26,6 +26,7 @@ class ProtocolTests(unittest.TestCase):
     def test_decodes_each_action(self) -> None:
         cases = [
             ("check", {"force": True}),
+            ("check", {"force": True, "background": True}),
             (
                 "create_job",
                 {

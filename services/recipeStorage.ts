@@ -124,9 +124,10 @@ export function deleteRecipe(
   idOrName: string,
   storage: RecipeStorage | null = defaultStorage()
 ): FilmRecipe[] {
-  const next = loadRecipes(storage).filter(
-    recipe => recipe.id !== idOrName && recipe.name !== idOrName
-  );
+  const recipes = loadRecipes(storage);
+  const target = recipes.find(recipe => recipe.id === idOrName)
+    ?? recipes.find(recipe => recipe.name === idOrName);
+  const next = recipes.filter(recipe => recipe !== target);
   persistRecipes(storage, next);
   return next;
 }

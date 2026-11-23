@@ -386,7 +386,7 @@ exact GitHub repository/workflow identity.
 The Unix socket protocol accepts only these actions:
 
 ```text
-check({ force?: boolean }) -> SystemUpdate
+check({ force?: boolean, background?: boolean }) -> SystemUpdate
 create_job({ version, idempotencyKey, actorHash }) -> UpdateJob
 get_job({ jobId }) -> UpdateJob
 get_active_job({}) -> UpdateJob | null
@@ -442,6 +442,14 @@ it reuses the verified cached manifest when available and still enforces
 release trust, updater compatibility, database compatibility, and the global
 update lock. This avoids making the UI wait for a duplicate attestation pass
 through the short Access-to-updater socket timeout.
+
+Access opts into background checks. Its forced check starts a live verification
+in the host updater and returns a cached status snapshot with
+`checkState: "checking"`. Polling reads that snapshot without waiting for the
+GitHub request or attestation subprocess. A failure reports
+`checkState: "failed"` and preserves the verified cache. Before the first
+successful verification, `candidate` and `checkedAt` are both null. Legacy CLI
+requests keep their synchronous behavior.
 
 Public releases verify without giving credentials to the GitHub CLI. The
 updater fetches attestations from the fixed repository API, writes only the

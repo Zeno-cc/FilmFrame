@@ -14,8 +14,8 @@ services:
   access:
     image: filmframe-access-proxy-test:local
     build:
-      context: ../../server/access
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: server/access/Dockerfile
       args:
         ACCESS_NODE_IMAGE: node:22.23.2-bookworm-slim@sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46
         FILMFRAME_REVISION: proxy-test

@@ -138,6 +138,13 @@ class StateStore:
             ).fetchone()
         return self._job(row) if row else None
 
+    def get_last_completed_switch(self) -> Optional[Job]:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM jobs WHERE state IN ('succeeded','rolled_back') ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        return self._job(row) if row else None
+
     def create_job(
         self,
         manifest: ReleaseManifest,

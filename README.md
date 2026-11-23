@@ -6,7 +6,7 @@ FilmFrame 是一间运行在浏览器里的数字暗房。它把本地照片排�
 
 [![React 19](https://img.shields.io/badge/React-19-149eca?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-646cff?logo=vite)](https://vite.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite)](https://vite.dev/)
 [![Local processing](https://img.shields.io/badge/image_processing-local-2f855a)](#隐私与数据边界)
 
 ## 当前能力
@@ -131,7 +131,7 @@ Cloudflare / OpenResty
   -> 生成、查看和撤销邀请码
 ```
 
-- React 19 + TypeScript + Vite 5
+- React 19 + TypeScript + Vite 6
 - Tailwind CSS 4 + 项目语义化 CSS token
 - Canvas / OffscreenCanvas 图像合成
 - 光谱成像与 WebGL2 / CPU 后端，按型号延迟加载光谱资源

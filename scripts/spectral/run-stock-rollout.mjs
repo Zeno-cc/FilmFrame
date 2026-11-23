@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { selectFilmStock } from '../../tests/e2e/stockPicker.ts';
 import { getRecipeInspector, selectRecipeControl } from '../../tests/e2e/recipeControls.ts';
 
@@ -42,7 +42,8 @@ try {
     results.push({ filmType, profileId, rendered: src?.startsWith('blob:'), dimensions });
     await page.close();
   }
-  await writeFile('.trellis/tasks/11-06-spectral-negative-stock-rollout/research/filmframe-stock-rendering.json', JSON.stringify({ results, errors }, null, 2));
+  await mkdir('output/playwright/spectral', { recursive: true });
+  await writeFile('output/playwright/spectral/filmframe-stock-rendering.json', JSON.stringify({ results, errors }, null, 2));
   console.log(JSON.stringify({ results, errors }, null, 2));
   if (errors.length) process.exitCode = 1;
 } finally { await browser.close(); }

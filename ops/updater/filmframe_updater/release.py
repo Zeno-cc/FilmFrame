@@ -2,20 +2,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from .errors import UpdaterError
 from .models import ReleaseManifest, parse_semver, utc_now
 from .store import StateStore
 from .system import CommandFailed, CommandRunner
+
+LOGGER = logging.getLogger("filmframe-updater")
+CheckState = Literal["checking", "failed"]
+CHECK_FAILURE_RETRY_SECONDS = 60
 
 GITHUB_API_URL = "https://api.github.com/repos/Zeno-cc/FilmFrame/releases/latest"
 GITHUB_RELEASE_BY_TAG_URL = "https://api.github.com/repos/Zeno-cc/FilmFrame/releases/tags/v{}"
@@ -260,20 +267,54 @@ class CachedReleaseService:
         self.store = store
         self.source = source
         self.ttl_seconds = ttl_seconds
+        self._refresh_lock = threading.Lock()
+        self._source_lock = threading.Lock()
+        self._refreshing = False
+        self._retry_after = 0.0
+
+    def check_background(
+        self, *, force: bool
+    ) -> tuple[ReleaseManifest | None, str | None, CheckState | None]:
+        with self._refresh_lock:
+            cached = self.store.get_cached_release()
+            manifest, checked_at = cached if cached else (None, None)
+            recent_failure = time.monotonic() < self._retry_after
+            stale = checked_at is None or _age_seconds(checked_at) >= self.ttl_seconds
+            if not self._refreshing and (force or (stale and not recent_failure)):
+                threading.Thread(target=self._refresh, name="release-check", daemon=True).start()
+                self._refreshing = True
+            state = "checking" if self._refreshing else "failed" if recent_failure else None
+            return manifest, checked_at, state
+
+    def _refresh(self) -> None:
+        succeeded = False
+        try:
+            self.check(force=True)
+            succeeded = True
+        except UpdaterError as error:
+            LOGGER.warning("background release check failed: %s", error.code)
+        finally:
+            with self._refresh_lock:
+                self._retry_after = 0.0 if succeeded else time.monotonic() + CHECK_FAILURE_RETRY_SECONDS
+                self._refreshing = False
 
     def check(self, *, force: bool = False) -> tuple[ReleaseManifest, str]:
         cached = self.store.get_cached_release()
         if cached and not force and _age_seconds(cached[1]) < self.ttl_seconds:
             return cached
-        try:
-            manifest = self.source.latest()
-        except UpdaterError:
-            if cached and not force:
+        with self._source_lock:
+            cached = self.store.get_cached_release()
+            if cached and not force and _age_seconds(cached[1]) < self.ttl_seconds:
                 return cached
-            raise
-        checked_at = utc_now()
-        self.store.cache_release(manifest, checked_at=checked_at)
-        return manifest, checked_at
+            try:
+                manifest = self.source.latest()
+            except UpdaterError:
+                if cached and not force:
+                    return cached
+                raise
+            checked_at = utc_now()
+            self.store.cache_release(manifest, checked_at=checked_at)
+            return manifest, checked_at
 
     def resolve(self, version: str) -> ReleaseManifest:
         cached = self.store.get_cached_release(version)

@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { getRecipeInspector, selectRecipeControl } from '../../tests/e2e/recipeControls.ts';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:4174';
@@ -76,7 +76,8 @@ try {
     report.gpuCpuWorker = compare(gpuWorker, cpuWorker);
     report.errors.push(...gpuWorker.errors, ...gpuMain.errors);
   }
-  await writeFile('.trellis/tasks/11-06-spectral-negative-stock-rollout/research/gold-production-validation.json', `${JSON.stringify(report, null, 2)}\n`);
+  await mkdir('output/playwright/spectral', { recursive: true });
+  await writeFile('output/playwright/spectral/gold-production-validation.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (report.errors.length || report.cpuWorkerMain.maxDifference > 0 || (report.gpuWorkerMain && (report.gpuWorkerMain.maxDifference > 0 || report.gpuCpuWorker.maxDifference > 0))) process.exitCode = 1;
 } finally {

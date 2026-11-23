@@ -3,7 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './output/playwright/test-results',
-  timeout: 60_000,
+  // A spectral CPU develop costs 12-65s per frame, so a case that develops
+  // twice can exceed a 60s test budget on a loaded machine even though every
+  // individual wait is fine. Cases with more work still set their own budget.
+  timeout: 180_000,
   // CI runners are several times slower than a development machine, and a 10s
   // expectation on an interaction or a React state change is not enough there:
   // the tag workflow failed twice on cases that pass locally in seconds.

@@ -18,7 +18,7 @@ from typing import Callable, Literal, Optional, Protocol
 
 from .config import Config
 from .errors import DeploymentError, UpdaterError
-from .models import CurrentRelease, Job, ReleaseManifest, parse_semver
+from .models import CurrentRelease, Job, ReleaseManifest, matches_migrated_rollback, parse_semver
 from .release import ReleaseSource
 from .system import CommandFailed, CommandRunner
 
@@ -72,7 +72,9 @@ process.stdout.write(JSON.stringify([row.max_canvas_mib,row.updated_at]));
 class Deployer(Protocol):
     def inspect_current(self) -> CurrentRelease: ...
 
-    def preflight(self, manifest: ReleaseManifest, current: CurrentRelease) -> None: ...
+    def preflight(
+        self, manifest: ReleaseManifest, current: CurrentRelease, *, rollback: Optional[Job] = None
+    ) -> None: ...
 
     def pull_artifacts(self, manifest: ReleaseManifest, job: Job) -> Path: ...
 
@@ -142,10 +144,16 @@ class ProductionDeployer:
         healthy = self._services_healthy(release)
         return CurrentRelease(version, revision, healthy, schema, str(release))
 
-    def preflight(self, manifest: ReleaseManifest, current: CurrentRelease) -> None:
+    def preflight(
+        self, manifest: ReleaseManifest, current: CurrentRelease, *, rollback: Optional[Job] = None
+    ) -> None:
         try:
-            if not current.healthy or current.schema_version != manifest.database.schema_from:
+            if not current.healthy:
                 raise DeploymentError("preflight_failed")
+            if current.schema_version != manifest.database.schema_from and not matches_migrated_rollback(
+                manifest, current, rollback
+            ):
+                raise DeploymentError("migration_incompatible")
             if parse_semver(manifest.version) <= parse_semver(current.version):
                 raise DeploymentError("preflight_failed")
             if parse_semver(current.version) < parse_semver(manifest.database.rollback_floor):

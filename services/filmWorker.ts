@@ -29,7 +29,6 @@ import {
   drawKodakGoldOverlayLayer,
   getReal135OverlayUrl,
   KODAK_GOLD_APERTURE_MASK_URL,
-  KODAK_GOLD_APERTURE_SHADOW_URL,
   KODAK_GOLD_BASE_URL,
   supportsReal135Template,
 } from './filmOverlay';

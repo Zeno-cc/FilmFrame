@@ -1,11 +1,11 @@
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, totalmem, platform, arch } from 'node:os';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../..');
-const research = resolve(root, '.trellis/tasks/11-06-spectral-negative-print-prototype/research');
+const outputDir = resolve(root, 'output/playwright/spectral');
 const server = await createServer({
   root,
   logLevel: 'error',
@@ -51,10 +51,11 @@ try {
     ...result,
   };
   const pngBase64 = result.comparison.pngDataUrl.replace(/^data:image\/png;base64,/, '');
-  await writeFile(resolve(research, 'synthetic-ab.png'), Buffer.from(pngBase64, 'base64'));
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(resolve(outputDir, 'synthetic-ab.png'), Buffer.from(pngBase64, 'base64'));
   delete report.comparison.pngDataUrl;
-  await writeFile(resolve(research, 'browser-benchmark.json'), `${JSON.stringify(report, null, 2)}\n`);
-  await page.screenshot({ path: resolve(research, 'browser-harness.png'), fullPage: true });
+  await writeFile(resolve(outputDir, 'browser-benchmark.json'), `${JSON.stringify(report, null, 2)}\n`);
+  await page.screenshot({ path: resolve(outputDir, 'browser-harness.png'), fullPage: true });
   console.log(JSON.stringify(report, null, 2));
   if (errors.length > 0 || result.errors.length > 0 || externalRequests.length > 0 || result.records.length !== 2) {
     throw new Error('Benchmark completed with unavailable or failed evidence; see browser-benchmark.json');

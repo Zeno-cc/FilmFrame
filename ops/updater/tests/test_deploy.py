@@ -6,6 +6,7 @@ import stat
 import tarfile
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -389,6 +390,24 @@ class CanvasBudgetCompatibilityTests(unittest.TestCase):
                 self.assertIn("SELECT max_canvas_mib,updated_at", script)
                 self.assertNotIn("UPDATE", script)
                 self.assertNotIn("INSERT", script)
+
+    def test_preflight_accepts_the_migrated_schema_only_for_the_matching_rollback(self) -> None:
+        runner = RecordingRunner(secure_compose(), budget_output=budget_output(2048))
+        deployer = self.deployer(runner)
+        current = CurrentRelease("1.4.12", "1" * 40, True, 4, str(self.old))
+        rollback = replace(self.job, state="rolled_back")
+        with patch.object(deployer, "_test_openresty"), patch(
+            "filmframe_updater.deploy.shutil.disk_usage"
+        ) as disk:
+            disk.return_value.free = 3 * 1024 * 1024 * 1024
+            for evidence in (None, self.job, replace(rollback, target_revision="9" * 40)):
+                with self.subTest(evidence=evidence):
+                    with self.assertRaises(DeploymentError) as raised:
+                        deployer.preflight(self.manifest, current, rollback=evidence)
+                    self.assertEqual(raised.exception.code, "migration_incompatible")
+            self.assertEqual(runner.calls, [])
+            deployer.preflight(self.manifest, current, rollback=rollback)
+        self.assertTrue(any("render_budget_settings" in call[-1] for call in runner.calls))
 
     def test_upgrade_accepts_6144_for_the_first_6gib_candidate(self) -> None:
         self.manifest = manifest("1.5.0")

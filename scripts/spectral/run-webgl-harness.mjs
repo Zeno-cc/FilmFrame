@@ -1,11 +1,11 @@
 import { createServer } from 'vite';
 import { chromium, firefox, webkit } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { arch, cpus, platform, totalmem } from 'node:os';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../..');
-const research = resolve(root, '.trellis/tasks/11-06-webgl2-spectral-migration/research');
+const outputDir = resolve(root, 'output/playwright/spectral');
 const stock = process.argv.find(argument => argument.startsWith('--stock='))?.split('=')[1];
 const quick = process.argv.includes('--quick');
 const browsers = process.argv.includes('--all-browsers') ? [['chromium', chromium], ['firefox', firefox], ['webkit', webkit]] : [['chromium', chromium]];
@@ -71,7 +71,8 @@ try {
     results,
   };
   const file = quick ? `webgl-smoke${stock ? `-${stock}` : ''}.json` : browsers.length === 1 ? `webgl-browser-validation${stock ? `-${stock}` : ''}.json` : 'webgl-cross-browser-validation.json';
-  await writeFile(resolve(research, file), `${JSON.stringify(report, null, 2)}\n`);
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(resolve(outputDir, file), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report.results.map(record => ({ browser: record.browser, status: record.status, error: record.error, consoleErrors: record.consoleErrors, failures: record.result?.failures, stages: record.result?.fixtures?.map(fixture => ({ fixture: fixture.fixture, passed: fixture.passed, stages: Object.fromEntries(Object.entries(fixture.stages).map(([stage, difference]) => [stage, { maxAbs: difference.maxAbs, violations: difference.violations, firstActual: difference.firstActual, firstExpected: difference.firstExpected }])) })), lifecycle: record.result?.lifecycle })), null, 2));
   if (results.some(record => record.status !== 'passed')) process.exitCode = 1;
 } finally {

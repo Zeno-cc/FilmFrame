@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { selectFilmStock } from '../../tests/e2e/stockPicker.ts';
 import { getRecipeInspector, selectRecipeControl } from '../../tests/e2e/recipeControls.ts';
 
@@ -21,7 +22,8 @@ try {
   await selectRecipeControl(page, '光谱计算', 'cpu');
   await page.getByRole('button', { name: /冲洗待更新照片/ }).click();
   await page.getByRole('img', { name: '已出片' }).waitFor({ timeout: 60000 });
-  await page.screenshot({ path: '.trellis/tasks/11-06-webgl2-spectral-migration/research/filmframe-spectral-gpu.png', fullPage: true });
+  await mkdir('output/playwright/spectral', { recursive: true });
+  await page.screenshot({ path: 'output/playwright/spectral/filmframe-spectral-gpu.png', fullPage: true });
   const src = await page.getByRole('img', { name: 'aperture-mask-derived.png' }).getAttribute('src');
   const gpuPixels = await page.getByRole('img', { name: 'aperture-mask-derived.png' }).evaluate(image => {
     const canvas = document.createElement('canvas');

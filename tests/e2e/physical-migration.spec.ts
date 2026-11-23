@@ -10,6 +10,8 @@ async function prepare(page: import('@playwright/test').Page) {
 }
 
 test('new sessions default to physical 135 with an automatic equivalent backend', async ({ page }) => {
+  // Two develops, each allowed a 90s wait for the finished frame.
+  test.setTimeout(300_000);
   await prepare(page);
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());

@@ -10,7 +10,7 @@ This directory records the approved open-source reuse route for the SpektraLab i
 npm run verify:provenance
 ```
 
-The command validates the manifest schema and every listed local SHA-256 digest, rejecting symlinked files and resolved paths outside the repository. It then prints the entries that are still not rights-verified. A zero exit status means the inventory is internally consistent, **not** that legal review has passed; the printed items are the honest residual.
+The command validates the manifest schema and each listed local SHA-256 digest. It rejects symlinked files, resolved paths outside the repository, and unapproved distribution blockers. For an unresolved entry to pass, its ID must be listed in the dated residual-risk section of the root NOTICE and its evidence must cite that decision date. The command still reports these unresolved entries for human release review.
 
 ## Decisions and Responsibilities
 

@@ -121,6 +121,14 @@ describe('recipe storage', () => {
     expect(deleteRecipe('Second', storage)).toEqual([]);
   });
 
+  it('deletes only the matching id when another recipe uses that id as its name', () => {
+    const storage = memoryStorage();
+    saveRecipe('First', settings, { storage, createId: () => 'first-id', now: () => 1 });
+    saveRecipe('first-id', settings, { storage, createId: () => 'second-id', now: () => 2 });
+
+    expect(deleteRecipe('first-id', storage).map(recipe => recipe.id)).toEqual(['second-id']);
+  });
+
   it('reports a failed save without replacing persisted recipes and allows a retry', () => {
     const storage = memoryStorage();
     saveRecipe('Existing', settings, { storage, createId: () => 'existing', now: () => 1 });

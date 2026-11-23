@@ -5,6 +5,7 @@ import json
 import os
 import stat
 import tempfile
+import threading
 import unittest
 import urllib.error
 import urllib.request
@@ -460,6 +461,58 @@ class ReleaseServiceTests(unittest.TestCase):
             self.assertEqual(destination.read_bytes(), bundle)
 
         self.assertEqual(client.calls[1], (bundle_api_url, "application/octet-stream"))
+
+    def test_background_check_returns_while_verification_runs_and_coalesces_requests(self) -> None:
+        started = threading.Event()
+        release_verification = threading.Event()
+        completed = threading.Event()
+        result = manifest()
+
+        class SlowSource:
+            def latest(self):
+                started.set()
+                if not release_verification.wait(5):
+                    raise TimeoutError("test did not release verification")
+                return result
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateStore(Path(directory) / "state.sqlite")
+            store.initialize()
+            service = CachedReleaseService(store, SlowSource())
+            run_refresh = service._refresh
+
+            def refresh() -> None:
+                try:
+                    run_refresh()
+                finally:
+                    completed.set()
+
+            with patch.object(service, "_refresh", side_effect=refresh) as worker:
+                try:
+                    self.assertEqual(service.check_background(force=True), (None, None, "checking"))
+                    self.assertTrue(started.wait(2))
+                    self.assertEqual(service.check_background(force=False), (None, None, "checking"))
+                    self.assertEqual(service.check_background(force=True), (None, None, "checking"))
+                    worker.assert_called_once()
+                finally:
+                    release_verification.set()
+                    self.assertTrue(completed.wait(2))
+                cached, checked_at, state = service.check_background(force=False)
+                self.assertEqual(cached, result)
+                self.assertIsNotNone(checked_at)
+                self.assertIsNone(state)
+
+    def test_failed_background_check_retains_verified_cache_and_reports_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateStore(Path(directory) / "state.sqlite")
+            store.initialize()
+            release = manifest()
+            checked_at = "2020-01-01T00:00:00Z"
+            store.cache_release(release, checked_at=checked_at)
+            service = CachedReleaseService(store, FailingSource())
+            with self.assertLogs("filmframe-updater", level="WARNING"):
+                service._refresh()
+            self.assertEqual(service.check_background(force=False), (release, checked_at, "failed"))
 
     def test_uses_stale_verified_cache_for_non_forced_status(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

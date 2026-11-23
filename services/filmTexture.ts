@@ -92,52 +92,6 @@ export function drawDust(ctx: CanvasRenderingContext2D, width: number, height: n
   ctx.restore();
 }
 
-export function drawFineScratches(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  count = 8
-) {
-  ctx.save();
-  ctx.lineCap = 'round';
-
-  for (let i = 0; i < count; i++) {
-    const x = Math.random() * width;
-    const y = Math.random() * height;
-    const len = height * (0.08 + Math.random() * 0.28);
-
-    ctx.globalAlpha = 0.025 + Math.random() * 0.05;
-    ctx.strokeStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
-    ctx.lineWidth = 0.4 + Math.random() * 0.8;
-
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 8, y + len);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-export function drawFilmBaseTexture(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  settings: FilmSettings
-) {
-  if (settings.enableRealisticRebate === false) return;
-
-  ctx.save();
-  for (let y = 0; y < height; y += 3) {
-    ctx.globalAlpha = 0.015 + Math.random() * 0.018;
-    ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
-    ctx.fillRect(0, y, width, 1);
-  }
-  ctx.restore();
-
-  drawFineScratches(ctx, width, height, 6);
-}
-
 export function drawRealFilmStockTexture(
   ctx: CanvasRenderingContext2D,
   layout: Film135SideLayout,

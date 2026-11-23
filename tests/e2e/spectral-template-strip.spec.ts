@@ -170,7 +170,9 @@ test('Portra 400 spectral template strip renders without a boundary error', asyn
 });
 
 test('forced main-thread Gold spectral template strip matches Worker output dimensions with one session', async ({ page }) => {
-  test.setTimeout(180_000);
+  // Two loads plus two four-frame spectral strips; a single strip alone may use
+  // the 180s inner wait, so the owning test needs more than that.
+  test.setTimeout(420_000);
   await setupStrip(page, FilmType.KODAK_GOLD_200, { files: 4 });
   const workerStrip = await generateStrip(page);
   const workerSize = await imageSize(workerStrip);
@@ -189,6 +191,8 @@ test('Portra 400 template strip reuses a single spectral session across frames',
 });
 
 test('Gold 200 legacy template strip keeps the Gold look instead of spectral development', async ({ page }) => {
+  // Two loads and two strips; the default 60s budget does not cover the work.
+  test.setTimeout(300_000);
   await setupStrip(page, FilmType.KODAK_GOLD_200, { mode: 'spectral' });
   const spectralStrip = await generateStrip(page);
   const spectral = await readRect(spectralStrip, apertureRect('gold', 1));
@@ -215,7 +219,8 @@ async function explicitWebgl2SpectralUsable(page: Page): Promise<boolean> {
 for (const stock of [FilmType.KODAK_GOLD_200, FilmType.KODAK_PORTRA_400] as const) {
   for (const backend of ['cpu', 'webgl2'] as const) {
     test(`${stock} strip first frame matches the single spectral aperture (${backend})`, async ({ page }, testInfo) => {
-      test.setTimeout(180_000);
+      // Load, single develop, spectral strip and a legacy comparison strip.
+      test.setTimeout(300_000);
       await setupStrip(page, stock, { backend, mode: 'spectral' });
       if (backend === 'webgl2') {
         test.skip(

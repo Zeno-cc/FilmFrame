@@ -151,6 +151,49 @@ describe("Unix updater client", () => {
     ]);
   });
 
+  it("accepts a pending background check before a verified candidate exists", async () => {
+    await withSocketServer(
+      (request, socket) => {
+        assert.deepEqual(request.params, { force: true, background: true });
+        socket.end(success(request, {
+          ...systemUpdate(),
+          candidate: null,
+          checkedAt: null,
+          checkState: "checking",
+        }));
+      },
+      async (client) => {
+        const result = await client.check(true);
+        assert.equal(result.checkState, "checking");
+        assert.equal(result.checkedAt, null);
+        assert.equal(result.candidate, null);
+      },
+    );
+  });
+
+  it("falls back when a legacy host rejects the background flag during decoding", async () => {
+    const checks: Array<Record<string, unknown>> = [];
+    await withSocketServer(
+      (request, socket) => {
+        checks.push(request.params);
+        if (request.params.background) {
+          socket.end(JSON.stringify({
+            protocolVersion: 1,
+            requestId: null,
+            ok: false,
+            error: { code: "invalid_request", message: "Invalid request", retryable: false },
+          }) + "\n");
+          return;
+        }
+        socket.end(success(request, systemUpdate()));
+      },
+      async (client) => {
+        assert.equal((await client.check(true)).candidate?.version, "1.1.0");
+        assert.deepEqual(checks, [{ force: true, background: true }, { force: true }]);
+      },
+    );
+  });
+
   it("passes only the allowlisted create-job identity projection", async () => {
     await withSocketServer(
       (request, socket) => {

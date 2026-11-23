@@ -1,0 +1,11 @@
+**
+!NOTICE
+!server/
+!server/access/
+!server/access/package.json
+!server/access/package-lock.json
+!server/access/tsconfig.json
+!server/access/src/
+!server/access/src/**
+!server/access/migrations/
+!server/access/migrations/**

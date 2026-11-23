@@ -295,6 +295,12 @@ async function verifyConfigFiles() {
     /connect-src 'self' blob:/.test(innerNginx),
     "inner Nginx permits browser-only Blob reads for ZIP export",
   );
+  const connectSources = innerNginx.match(/\bconnect-src ([^;"]+)/)?.[1].split(/\s+/) ?? [];
+  check(
+    ["'self'", "blob:", "https://commons.wikimedia.org", "https://upload.wikimedia.org", "https://thumb.wikimedia.org"]
+      .sort().join(" ") === connectSources.sort().join(" "),
+    "inner Nginx limits gallery connection sources to the expected Wikimedia hosts",
+  );
   check(
     /Permissions-Policy\s+"[^"]*camera=\(\)[^"]*microphone=\(\)[^"]*"/.test(
       innerNginx,
@@ -473,10 +479,36 @@ function verifyInstalledOpenResty() {
   check(dump.status === 0, "active OpenResty configuration can be inspected");
   if (dump.status !== 0) return;
 
-  verifyPasskeyProxyRoutes(
-    `${dump.stdout ?? ""}\n${dump.stderr ?? ""}`,
-    "active OpenResty configuration",
+  const publicVhosts = nginxServerBlocks(dump.stdout ?? "").filter((block) =>
+    /^\s*listen\s+[^;]*\bssl\b[^;]*;/m.test(block) &&
+    [...block.matchAll(/^\s*server_name\s+([^;]+);/gm)].some(([, names]) =>
+      names.split(/\s+/).includes(options.siteHost)),
   );
+  check(publicVhosts.length > 0, "active OpenResty configuration defines the public TLS vhost");
+  for (const block of publicVhosts) {
+    verifyPasskeyProxyRoutes(block, "active public TLS vhost");
+  }
+}
+
+function nginxServerBlocks(config) {
+  const tokens = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|#[^\r\n]*|\$\{[^}\r\n]*\}|\bserver\s*\{|[{}]/g;
+  const blocks = [];
+  let start = 0;
+  let depth = 0;
+  for (const token of config.matchAll(tokens)) {
+    const match = token[0];
+    if (depth === 0) {
+      if (match.startsWith("server")) {
+        start = token.index + match.length;
+        depth = 1;
+      }
+    } else if (match === "{" || match.startsWith("server")) {
+      depth += 1;
+    } else if (match === "}" && --depth === 0) {
+      blocks.push(config.slice(start, token.index));
+    }
+  }
+  return blocks;
 }
 
 function runOpenResty(arguments_) {
@@ -649,7 +681,7 @@ async function verifyOrigin(baseUrl, host, label, expectedBoundary) {
   const response = await requestOrigin(url, host);
   if (response) {
     if (expectedBoundary === "filmframe") {
-      checkAccessRedirect(response, url, `${label} anonymous request`);
+      checkAccessRedirect(response, new URL(`https://${host}/`), `${label} anonymous request`);
     } else {
       check(
         [401, 403].includes(response.status),

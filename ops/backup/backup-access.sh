@@ -62,15 +62,23 @@ require_backup_root() {
     exit 2
   fi
 
+  case "$BACKUP_ROOT/" in
+    *//*|*/./*|*/../*) echo "backup root must be canonical" >&2; exit 2 ;;
+  esac
+  local ancestor=$BACKUP_ROOT suffix="" resolved
+  while [[ ! -e "$ancestor" && ! -L "$ancestor" ]]; do
+    suffix="/${ancestor##*/}$suffix"
+    ancestor=${ancestor%/*}
+    ancestor=${ancestor:-/}
+  done
+  if ! resolved=$(cd -P -- "$ancestor" && pwd) || [[ "${resolved%/}$suffix" != "$BACKUP_ROOT" ]]; then
+    echo "backup root must be canonical" >&2
+    exit 2
+  fi
+
   umask 077
   mkdir -p "$BACKUP_ROOT"
   chmod 0700 "$BACKUP_ROOT"
-  local resolved
-  resolved=$(cd -P "$BACKUP_ROOT" && pwd)
-  if [[ "$resolved" != "$BACKUP_ROOT" ]]; then
-    echo "backup root must be canonical: $resolved" >&2
-    exit 2
-  fi
 }
 
 run_session_maintenance() {

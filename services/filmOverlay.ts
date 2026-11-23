@@ -19,7 +19,6 @@ export const COMPATIBILITY_135_OVERLAY = 'compatibility-135';
 export const ILFORD_HP5_PLUS_OVERLAY_URL = '/film-overlays/ilford-hp5-plus.png';
 export const KODAK_GOLD_BASE_URL = '/film-overlays/film-base.png';
 export const KODAK_GOLD_APERTURE_MASK_URL = '/film-overlays/aperture-mask-derived.png';
-export const KODAK_GOLD_APERTURE_SHADOW_URL = '/film-overlays/aperture-shadow-derived.png';
 
 const TEMPLATE_W = 1307;
 const TEMPLATE_H = 1203;

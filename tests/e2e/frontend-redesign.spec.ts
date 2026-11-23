@@ -42,7 +42,12 @@ async function countZipEntries(download: Download): Promise<number> {
   return count;
 }
 
-test.beforeEach(async ({ page }) => {
+const desktopEmptyDarkroomTest = 'desktop empty darkroom exposes one clear import action and a complete film frame';
+
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.title === desktopEmptyDarkroomTest) {
+    await page.route('https://commons.wikimedia.org/w/api.php?**', route => route.abort('failed'));
+  }
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await uploadCurationFixtures(page, 1);
@@ -54,7 +59,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('heading', { name: '让这一卷，慢慢显影' }).waitFor();
 });
 
-test('desktop empty darkroom exposes one clear import action and a complete film frame', async ({ page }) => {
+test(desktopEmptyDarkroomTest, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
 
   await expect(page.getByRole('heading', { name: '让这一卷，慢慢显影' })).toBeVisible();
@@ -904,6 +909,11 @@ test('credits dialog exposes source licenses and unresolved rights accessibly', 
   const licenseResponse = await page.request.get(licenseHref!);
   expect(licenseResponse.ok()).toBe(true);
   expect(await licenseResponse.text()).toContain('GNU GENERAL PUBLIC LICENSE');
+  const noticeHref = await dialog.getByRole('link', { name: '下载 NOTICE' }).getAttribute('href');
+  expect(noticeHref).toBeTruthy();
+  const noticeResponse = await page.request.get(noticeHref!);
+  expect(noticeResponse.ok()).toBe(true);
+  expect(await noticeResponse.body()).toEqual(await readFile(path.resolve(process.cwd(), 'NOTICE')));
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button', { name: '更多操作' })).toBeFocused();
@@ -1221,6 +1231,45 @@ test('changing the included subset marks a generated film strip stale', async ({
     .uncheck();
   await expect(page.getByText('需重新生成', { exact: true })).toBeVisible();
   await expect(stripStage.getByRole('img', { name: '需要重新生成的胶片长条' })).toBeVisible();
+});
+
+test('a timed-out regeneration preserves the previous downloadable film strip', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    let stripRequests = 0;
+
+    window.Worker = class extends NativeWorker {
+      postMessage(message: { type?: string }, options?: Transferable[] | StructuredSerializeOptions) {
+        if (message.type === 'generateFilmStrip' && ++stripRequests === 2) return;
+        if (Array.isArray(options)) super.postMessage(message, options);
+        else super.postMessage(message, options);
+      }
+    };
+    Object.defineProperty(window, 'setTimeout', {
+      value: (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+        nativeSetTimeout(handler, timeout === 120_000 && stripRequests === 1 ? 50 : timeout, ...args),
+    });
+  });
+  await page.reload();
+  await uploadCurationFixtures(page, 2);
+  await page.getByRole('tab', { name: /胶片长条 2 张入选/ }).click();
+  const stripStage = page.getByLabel('长条预览');
+  await stripStage.getByRole('button', { name: '生成胶片长条', exact: true }).click();
+  const output = stripStage.getByRole('img', { name: '已生成的胶片长条' });
+  await expect(output).toBeVisible({ timeout: 30_000 });
+  const originalUrl = await output.getAttribute('src');
+
+  await stripStage.getByRole('button', { name: '重新生成胶片长条', exact: true }).click();
+  const error = page.getByRole('dialog', { name: '需要处理' });
+  await expect(error).toContainText('渲染超时');
+  await error.getByRole('button', { name: '我知道了' }).click();
+
+  await expect(output).toHaveAttribute('src', originalUrl!);
+  const download = page.waitForEvent('download');
+  await stripStage.getByRole('button', { name: '下载', exact: true }).click();
+  expect(await (await download).failure()).toBeNull();
 });
 
 test('mobile batch curation remains operable without horizontal overflow', async ({ page }) => {

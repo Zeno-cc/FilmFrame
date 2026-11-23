@@ -192,12 +192,18 @@ export function paintPhysicalImprints(
   if (rectangles.length) {
     const mask = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
     for (const op of rectangles) {
-      const start = filmToCanvas(plan, op.s, op.t);
-      const end = filmToCanvas(plan, op.s1!, op.t1!);
-      const left = Math.max(0, Math.floor(Math.min(start.s, end.s) * plan.pxPerMm));
-      const right = Math.min(ctx.canvas.width - 1, Math.ceil(Math.max(start.s, end.s) * plan.pxPerMm));
-      const top = Math.max(0, Math.floor(Math.min(start.t, end.t) * plan.pxPerMm));
-      const bottom = Math.min(ctx.canvas.height - 1, Math.ceil(Math.max(start.t, end.t) * plan.pxPerMm));
+      const corners = [
+        filmToCanvas(plan, op.s, op.t),
+        filmToCanvas(plan, op.s1!, op.t),
+        filmToCanvas(plan, op.s, op.t1!),
+        filmToCanvas(plan, op.s1!, op.t1!),
+      ];
+      const xs = corners.map(point => point.s * plan.pxPerMm);
+      const ys = corners.map(point => point.t * plan.pxPerMm);
+      const left = Math.max(0, Math.floor(Math.min(...xs)));
+      const right = Math.min(ctx.canvas.width - 1, Math.ceil(Math.max(...xs)));
+      const top = Math.max(0, Math.floor(Math.min(...ys)));
+      const bottom = Math.min(ctx.canvas.height - 1, Math.ceil(Math.max(...ys)));
       const from = { s: Math.min(op.s, op.s1!), t: Math.min(op.t, op.t1!) };
       const to = { s: Math.max(op.s, op.s1!), t: Math.max(op.t, op.t1!) };
       for (let y = top; y <= bottom; y += 1) {
@@ -297,24 +303,29 @@ export function paintPhysicalFrame(
   ctx.fillStyle = 'rgba(0,0,0,0)';
   ctx.fillRect(0, 0, width, height);
   ctx.globalCompositeOperation = 'source-over';
-  const gateTopLeft = filmToCanvas(plan, plan.gate.s, plan.gate.t);
-  const gateBottomRight = filmToCanvas(plan, plan.gate.s + plan.gate.width, plan.gate.t + plan.gate.height);
-  const gateX = Math.round(Math.min(gateTopLeft.s, gateBottomRight.s) * plan.pxPerMm);
-  const gateY = Math.round(Math.min(gateTopLeft.t, gateBottomRight.t) * plan.pxPerMm);
-  const gateW = Math.round(Math.abs(gateBottomRight.s - gateTopLeft.s) * plan.pxPerMm);
-  const gateH = Math.round(Math.abs(gateBottomRight.t - gateTopLeft.t) * plan.pxPerMm);
+  const portrait = plan.orientation === 'portrait';
+  // Start from the top-left corner in the oriented gate before applying scan rotation.
+  const gateTopLeft = filmToCanvas(plan, plan.gate.s, plan.gate.t + (portrait ? plan.gate.height : 0));
+  const radians = plan.frame.straightenDegrees * Math.PI / 180;
+  const gateX = gateTopLeft.s * plan.pxPerMm;
+  const gateY = gateTopLeft.t * plan.pxPerMm;
+  const gateW = (portrait ? plan.gate.height : plan.gate.width) * plan.pxPerMm;
+  const gateH = (portrait ? plan.gate.width : plan.gate.height) * plan.pxPerMm;
   const radius = Math.max(1, Math.min(...plan.body.gateRadii) * plan.pxPerMm);
   const penumbra = Math.max(0.5, 0.29 / (2 * plan.aperture) * plan.pxPerMm);
   ctx.filter = `blur(${penumbra}px)`;
+  ctx.translate(radians ? gateX : Math.round(gateX), radians ? gateY : Math.round(gateY));
+  if (radians) ctx.rotate(radians);
+  const widthPx = radians ? gateW : Math.round(gateW);
+  const heightPx = radians ? gateH : Math.round(gateH);
   ctx.beginPath();
-  ctx.roundRect(gateX, gateY, gateW, gateH, radius);
+  ctx.roundRect(0, 0, widthPx, heightPx, radius);
   ctx.clip();
   const normalized = normalizeRenderTransform(transform);
-  const source = image;
-  if (plan.orientation === 'portrait') {
-    drawImageCoverWithTransform(ctx, source, gateX, gateY, gateW, gateH, normalized);
+  if (portrait) {
+    drawImageCoverWithTransform(ctx, image, 0, 0, widthPx, heightPx, normalized);
   } else {
-    drawImageCoverAutoRotate(ctx, source, gateX, gateY, gateW, gateH, normalized);
+    drawImageCoverAutoRotate(ctx, image, 0, 0, widthPx, heightPx, normalized);
   }
   ctx.restore();
 }

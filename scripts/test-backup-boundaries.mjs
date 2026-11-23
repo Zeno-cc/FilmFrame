@@ -2,10 +2,12 @@
 
 import assert from "node:assert/strict";
 import {
+  chmod,
   mkdtemp,
   mkdir,
   readFile,
   realpath,
+  stat,
   symlink,
   utimes,
   writeFile,
@@ -90,5 +92,30 @@ const unsafe = spawnSync(
   },
 );
 assert.notEqual(unsafe.status, 0);
+
+const backupAlias = path.join(backupRoot, 'parent-alias');
+const realParent = path.join(backupRoot, 'real-parent');
+const existingTarget = path.join(realParent, 'existing');
+await mkdir(existingTarget, { recursive: true });
+await chmod(existingTarget, 0o755);
+await symlink(realParent, backupAlias);
+for (const leaf of ['existing', 'missing']) {
+  const throughAlias = spawnSync(
+    "bash",
+    [path.resolve("ops/backup/backup-access.sh"), "--cleanup-only"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        FILMFRAME_BACKUP_DIR: path.join(backupAlias, leaf),
+        FILMFRAME_ALLOW_CUSTOM_BACKUP_DIR: "1",
+      },
+    },
+  );
+  assert.equal(throughAlias.status, 2, throughAlias.stderr);
+  assert.match(throughAlias.stderr, /backup root must be canonical/);
+}
+assert.equal((await stat(existingTarget)).mode & 0o777, 0o755);
+assert.equal(await exists(path.join(realParent, 'missing')), false);
 
 console.log("backup cleanup boundary tests passed");

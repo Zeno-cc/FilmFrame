@@ -33,10 +33,11 @@ export function exportCanvasToObjectUrl(
           reject(new Error(errorMessage));
           return;
         }
-        resolve({
-          url: URL.createObjectURL(blob),
-          byteSize: blob.size,
-        });
+        try {
+          resolve({ url: URL.createObjectURL(blob), byteSize: blob.size });
+        } catch (error) {
+          reject(error);
+        }
       },
       outputFormat,
       outputQuality,

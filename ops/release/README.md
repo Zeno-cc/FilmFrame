@@ -48,8 +48,10 @@ stored in repository secrets.
 
 ## Verification contract
 
-The updater must download the fixed manifest asset and deploy bundle for the
-selected GitHub Release, authenticate to GHCR, then run:
+The host updater downloads the fixed manifest and bundle for the selected
+GitHub Release and verifies them through its Python `GitHubAttestationVerifier`.
+The release workflow and manual artifact checks use this equivalent verifier
+with access to GitHub and GHCR:
 
 ```bash
 node ops/release/verify-attestations.mjs \

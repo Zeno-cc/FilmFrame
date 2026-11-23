@@ -7,7 +7,15 @@ from typing import Callable, Optional
 
 from .deploy import Deployer
 from .errors import DeploymentError, UpdaterError
-from .models import PRE_SWITCH_STATES, UPDATER_VERSION, Job, ReleaseManifest, parse_semver
+from .models import (
+    PRE_SWITCH_STATES,
+    UPDATER_VERSION,
+    CurrentRelease,
+    Job,
+    ReleaseManifest,
+    matches_migrated_rollback,
+    parse_semver,
+)
 from .release import CachedReleaseService
 from .store import StateStore
 from .system import CommandFailed, DeploymentLock, DeploymentLockBusy
@@ -43,8 +51,11 @@ class DeploymentCoordinator:
         try:
             manifest = self.releases.resolve(job.target_version)
             self._transition(job_id, "verifying_release")
+            if manifest.commit != job.target_revision:
+                raise DeploymentError("release_untrusted")
             current = self.deployer.inspect_current()
-            self.deployer.preflight(manifest, current)
+            rollback = _find_migrated_rollback(self.store, manifest, current)
+            self.deployer.preflight(manifest, current, rollback=rollback)
             if not current.release_path:
                 raise DeploymentError("preflight_failed")
             self.store.set_release_paths(
@@ -270,7 +281,7 @@ class UpdaterApplication:
 
     def dispatch(self, action: str, params: dict):
         if action == "check":
-            return self.status(force=params.get("force", False))
+            return self.status(force=params.get("force", False), background=params.get("background", False))
         if action == "create_job":
             return self.create_job(params)
         if action == "get_job":
@@ -285,12 +296,17 @@ class UpdaterApplication:
             return {"jobs": [job.public_dict() for job in self.store.list_history(params.get("limit", 20))]}
         raise UpdaterError("invalid_request")
 
-    def status(self, *, force: bool) -> dict:
+    def status(self, *, force: bool, background: bool = False) -> dict:
         current = self.deployer.inspect_current()
-        candidate, checked_at = self.releases.check(force=force)
+        check_state = None
+        if background:
+            candidate, checked_at, check_state = self.releases.check_background(force=force)
+        else:
+            candidate, checked_at = self.releases.check(force=force)
         candidate_public = None
-        if parse_semver(candidate.version) > parse_semver(current.version):
-            blocked = _blocked_reason(candidate, current)
+        if candidate and parse_semver(candidate.version) > parse_semver(current.version):
+            rollback = _find_migrated_rollback(self.store, candidate, current)
+            blocked = _blocked_reason(candidate, current, rollback)
             candidate_public = candidate.public_dict(installable=blocked is None, blocked_reason=blocked)
         active = self.store.get_active_job()
         return {
@@ -299,6 +315,7 @@ class UpdaterApplication:
             "activeJob": active.public_dict() if active else None,
             "checkedAt": checked_at,
             "updaterVersion": UPDATER_VERSION,
+            **({"checkState": check_state} if check_state else {}),
         }
 
     def create_job(self, params: dict) -> dict:
@@ -310,13 +327,15 @@ class UpdaterApplication:
             return reusable.public_dict()
         manifest = self.releases.resolve(params["version"])
         current = self.deployer.inspect_current()
-        blocked = _blocked_reason(manifest, current)
+        rollback = _find_migrated_rollback(self.store, manifest, current)
+        blocked = _blocked_reason(manifest, current, rollback)
         if blocked:
             raise UpdaterError(blocked)
         job, created = self.store.create_job(
             manifest,
             idempotency_key=params["idempotencyKey"],
             actor_hash=params["actorHash"],
+            retry_of=rollback.id if rollback else None,
         )
         if created:
             self.worker_launcher(job.id)
@@ -338,14 +357,25 @@ def _recovery_error_code(exc: Exception) -> str:
     return "rollback_failed"
 
 
-def _blocked_reason(manifest: ReleaseManifest, current) -> Optional[str]:
+def _find_migrated_rollback(
+    store: StateStore, manifest: ReleaseManifest, current: CurrentRelease
+) -> Optional[Job]:
+    if current.schema_version != manifest.database.schema_to or current.schema_version == manifest.database.schema_from:
+        return None
+    rollback = store.get_last_completed_switch()
+    return rollback if matches_migrated_rollback(manifest, current, rollback) else None
+
+
+def _blocked_reason(
+    manifest: ReleaseManifest, current: CurrentRelease, rollback: Optional[Job]
+) -> Optional[str]:
     if parse_semver(manifest.version) <= parse_semver(current.version):
         return "release_not_found"
     if parse_semver(UPDATER_VERSION) < parse_semver(manifest.min_updater_version):
         return "updater_upgrade_required"
     if (
         not current.healthy
-        or current.schema_version != manifest.database.schema_from
+        or (current.schema_version != manifest.database.schema_from and rollback is None)
         or parse_semver(current.version) < parse_semver(manifest.database.rollback_floor)
         or not manifest.database.backward_compatible
     ):

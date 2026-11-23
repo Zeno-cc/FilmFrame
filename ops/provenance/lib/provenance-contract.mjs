@@ -93,7 +93,7 @@ export function validateProvenanceManifest(value) {
   return errors;
 }
 
-export function getDistributionBlockers(manifest) {
+export function getDistributionBlockers(manifest, acceptedEntries = new Set()) {
   const blockers = [];
   if (manifest.projectDistribution?.rightsStatus !== "verified") {
     blockers.push("project distribution rights have not been verified");
@@ -102,6 +102,7 @@ export function getDistributionBlockers(manifest) {
     blockers.push("corresponding-source distribution is not ready");
   }
   for (const entry of manifest.entries ?? []) {
+    if (acceptedEntries.has(entry.id)) continue;
     if (entry.rightsStatus !== "verified") {
       blockers.push(`${entry.id}: ${entry.rightsStatus}`);
     }

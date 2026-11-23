@@ -16,19 +16,15 @@ import {
   getFrameNumberForImage,
 } from './filmFrameNumber';
 import {
-  create135LandscapeLayout,
   create135SidePerforationLayout,
   drawImageCoverAutoRotate,
   drawImageCoverWithTransform,
-  Film135Layout,
   Film135SideLayout,
-  PHYS_135,
 } from './filmGeometry';
 import { getRotatedDimensions, normalizeRenderTransform } from './renderTransform';
-import { draw135Markings, draw135SideMarkings } from './filmMarkings';
+import { draw135SideMarkings } from './filmMarkings';
 import {
   KODAK_GOLD_APERTURE_MASK_URL,
-  KODAK_GOLD_APERTURE_SHADOW_URL,
   KODAK_GOLD_BASE_URL,
   createFilmTemplateStripLayout,
   createKodakGoldStripLayout,
@@ -41,7 +37,6 @@ import {
 } from './filmOverlay';
 import {
   drawDust,
-  drawFilmBaseTexture,
   drawGrain as drawRealGrain,
   drawRealFilmStockTexture,
 } from './filmTexture';
@@ -50,7 +45,7 @@ import {
   getReal135TargetImageWidth,
   getScannerCanvasSize,
 } from './filmResolution';
-import { assertCanvasBudget, type RenderBudgetLimits } from './renderBudget';
+import { assertCanvasBudget, validateCanvasBudget, type RenderBudgetLimits } from './renderBudget';
 import { assertSpectralStripSupported } from './spectral/scope';
 import { physicalPlanForSettings } from './physical135/frame';
 import { assertPhysicalCombination } from './physical135/plan';
@@ -64,7 +59,6 @@ import {
   exportCanvasToObjectUrl,
   loadCanvasImage,
   restoreOutputOrientationForSource,
-  rotateCanvas,
 } from './canvasRuntime';
 
 /**
@@ -300,34 +294,6 @@ const drawGrain = (
   ctx.restore();
 };
 
-function drawFilmBase(
-  ctx: CanvasRenderingContext2D,
-  layout: Film135Layout,
-  settings: FilmSettings
-) {
-  const base = settings.enableRealisticRebate === false ? settings.borderColor : '#090807';
-
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
-
-  if (settings.enableRealisticRebate === false) return;
-
-  const gradient = ctx.createRadialGradient(
-    layout.filmW / 2,
-    layout.filmH / 2,
-    layout.filmH * 0.2,
-    layout.filmW / 2,
-    layout.filmH / 2,
-    layout.filmW * 0.75
-  );
-
-  gradient.addColorStop(0, 'rgba(255,255,255,0.035)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.18)');
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, layout.filmW, layout.filmH);
-}
-
 function drawReal135FilmBase(
   ctx: CanvasRenderingContext2D,
   layout: Film135SideLayout,
@@ -374,21 +340,6 @@ function drawImageGateShadow(ctx: CanvasRenderingContext2D, layout: Film135SideL
   ctx.fillRect(layout.imageX - Math.round(layout.pxPerMm * 0.12), layout.imageY, Math.round(layout.pxPerMm * 0.12), layout.imageH);
   ctx.fillRect(layout.imageX + layout.imageW, layout.imageY, Math.round(layout.pxPerMm * 0.12), layout.imageH);
   ctx.restore();
-}
-
-function draw135Perforations(
-  ctx: CanvasRenderingContext2D,
-  layout: Film135Layout,
-  settings: FilmSettings
-) {
-  const holeColor = settings.holeColor || '#f2efe6';
-
-  for (let i = 0; i < PHYS_135.perforationsPerFrame; i++) {
-    const x = Math.round(layout.perfStartX + i * layout.perfPitch);
-
-    drawHole(ctx, { ...settings, holeColor }, x, layout.perfTopY, layout.perfW, layout.perfH, layout.topRebateH);
-    drawHole(ctx, { ...settings, holeColor }, x, layout.perfBottomY, layout.perfW, layout.perfH, layout.bottomRebateH);
-  }
 }
 
 function drawReal135SidePerforations(
@@ -757,7 +708,6 @@ async function drawKodakGoldTemplateFrame(
   ctx.fillRect(0, 0, layout.filmW, layout.filmH);
   if (!overlay) paintCompatibility135Frame(ctx, layout, settings);
 
-  assertCanvasBudget(img.width, img.height, renderBudgetLimits);
   const source = document.createElement('canvas');
   const sourceContext = source.getContext('2d');
   if (!sourceContext) throw new Error('Canvas context not found');
@@ -768,10 +718,16 @@ async function drawKodakGoldTemplateFrame(
     sourceContext.drawImage(overlay, 0, 0);
     ctx.drawImage(source, 0, 0, layout.filmW, layout.filmH);
   }
-  source.width = img.width;
-  source.height = img.height;
-  sourceContext.drawImage(img, 0, 0);
-  drawImageCoverAutoRotate(ctx, source, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
+  let photo: HTMLImageElement | HTMLCanvasElement = img;
+  // Keep the bitmap-like raster when it fits. An oversized input can still be
+  // drawn directly into the admitted output, as it is in the Worker.
+  if (validateCanvasBudget(img.width, img.height, renderBudgetLimits).ok) {
+    source.width = img.width;
+    source.height = img.height;
+    sourceContext.drawImage(img, 0, 0);
+    photo = source;
+  }
+  drawImageCoverAutoRotate(ctx, photo, layout.imageX, layout.imageY, layout.imageW, layout.imageH, transform);
 
   if (session) {
     // The frame may be drawn under a translate (strip layout). getImageData and

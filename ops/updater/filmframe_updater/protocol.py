@@ -70,9 +70,9 @@ def decode_request(data: bytes) -> Request:
 
     try:
         if action == "check":
-            require_exact_keys(params, set(), {"force"})
-            if "force" in params and not isinstance(params["force"], bool):
-                raise ValueError("force must be boolean")
+            require_exact_keys(params, set(), {"force", "background"})
+            if not all(isinstance(value, bool) for value in params.values()):
+                raise ValueError("check options must be boolean")
         elif action == "create_job":
             require_exact_keys(params, {"version", "idempotencyKey", "actorHash"})
             if not isinstance(params["version"], str):

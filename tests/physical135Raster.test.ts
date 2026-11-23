@@ -88,6 +88,59 @@ afterEach(() => {
 });
 
 describe('physical imprint rasterization', () => {
+  it('paints the corner coverage that extends beyond the original DX rectangle diagonal', () => {
+    const physicalPlan = plan({ physicalStraighten: 5 });
+    const from = { s: 8, t: 4 };
+    const to = { s: 9, t: 8 };
+    const point = filmToCanvas(physicalPlan, 8.08, 7.9);
+    const x = Math.floor(point.s * physicalPlan.pxPerMm);
+    const y = Math.floor(point.t * physicalPlan.pxPerMm);
+    const { outputWidth: width, outputHeight: height } = physicalPlan;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const { context } = createImprintContext(width, height);
+    Object.assign(context, {
+      getImageData: () => ({ data: pixels }),
+      putImageData: vi.fn(),
+    });
+
+    paintPhysicalImprints(context, physicalPlan, { brandText: FilmType.KODAK_PORTRA_400, frameNumber: 1 }, [
+      { kind: 'rect', s: from.s, t: from.t, s1: to.s, t1: to.t },
+    ]);
+
+    const expectedAlpha = Math.round(physicalRectangleCoverage(physicalPlan, x, y, from, to) * 255);
+    expect(expectedAlpha).toBeGreaterThan(200);
+    expect(pixels[(y * width + x) * 4 + 3]).toBe(expectedAlpha);
+  });
+
+  it.each([
+    { orientation: 'landscape' as const, straighten: -5 },
+    { orientation: 'landscape' as const, straighten: 5 },
+    { orientation: 'portrait' as const, straighten: -5 },
+    { orientation: 'portrait' as const, straighten: 5 },
+  ])('aligns the $orientation photo clip with the physical gate at $straighten degrees', ({ orientation, straighten }) => {
+    const physicalPlan = createPhysicalFilmPlan({
+      settings: { ...base, physicalStraighten: straighten },
+      orientation,
+      gateWidth: 36,
+      gateHeight: 24,
+      pxPerMm: 4,
+    });
+    const { outputWidth: width, outputHeight: height, gate, pxPerMm } = physicalPlan;
+    const { context } = createPhotoContext(width, height);
+    const portrait = orientation === 'portrait';
+    const origin = filmToCanvas(physicalPlan, gate.s, gate.t + (portrait ? gate.height : 0));
+
+    paintPhysicalFrame(context, { width: 120, height: 80 } as HTMLImageElement, physicalPlan,
+      { brandText: FilmType.KODAK_PORTRA_400, frameNumber: 1 }, createPhysicalRaster(physicalPlan));
+
+    expect(context.translate).toHaveBeenNthCalledWith(1, origin.s * pxPerMm, origin.t * pxPerMm);
+    expect(context.rotate).toHaveBeenNthCalledWith(1, straighten * Math.PI / 180);
+    expect(context.roundRect).toHaveBeenCalledWith(0, 0,
+      (portrait ? gate.height : gate.width) * pxPerMm, (portrait ? gate.width : gate.height) * pxPerMm,
+      expect.any(Number));
+    expect(context.drawImage).toHaveBeenCalled();
+  });
+
   it('leaves compatibility imprint coverage to the exposure pass', () => {
     const physicalPlan = {
       ...plan({ imagingMode: 'legacy' }),

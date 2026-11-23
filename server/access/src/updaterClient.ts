@@ -207,8 +207,9 @@ export const systemUpdateSchema = z
     current: currentReleaseSchema,
     candidate: candidateReleaseSchema.nullable(),
     activeJob: updateJobSchema.nullable(),
-    checkedAt: timestampSchema,
+    checkedAt: timestampSchema.nullable(),
     updaterVersion: versionSchema,
+    checkState: z.enum(["checking", "failed"]).optional(),
   })
   .strict();
 
@@ -249,7 +250,7 @@ const responseEnvelopeSchema = z.discriminatedUnion("ok", [
 type UpdaterAction = keyof typeof requestParamsSchemas;
 
 const requestParamsSchemas = {
-  check: z.object({ force: z.boolean().optional() }).strict(),
+  check: z.object({ force: z.boolean().optional(), background: z.boolean().optional() }).strict(),
   create_job: z
     .object({
       version: versionSchema,
@@ -308,10 +309,17 @@ export class UnixUpdaterClient implements UpdaterClient {
   constructor(private readonly options: UnixUpdaterClientOptions) {}
 
   async check(force = false): Promise<SystemUpdate> {
-    return parseResult(
-      systemUpdateSchema,
-      await this.send("check", force ? { force: true } : {}),
-    );
+    const params = force ? { force: true } : {};
+    try {
+      return parseResult(
+        systemUpdateSchema,
+        await this.send("check", { ...params, background: true }),
+      );
+    } catch (error) {
+      // Older host updaters reject the optional background flag.
+      if (!(error instanceof UpdaterClientError) || error.code !== "invalid_request") throw error;
+      return parseResult(systemUpdateSchema, await this.send("check", params));
+    }
   }
 
   async createJob(input: {
@@ -372,6 +380,14 @@ export class UnixUpdaterClient implements UpdaterClient {
       throw new UpdaterClientError("updater_unavailable", true);
     }
     if (envelope.data.requestId !== requestId) {
+      // A legacy updater rejects unknown check parameters without returning a request ID.
+      if (
+        action === "check" && "background" in parsedParams.data
+        && envelope.data.requestId === null && !envelope.data.ok
+        && envelope.data.error.code === "invalid_request"
+      ) {
+        throw new UpdaterClientError("invalid_request", false);
+      }
       throw new UpdaterClientError("updater_unavailable", true);
     }
     if (!envelope.data.ok) {

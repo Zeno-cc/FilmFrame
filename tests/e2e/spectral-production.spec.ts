@@ -55,6 +55,8 @@ test('Gold layered frame executes spectral resources and changes the aperture', 
 });
 
 test('Gold layered rendering does not require the disabled aperture shadow', async ({ page }, testInfo) => {
+  // Two spectral develops plus decoded-pixel reads for both routes.
+  test.setTimeout(300_000);
   await page.route('**/film-overlays/aperture-shadow-derived.png', route => route.fulfill({ status: 404 }));
   await selectGoldSpectral(page);
   await develop(page);

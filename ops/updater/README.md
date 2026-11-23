@@ -164,6 +164,20 @@ intact. Access cannot dispatch this maintenance action. Do not delete
 `state.sqlite` or edit job rows to bypass the lock, and do not expect an
 updater restart to retry into success.
 
+## Release checks from Access
+
+The Access status endpoint reads the verified release cache. A manual check
+starts background verification in the host updater and returns the current
+snapshot immediately. Concurrent checks share the same background refresh.
+Access polls while verification is running. A failed verification leaves the
+last verified candidate and timestamp intact. On a cold cache, Access shows
+that verification is pending until the host has a result.
+
+The Unix protocol opts into this behavior with `check({ background: true })`.
+Existing CLI checks remain synchronous. Roll out the host updater with the
+Access release to enable background checks. New Access can still talk to an
+older host updater through the synchronous check path.
+
 ## Recovery and removal
 
 At startup, interrupted pre-switch jobs become `failed_pre_switch`. For a job
@@ -173,6 +187,14 @@ the application back. Automatic rollback never restores SQLite. If the old
 application cannot be proven healthy, the job becomes `recovery_required` and
 keeps the global update lock; use the existing SSH release and database
 recovery procedures.
+
+After a verified rollback, the same candidate can be submitted again with a
+new idempotency key if the database already reports its target schema. The
+latest completed cutover must identify that exact candidate version and
+revision as rolled back, and the healthy current release must match the
+recorded previous version, revision, and release path. The retry rechecks
+artifacts, rehearses on a restored copy, and backs up the live database before
+switching. Keep the rollback record in the updater state database.
 
 To disable the feature without changing FilmFrame or deleting audit state:
 

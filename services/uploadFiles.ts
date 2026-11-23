@@ -1,3 +1,4 @@
+import EXIF from 'exif-js';
 import type { ImageItem } from '../types';
 
 export const LARGE_FILE_BYTES = 25 * 1024 * 1024;
@@ -7,6 +8,28 @@ export const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   'image/png',
   'image/webp',
 ]);
+
+export async function readExifDate(file: Blob): Promise<string> {
+  const readJpegDate = async () => {
+    const signature = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    // exif-js only parses JPEG, regardless of the input's declared MIME type.
+    if (signature[0] !== 0xff || signature[1] !== 0xd8) return '';
+
+    const metadata: { DateTimeOriginal?: unknown } | false = EXIF.readFromBinaryFile(await file.arrayBuffer());
+    const date = metadata && metadata.DateTimeOriginal;
+    return typeof date === 'string' ? date.split(' ')[0].replace(/:/g, '/') : '';
+  };
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readJpegDate(),
+      new Promise<string>(resolve => { timeout = setTimeout(() => resolve(''), 1000); }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 type UploadFile = Pick<File, 'name' | 'size' | 'type'>;
 

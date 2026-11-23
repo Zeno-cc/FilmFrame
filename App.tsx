@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { DEFAULT_SCAN_BACKGROUND_COLOR, FilmType, FilmSettings, ImageItem, OutputMode } from './types';
 import {
   cancelFilmRendering,
@@ -20,7 +20,7 @@ import {
   savePreferences,
 } from './services/settingsStorage';
 import { buildPreviewDownload } from './services/previewDownload';
-import { prepareUploadedImages } from './services/uploadFiles';
+import { prepareUploadedImages, readExifDate } from './services/uploadFiles';
 import {
   isHeicOrHeifCandidate,
   prepareHeicRenderFile,
@@ -98,8 +98,6 @@ import { SupportDialog } from './components/feedback/SupportDialog';
 import { CreditsDialog } from './components/feedback/CreditsDialog';
 import { DeleteAllPhotosDialog } from './components/feedback/DeleteAllPhotosDialog';
 import { IncompleteExportDialog } from './components/feedback/IncompleteExportDialog';
-// Security Fix: Import EXIF from local dependency instead of external CDN
-import EXIF from 'exif-js';
 
 const DEFAULT_SETTINGS: FilmSettings = {
   brandText: FilmType.KODAK_GOLD_200,
@@ -164,35 +162,26 @@ function timestampForFilename(): string {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '_');
 }
 
-function getCurrentImageArtifact(
-  item: ImageItem,
-  index: number,
-  settings: FilmSettings,
-): RenderArtifact | null {
-  if (!item.processedUrl || !item.processedMime || !item.processedSettingsKey) {
-    return null;
-  }
-
-  const imageSettings = settingsForImage(settings, index, item);
-  const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform, item.physicalFrameSeed);
-  if (item.processedMime !== settings.outputFormat || item.processedSettingsKey !== settingsKey) {
-    return null;
-  }
-  return {
-    url: item.processedUrl,
-    mime: item.processedMime,
-    settingsKey: item.processedSettingsKey,
-    byteSize: item.processedByteSize,
-  };
+function getImageRenderEntries(images: readonly ImageItem[], settings: FilmSettings) {
+  return images.map((item, index) => {
+    const imageSettings = settingsForImage(settings, index, item);
+    const settingsKey = createImageRenderKey(imageSettings, item.exifDate, item.transform, item.physicalFrameSeed);
+    const artifact: RenderArtifact | null = item.processedUrl
+      && item.processedMime === settings.outputFormat
+      && item.processedSettingsKey === settingsKey
+      ? {
+          url: item.processedUrl,
+          mime: item.processedMime,
+          settingsKey,
+          byteSize: item.processedByteSize,
+        }
+      : null;
+    return { item, index, included: isImageIncluded(item), settingsKey, artifact };
+  });
 }
 
 function getSingleExportReadiness(images: readonly ImageItem[], settings: FilmSettings) {
-  return evaluateExportReadiness(images.map((item, index) => ({
-    item,
-    index,
-    included: isImageIncluded(item),
-    artifact: getCurrentImageArtifact(item, index, settings),
-  })));
+  return evaluateExportReadiness(getImageRenderEntries(images, settings));
 }
 
 function readImageSize(src: string): Promise<{ width: number; height: number }> {
@@ -388,23 +377,6 @@ const App: React.FC = () => {
     }
   }, [images, preview, settings, stripResult]);
 
-  const readExifDate = useCallback(async (file: File): Promise<string> => {
-    let exifDate = '';
-    await Promise.race([
-      new Promise((resolve) => {
-        EXIF.getData(file as any, function(this: any) {
-          const date = EXIF.getTag(this, "DateTimeOriginal");
-          if (date) {
-            exifDate = date.split(' ')[0].replace(/:/g, '/');
-          }
-          resolve(null);
-        });
-      }),
-      new Promise((resolve) => setTimeout(resolve, 1000))
-    ]);
-    return exifDate;
-  }, []);
-
   const addFiles = useCallback(async (files: Iterable<File>) => {
     const rollEpoch = rollEpochRef.current;
     const { images: newImages, errors: uploadErrors, warnings: uploadWarnings } = await prepareUploadedImages(files, {
@@ -448,7 +420,7 @@ const App: React.FC = () => {
     setImages(nextImages);
     setSelectedImageId(current => current ?? newImages[0]?.id ?? null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [readExifDate]);
+  }, []);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -759,13 +731,6 @@ const App: React.FC = () => {
         : e instanceof Error && e.message.includes('Spectral template strip')
           ? '光谱负片用模板片边生成胶片长条需要光谱胶片与 135 模板路径；当前设置不可用，请改用物理片边，或改选经典色彩后重试。'
           : '处理过程中发生错误，可能是图片文件损坏或内存不足。');
-      if (e instanceof WorkerTimeoutError && batchMode === 'strip') {
-        setStripResult(previous => {
-          if (previous) revokeObjectUrl(previous.url);
-          stripResultRef.current = null;
-          return null;
-        });
-      }
       return 'failed';
     } finally {
       if (mountedRef.current && generation === renderGenerationRef.current) {
@@ -1223,49 +1188,39 @@ const App: React.FC = () => {
     await addFiles(Array.from(event.dataTransfer.files));
   };
 
-  const currentImageArtifacts = new Map(
-    images.flatMap((img, index) => {
-      const artifact = getCurrentImageArtifact(img, index, settings);
-      return artifact ? [[img.id, artifact] as const] : [];
-    }),
+  const imageRenderEntries = useMemo(() => getImageRenderEntries(images, settings), [images, settings]);
+  const singleExportReadiness = useMemo(
+    () => evaluateExportReadiness(imageRenderEntries),
+    [imageRenderEntries],
   );
-  const includedImages = getIncludedImages(images);
-  const includedCount = getIncludedImageCount(images);
+  const includedCount = singleExportReadiness.totalCount;
+  const includedProcessedCount = singleExportReadiness.readyCount;
   const currentStripKey = createOrderedStripKey(settings, getIncludedStripImages(images));
   const currentStripResult =
     stripResult?.settingsKey === currentStripKey && stripResult.mime === settings.outputFormat
       ? stripResult
       : null;
-  const includedProcessedCount = includedImages.reduce(
-    (count, image) => count + Number(currentImageArtifacts.has(image.id)),
-    0,
-  );
-  const singleExportReadiness = getSingleExportReadiness(images, settings);
-  const imageWorkflowStatuses = new Map(
-    images.map((img, index) => {
-      const imageSettings = settingsForImage(settings, index, img);
-      return [
-        img.id,
-        deriveImageWorkflowStatus(img, {
-          expectedMime: settings.outputFormat,
-          expectedSettingsKey: createImageRenderKey(imageSettings, img.exifDate, img.transform, img.physicalFrameSeed),
-          activeImageId,
-          queuedImageIds,
-        }),
-      ] as const;
+  const contactSheetItems = imageRenderEntries.map(({ item, index, settingsKey, artifact }) => ({
+    item,
+    index,
+    frameNumber: frameNumberForIndex(settings, index),
+    status: deriveImageWorkflowStatus(item, {
+      expectedMime: settings.outputFormat,
+      expectedSettingsKey: settingsKey,
+      activeImageId,
+      queuedImageIds,
     }),
-  );
-  const includedPendingCount = includedImages
-    .map(image => imageWorkflowStatuses.get(image.id)!)
-    .filter(status => status.kind === 'unprocessed' || status.kind === 'stale' || status.kind === 'failed')
-    .length;
+    artifact,
+    active: activeImageId === item.id,
+  }));
+  const includedPendingCount = contactSheetItems.filter(({ item, status }) =>
+    isImageIncluded(item) && (status.kind === 'unprocessed' || status.kind === 'stale' || status.kind === 'failed'),
+  ).length;
   const hasExportAction = outputMode === 'single' ? includedCount > 0 : Boolean(currentStripResult);
   const previewImageIndex =
     preview?.type === 'single' ? getPreviewImageIndex(images, preview.imageId) : -1;
   const previewImageItem = previewImageIndex >= 0 ? images[previewImageIndex] : null;
-  const previewImageArtifact = previewImageItem
-    ? currentImageArtifacts.get(previewImageItem.id) ?? null
-    : null;
+  const previewImageArtifact = imageRenderEntries[previewImageIndex]?.artifact ?? null;
   const previewImageSource =
     preview?.type === 'single' && previewImageItem
       ? previewImageArtifact?.url ?? previewImageItem.previewUrl
@@ -1473,14 +1428,6 @@ const App: React.FC = () => {
           ? exportMessage
           : primaryAction.label,
   };
-  const contactSheetItems = images.map((item, index) => ({
-    item,
-    index,
-    frameNumber: frameNumberForIndex(settings, index),
-    status: imageWorkflowStatuses.get(item.id)!,
-    artifact: currentImageArtifacts.get(item.id) ?? null,
-    active: activeImageId === item.id,
-  }));
   const stripStage: FilmStripStageState = processing && activeBatchMode === 'strip'
     ? { kind: 'processing', message: processingMessage }
     : currentStripResult

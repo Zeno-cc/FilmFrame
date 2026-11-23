@@ -93,6 +93,17 @@ describe('canvas export', () => {
       'Failed to export film strip blob',
     )).rejects.toThrow('Failed to export film strip blob');
   });
+
+  it('rejects when URL creation fails in the asynchronous toBlob callback', async () => {
+    let finish!: BlobCallback;
+    const canvas = { toBlob: (callback: BlobCallback) => { finish = callback; } } as HTMLCanvasElement;
+    const failure = new Error('Object URL unavailable');
+    vi.stubGlobal('URL', { createObjectURL: () => { throw failure; } });
+
+    const pending = exportCanvasToObjectUrl(canvas, 'image/jpeg', 0.9);
+    expect(() => finish(new Blob(['rendered']))).not.toThrow();
+    await expect(pending).rejects.toBe(failure);
+  });
 });
 
 describe('canvas orientation', () => {

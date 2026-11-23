@@ -635,7 +635,7 @@
       "attribution": "FilmFrame project; LICENSE carries the unmodified GNU GPL version 3 text.",
       "rightsStatus": "verified",
       "noticePath": "NOTICE",
-      "modifications": "LICENSE carries the unmodified GPL-3.0 text; the in-app credits surface serves the same text from ops/provenance/licenses/filmframe-GPL-3.0.txt. NOTICE records project attribution, upstream works and revisions, dependency licenses, corresponding-source instructions and the owner-accepted residual risk.",
+      "modifications": "LICENSE carries the unmodified GPL-3.0 text; the in-app credits surface serves the same GPL text from ops/provenance/licenses/filmframe-GPL-3.0.txt and the same notice text from ops/provenance/licenses/filmframe-NOTICE.txt. NOTICE records project attribution, upstream works and revisions, dependency licenses, corresponding-source instructions and the owner-accepted residual risk.",
       "localPaths": [
         {
           "path": "LICENSE",
@@ -648,6 +648,10 @@
         {
           "path": "ops/provenance/licenses/filmframe-GPL-3.0.txt",
           "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "ops/provenance/licenses/filmframe-NOTICE.txt",
+          "sha256": "27641dbfef81b548e31663bf0682edc5bf300b30dd23b6bce4aad7785bf8e6d5"
         }
       ],
       "evidence": "Owner instructed distribution on 2026-11-20; the project license and corresponding source are published with the repository."

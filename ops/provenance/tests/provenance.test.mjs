@@ -81,6 +81,36 @@ test("a CLI hash mismatch exits unsuccessfully", async () => {
   }
 });
 
+test("the CLI rejects a new unresolved item even when its evidence asserts owner acceptance", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "filmframe-provenance-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "manifest.json");
+  const entries = [...manifest.entries, {
+    ...manifest.entries.find((entry) => entry.id === "spektrafilm-spectral-constants"),
+    id: "new-unapproved-data",
+    localPaths: [],
+  }];
+  await writeFile(filePath, JSON.stringify({ ...manifest, entries }));
+
+  const result = run(node, ["ops/provenance/validate-provenance.mjs", filePath]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unapproved distribution blockers/);
+  assert.match(result.stderr, /new-unapproved-data: unresolved/);
+  assert.doesNotMatch(result.stderr, /spektrafilm-spectral-constants/);
+});
+
+test("the CLI diagnoses an invalid entry before reading digests", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "filmframe-provenance-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "manifest.json");
+  await writeFile(filePath, JSON.stringify({ ...manifest, entries: [null] }));
+
+  const result = run(node, ["ops/provenance/validate-provenance.mjs", filePath]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /entries\[0\] must be an object/);
+  assert.doesNotMatch(result.stderr, /TypeError/);
+});
+
 test("a symlinked local file is not accepted as provenance evidence", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "filmframe-provenance-link-"));
   try {

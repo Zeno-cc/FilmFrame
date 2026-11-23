@@ -1,6 +1,6 @@
 import { createServer } from 'vite';
 import { firefox, webkit } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { arch, platform } from 'node:os';
 
@@ -40,7 +40,9 @@ try {
     configuration: 'Portra 400 -> Portra Endura, Float32Array, exact two 81-wavelength integrals, OkLch output, no GPU/WASM/grain/templates',
     results,
   };
-  await writeFile(resolve(root, '.trellis/tasks/11-06-spectral-negative-print-prototype/research/cross-browser-validation.json'), `${JSON.stringify(report, null, 2)}\n`);
+  const outputDir = resolve(root, 'output/playwright/spectral');
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(resolve(outputDir, 'cross-browser-validation.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (results.some(record => record.status !== 'passed')) process.exitCode = 1;
 } finally {

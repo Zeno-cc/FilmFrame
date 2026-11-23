@@ -11,6 +11,7 @@ const licenseUrls = {
   spektrafilm: new URL('../../ops/provenance/licenses/spektrafilm-profiles-CC-BY-SA-4.0.txt', import.meta.url).href,
   heicTo: new URL('../../ops/provenance/licenses/heic-to-LGPL-3.0.txt', import.meta.url).href,
   provenance: new URL('../../ops/provenance/README.md', import.meta.url).href,
+  notice: new URL('../../ops/provenance/licenses/filmframe-NOTICE.txt', import.meta.url).href,
 };
 
 const sources = [
@@ -84,6 +85,7 @@ export function CreditsDialog({ open, onClose }: CreditsDialogProps) {
           Hanatos 光谱上采样常量、两个继承该常量的派生表与 CineStill 空间模型的来源权利仍未核实。项目所有者已于 2026-11-20 在有记录的风险接受前提下决定分发，`npm run verify:provenance` 会持续列出这些条目，它们不会被标记为已核实。完整清单见来源与发布清单与 NOTICE。
         </p>
         <a className="mt-2 inline-block text-xs text-[var(--ff-amber)] underline underline-offset-2" href={licenseUrls.provenance} target="_blank" rel="noopener noreferrer">完整来源与发布清单</a>
+        <a className="ml-4 mt-2 inline-block text-xs text-[var(--ff-amber)] underline underline-offset-2" href={licenseUrls.notice} download="NOTICE.txt">下载 NOTICE</a>
       </section>
     </ModalSurface>
   );

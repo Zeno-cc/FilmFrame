@@ -51,7 +51,7 @@ FilmFrame 的照片处理全部在浏览器中完成。项目同时包含可选�
 npm run check                  # Vitest、光谱数值校验、TypeScript、生产构建
 npm run check:access           # Access 测试、类型检查、构建
 npm run test:e2e               # 开发服务器浏览器回归
-npx playwright test --config playwright.preview.config.ts # 先 build，再验证生产资产
+npm run test:e2e:preview       # 重建 dist，再启动独占预览验证生产资产
 npm run verify:provenance      # 来源清单与文件摘要；不等于分发许可审核通过
 npm run check:release          # 发布门禁；执行前阅读 ops/release/README.md
 

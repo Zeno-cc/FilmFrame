@@ -9,11 +9,11 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json ./
+COPY server/access/package.json server/access/package-lock.json ./
 RUN npm_config_build_from_source=true npm ci
 
-COPY tsconfig.json ./
-COPY src ./src
+COPY server/access/tsconfig.json ./
+COPY server/access/src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM ${ACCESS_NODE_IMAGE} AS runtime
@@ -35,7 +35,8 @@ WORKDIR /app
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY migrations ./migrations
+COPY server/access/migrations ./migrations
+COPY NOTICE ./NOTICE
 
 RUN groupadd --gid 10001 filmframe \
     && useradd --uid 10001 --gid filmframe --shell /usr/sbin/nologin --create-home filmframe \
